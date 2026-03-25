@@ -1,7 +1,7 @@
 {
-  "name": "vite-vue-starter",
+  "name": "mrhsaas",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.30"
+    "vue": "^3.5.30",
+    "firebase": "^10.0.0",
+    "vue-router": "^4.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.5",
