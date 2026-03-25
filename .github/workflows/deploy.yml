@@ -5,26 +5,35 @@ on:
     branches:
       - main
 
+# 🔥 IMPORTANT : autoriser le push vers gh-pages
+permissions:
+  contents: write
+
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 📥 Récupérer le code
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install Node
+      # 🟢 Installer Node.js (version compatible Vite)
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      - name: Install deps
+      # 📦 Installer les dépendances
+      - name: Install dependencies
         run: npm install
 
+      # 🏗️ Build du projet (génère dist)
       - name: Build
         run: npm run build
 
-      - name: Deploy to GH Pages
+      # 🚀 Déployer sur gh-pages
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
