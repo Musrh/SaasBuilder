@@ -1,17 +1,19 @@
 {
   "name": "mrhsaas",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "serve -s dist -l $PORT"
   },
   "dependencies": {
     "vue": "^3.5.30",
     "firebase": "^10.0.0",
-    "vue-router": "^4.2.0"
+    "vue-router": "^4.2.0",
+    "serve": "^14.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.5",
