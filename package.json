@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "vue": "^3.5.30",
-    "firebase": "^10.0.0",
     "vue-router": "^4.2.0",
     "serve": "^14.2.0"
   },
