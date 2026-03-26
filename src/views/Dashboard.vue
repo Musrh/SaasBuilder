@@ -1,37 +1,20 @@
 <template>
-  <div class="container">
-    <h1>Dashboard</h1>
-    <p>Plan actuel : {{ plan }}</p>
-    <p>Sections du projet : {{ sections.length }}</p>
+  <div class="min-h-screen bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow">
+      <h1 class="text-3xl font-bold mb-4">Bienvenue sur votre Dashboard !</h1>
+      <p class="text-gray-700">Plan sélectionné : {{ planName }}</p>
+      <!-- Ici tu peux ajouter les composants / infos du Dashboard -->
+    </div>
   </div>
 </template>
 
-<script>
-import { auth, db } from "../firebase.js";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+<script setup>
+import { useRoute } from "vue-router";
 
-export default {
-  name: "Dashboard",
-  data() {
-    return {
-      plan: "",
-      sections: [],
-    };
-  },
-  async created() {
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          this.plan = docSnap.data().plan;
-          this.sections = docSnap.data().project.sections || [];
-        }
-      } else {
-        this.$router.push("/login");
-      }
-    });
-  },
-};
+const route = useRoute();
+const plan = route.query.plan || null;
+
+// Optionnel : afficher le nom complet du plan
+const planMap = { 1: "Plan Offert", 2: "Plan Pro", 3: "Plan Premium" };
+const planName = planMap[plan] || "Non défini";
 </script>
