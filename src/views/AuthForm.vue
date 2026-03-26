@@ -1,32 +1,8 @@
-<script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-
-import { auth, db } from "../firebase";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
-
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-
-const email = ref("");
-const password = ref("");
-const isLogin = ref(true);
-
-const router = useRouter();
-
-const toggleMode = () => {
-  isLogin.value = !isLogin.value;
-};
-
 const handleSubmit = async () => {
   try {
-
     if (isLogin.value) {
       await signInWithEmailAndPassword(auth, email.value, password.value);
     } else {
-
       const userCred = await createUserWithEmailAndPassword(
         auth,
         email.value,
@@ -35,23 +11,24 @@ const handleSubmit = async () => {
 
       const user = userCred.user;
 
-      const plan = parseInt(localStorage.getItem("planChoisi")) || 1;
-      const expiry = localStorage.getItem("planExpiry");
+      // 🔥 FIX 2 : même clé que PlanSelection
+      const plan = localStorage.getItem("selectedPlan") || "free";
 
-      // 🔥 STRUCTURE UNIQUE CLEAN
+      // 🔥 FIX 3 : structure SaaS stable
       await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
+        email: email.value,
+        username: email.value.split("@")[0],
         plan: plan,
 
-        createdAt: serverTimestamp(),
-        expiresAt: expiry ? new Date(parseInt(expiry)) : null,
+        createdAt: new Date(),
+        expiresAt: null,
 
         sections: [
           {
             id: crypto.randomUUID(),
             type: "Header",
             props: {
-              title: "Bienvenue 👋"
+              title: "Bienvenue"
             }
           }
         ]
@@ -64,4 +41,3 @@ const handleSubmit = async () => {
     alert(err.message);
   }
 };
-</script>
