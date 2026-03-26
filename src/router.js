@@ -6,11 +6,9 @@ import Dashboard from "./views/Dashboard.vue";
 import Builder from "./views/Builder.vue";
 
 const routes = [
-  // 🔥 ENTRY POINT
-  { path: "/", redirect: "/plan" },
 
   // 🧭 FLOW SAAS
-  { path: "/plan", name: "Plan", component: PlanSelection },
+  { path: "/", name: "Plan", component: PlanSelection },
   { path: "/auth", name: "Auth", component: AuthForm },
   { path: "/dashboard", name: "Dashboard", component: Dashboard, meta: { requiresAuth: true } },
   { path: "/builder", name: "Builder", component: Builder, meta: { requiresAuth: true } },
