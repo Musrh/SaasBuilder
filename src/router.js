@@ -6,17 +6,17 @@ const router = createRouter({
     {
       path: "/auth",
       name: "AuthForm",
-      component: () => import("../views/AuthForm.vue"),
+      component: () => import("./views/AuthForm.vue"),
     },
     {
       path: "/dashboard",
       name: "Dashboard",
-      component: () => import("../views/Dashboard.vue"),
+      component: () => import("./views/Dashboard.vue"),
     },
     {
       path: "/builder",
       name: "Builder",
-      component: () => import("../views/Builder.vue"),
+      component: () => import("./views/Builder.vue"),
     },
   ],
 });
