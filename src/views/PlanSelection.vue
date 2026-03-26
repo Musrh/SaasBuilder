@@ -15,6 +15,7 @@
           </p>
         </div>
 
+        <!-- Bouton pour passer à AuthForm avec le plan choisi -->
         <button
           @click="selectPlan(plan)"
           class="mt-auto bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-semibold"
@@ -38,14 +39,10 @@ const plans = [
 ];
 
 const selectPlan = (plan) => {
-  // Redirection vers AuthForm avec plan choisi
-  router.push({ name: "AuthForm", query: { plan: plan.id } });
+  // Redirige vers AuthForm.vue et passe le plan choisi via query
+  router.push({
+    name: "AuthForm",
+    query: { plan: plan.id }
+  });
 };
 </script>
-
-<style scoped>
-/* Ajout d'une petite animation sur hover */
-div[role="plan-card"]:hover {
-  transform: translateY(-2px);
-}
-</style>
