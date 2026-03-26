@@ -4,8 +4,8 @@
       <h1 class="text-3xl font-bold mb-6 text-center">Bienvenue sur votre Dashboard !</h1>
 
       <div class="space-y-4 text-gray-700">
-        <p><span class="font-semibold">Email :</span> {{ userEmail }}</p>
-        <p><span class="font-semibold">Plan choisi :</span> {{ planName }}</p>
+        <p v-if="userEmail"><span class="font-semibold">Email :</span> {{ userEmail }}</p>
+        <p v-if="planName"><span class="font-semibold">Plan choisi :</span> {{ planName }}</p>
         <p v-if="planExpiry"><span class="font-semibold">Date d'expiration :</span> {{ planExpiry }}</p>
       </div>
 
@@ -27,35 +27,42 @@ import { useRouter } from "vue-router";
 import { auth } from "../firebase"; // Assure-toi que firebase.js exporte auth
 
 const router = useRouter();
+
+// Références pour afficher infos utilisateur
 const userEmail = ref("");
-const planName = ref("Plan Offert");
+const planName = ref("");
 const planExpiry = ref("");
 
 const planMap = { 1: "Plan Offert", 2: "Plan Pro", 3: "Plan Premium" };
 
-// 🔹 Charger les infos utilisateur
+// 🔹 Charger les infos utilisateur au montage
 onMounted(() => {
-  if (auth.currentUser) {
-    userEmail.value = auth.currentUser.email;
+  const unsubscribe = auth.onAuthStateChanged(user => {
+    if (user) {
+      userEmail.value = user.email;
 
-    // Récupération du plan et date depuis localStorage
-    const storedPlan = parseInt(localStorage.getItem("planChoisi")) || 1;
-    planName.value = planMap[storedPlan] || "Plan Offert";
+      // Plan choisi stocké dans localStorage lors de l'inscription
+      const storedPlan = parseInt(localStorage.getItem("planChoisi")) || 1;
+      planName.value = planMap[storedPlan] || "Plan Offert";
 
-    const storedExpiry = localStorage.getItem("planExpiry");
-    if (storedExpiry) {
-      const date = new Date(parseInt(storedExpiry));
-      planExpiry.value = date.toLocaleDateString();
+      const storedExpiry = localStorage.getItem("planExpiry");
+      if (storedExpiry) {
+        const date = new Date(parseInt(storedExpiry));
+        planExpiry.value = date.toLocaleDateString();
+      }
+    } else {
+      // Pas connecté → redirige vers AuthForm
+      router.push({ name: "AuthForm" });
     }
-  } else {
-    // Redirection vers AuthForm si pas connecté
-    router.push({ name: "AuthForm" });
-  }
+  });
+
+  // Nettoyage si besoin
+  return () => unsubscribe();
 });
 
-// 🔹 Bouton Start Building
+// 🔹 Bouton start builder
 const startBuilder = () => {
-  // Vérifie si Builder est bien dans le router
+  // Vérifie si la route Builder existe dans router
   router.push({ name: "Builder" });
 };
 </script>
