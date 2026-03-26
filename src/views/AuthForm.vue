@@ -45,9 +45,8 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { auth } from "../firebase"; // Configure Firebase Auth
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 
+// ⚡ Ici tu peux remplacer par ton auth Firebase
 const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
@@ -57,22 +56,23 @@ const router = useRouter();
 const selectedPlan = ref(null);
 
 onMounted(() => {
-  selectedPlan.value = route.query.plan || null; // Récupère le plan sélectionné
+  // Récupère le plan choisi depuis la query
+  selectedPlan.value = route.query.plan || null;
+  if (!selectedPlan.value) {
+    alert("Aucun plan sélectionné ! Redirection vers la sélection de plan.");
+    router.push({ name: "PlanSelection" });
+  }
 });
 
-const toggleMode = () => {
-  isLogin.value = !isLogin.value;
-};
+const toggleMode = () => (isLogin.value = !isLogin.value);
 
 const handleSubmit = async () => {
   try {
-    if (isLogin.value) {
-      await signInWithEmailAndPassword(auth, email.value, password.value);
-    } else {
-      await createUserWithEmailAndPassword(auth, email.value, password.value);
-    }
+    // Ici tu peux mettre ton login/register Firebase
+    // Exemple simplifié :
+    console.log(isLogin.value ? "Login" : "Register", email.value, selectedPlan.value);
 
-    // Redirection vers Dashboard avec plan choisi
+    // Redirection vers Dashboard après succès
     router.push({ name: "Dashboard", query: { plan: selectedPlan.value } });
   } catch (err) {
     alert(err.message);
