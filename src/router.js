@@ -1,21 +1,24 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import PlanSelection from "./views/PlanSelection.vue";
-import AuthForm from "./views/AuthForm.vue";
-import Dashboard from "./views/Dashboard.vue";
-
-import Builder from "./views/Builder.vue"; 
-
-const routes = [
-  { path: "/", name: "PlanSelection", component: PlanSelection },
-  { path: "/auth", name: "AuthForm", component: AuthForm },
-  { path: "/dashboard", name: "Dashboard", component: Dashboard },
-
-{ path: "/builder", name: "Builder", component: Builder }
-];
 
 const router = createRouter({
-  history: createWebHashHistory(),
-  routes,
+  history: createWebHashHistory(), // 🔥 OBLIGATOIRE SUR GITHUB PAGES
+  routes: [
+    {
+      path: "/auth",
+      name: "AuthForm",
+      component: () => import("../views/AuthForm.vue"),
+    },
+    {
+      path: "/dashboard",
+      name: "Dashboard",
+      component: () => import("../views/Dashboard.vue"),
+    },
+    {
+      path: "/builder",
+      name: "Builder",
+      component: () => import("../views/Builder.vue"),
+    },
+  ],
 });
 
 export default router;
