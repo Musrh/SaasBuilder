@@ -1,56 +1,31 @@
 <template>
-  <div class="flex h-screen">
-    <!-- Onglet gauche: éditeur -->
-    <div class="w-1/4 border-r p-4">
-      <h2 class="font-bold mb-2">Éditeur</h2>
-      <component-editor :file="selectedFile" />
-    </div>
+  <div class="p-6">
+    <h1 class="text-2xl font-bold mb-4">Builder</h1>
 
-    <!-- Zone principale: drop sections -->
-    <div class="flex-1 p-4">
-      <h2 class="font-bold mb-4">Votre site</h2>
-      <div class="site-drop-area">
-        <draggable v-model="sections" item-key="id">
-          <component
-            v-for="sec in sections"
-            :is="sec.component"
-            :key="sec.id"
-          />
-        </draggable>
+    <div class="border p-4 rounded">
+      <div v-for="sec in sections" :key="sec.id" class="p-2 border mb-2">
+        {{ sec.name }}
       </div>
     </div>
 
-    <!-- Onglet droit: arborescence -->
-    <div class="w-1/4 border-l p-4">
-      <h2 class="font-bold mb-2">Fichiers</h2>
-      <file-tree :files="fileTree" @select="selectedFile = $event" />
-    </div>
-
-    <!-- Onglet bas: aperçu live -->
-    <div class="absolute bottom-0 left-0 right-0 h-1/4 border-t p-2 bg-gray-50">
-      <live-preview :sections="sections" />
-    </div>
+    <button
+      @click="addSection"
+      class="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+    >
+      Ajouter section
+    </button>
   </div>
 </template>
 
 <script setup>
 import { ref } from "vue";
-import draggable from "vuedraggable";
-import ComponentEditor from "../components/ComponentEditor.vue";
-import FileTree from "../components/FileTree.vue";
-import LivePreview from "../components/LivePreview.vue";
 
-// Sections ajoutées
 const sections = ref([]);
 
-// Arborescence des fichiers
-const fileTree = ref([
-  { name: "App.vue" },
-  { name: "main.js" },
-  { name: "index.html" },
-  { name: "firebase.js" },
-]);
-
-// Fichier actuellement sélectionné pour édition
-const selectedFile = ref(null);
+const addSection = () => {
+  sections.value.push({
+    id: Date.now(),
+    name: "Nouvelle section"
+  });
+};
 </script>
