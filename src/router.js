@@ -1,19 +1,16 @@
-import { createRouter, createWebHashHistory } from "vue-router";
-
+import { createRouter, createWebHistory } from "vue-router";
 import PlanSelection from "./views/PlanSelection.vue";
-import Register from "./views/Register.vue";
-import Login from "./views/Login.vue";
+import AuthForm from "./views/AuthForm.vue";
 import Dashboard from "./views/Dashboard.vue";
 
 const routes = [
-  { path: "/", component: PlanSelection },
-  { path: "/register", component: Register },
-  { path: "/login", component: Login },
-  { path: "/dashboard", component: Dashboard },
+  { path: "/", name: "PlanSelection", component: PlanSelection },
+  { path: "/auth", name: "AuthForm", component: AuthForm },
+  { path: "/dashboard", name: "Dashboard", component: Dashboard },
 ];
 
 const router = createRouter({
-  history: createWebHashHistory(), // 🔥 IMPORTANT
+  history: createWebHistory(),
   routes,
 });
 
