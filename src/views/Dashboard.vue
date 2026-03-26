@@ -1,30 +1,50 @@
 <template>
   <div class="p-6">
 
-    <div v-if="loading">Loading...</div>
+    <h1 class="text-2xl font-bold mb-4">
+      Dashboard
+    </h1>
 
-    <div v-else-if="user">
+    <!-- Loading -->
+    <div v-if="loading">
+      Loading...
+    </div>
 
-      <h1 class="text-2xl font-bold mb-4">
-        Dashboard
-      </h1>
-
-      <p>Email: {{ user.email }}</p>
-      <p>Plan: {{ user.plan }}</p>
-
+    <!-- Not logged -->
+    <div v-else-if="!user">
+      <p>Utilisateur non connecté</p>
       <button
-        @click="goBuilder"
-        class="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+        class="bg-blue-500 text-white px-4 py-2 rounded mt-2"
+        @click="goAuth"
       >
-        Ouvrir Builder
+        Login
       </button>
+    </div>
 
-      <button
-        @click="logout"
-        class="mt-4 ml-2 bg-red-500 text-white px-4 py-2 rounded"
-      >
-        Logout
-      </button>
+    <!-- User data -->
+    <div v-else>
+
+      <div class="border p-4 rounded mb-4">
+        <p><strong>Email:</strong> {{ user.email }}</p>
+        <p><strong>Plan:</strong> {{ user.plan }}</p>
+        <p><strong>Sections:</strong> {{ user.sections?.length || 0 }}</p>
+      </div>
+
+      <div class="flex gap-2">
+        <button
+          class="bg-green-500 text-white px-4 py-2 rounded"
+          @click="goBuilder"
+        >
+          Ouvrir Builder
+        </button>
+
+        <button
+          class="bg-red-500 text-white px-4 py-2 rounded"
+          @click="logout"
+        >
+          Logout
+        </button>
+      </div>
 
     </div>
 
@@ -46,8 +66,10 @@ const loading = ref(true);
 
 onMounted(() => {
   onAuthStateChanged(auth, async (u) => {
+
     if (!u) {
-      router.push("/auth");
+      user.value = null;
+      loading.value = false;
       return;
     }
 
@@ -55,6 +77,12 @@ onMounted(() => {
 
     if (snap.exists()) {
       user.value = snap.data();
+    } else {
+      user.value = {
+        email: u.email,
+        plan: "free",
+        sections: []
+      };
     }
 
     loading.value = false;
@@ -63,6 +91,10 @@ onMounted(() => {
 
 const goBuilder = () => {
   router.push("/builder");
+};
+
+const goAuth = () => {
+  router.push("/auth");
 };
 
 const logout = async () => {
