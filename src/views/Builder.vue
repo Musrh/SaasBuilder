@@ -25,8 +25,12 @@
     </div>
 
     <!-- 🔹 Aperçu du site -->
-    <div class="border p-4 rounded bg-white">
+    <div class="border p-4 rounded bg-white mt-4">
       <h2 class="font-bold mb-2">Aperçu du site</h2>
+
+      <div v-if="sections.length === 0" class="text-gray-400 text-center py-10">
+        Aucune section ajoutée pour le moment
+      </div>
 
       <component
         v-for="(sec, index) in sections"
@@ -38,27 +42,31 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, defineComponent } from "vue";
 
-// 🔹 Sections factices intégrées pour éviter tout import
-const Logo = {
-  template: "<div class='p-4 bg-blue-100 text-center font-bold'>LOGO</div>",
-};
-const Menu = {
-  template: "<div class='p-4 bg-gray-800 text-white text-center'>Menu | Accueil | Produits | Contact</div>",
-};
-const Header = {
-  template: "<div class='p-8 bg-gray-200 text-center'><h1 class='text-2xl font-bold'>Bienvenue sur mon site</h1></div>",
-};
+// 🔹 Sections factices avec defineComponent pour que Vue les affiche correctement
+const Logo = defineComponent({
+  template: `<div class="p-4 bg-blue-100 text-center font-bold">LOGO</div>`,
+});
 
-// 🔹 Sections disponibles
+const Menu = defineComponent({
+  template: `<div class="p-4 bg-gray-800 text-white text-center">Menu | Accueil | Produits | Contact</div>`,
+});
+
+const Header = defineComponent({
+  template: `<div class="p-8 bg-gray-200 text-center">
+               <h1 class="text-2xl font-bold">Bienvenue sur mon site</h1>
+             </div>`,
+});
+
+// 🔹 Liste des sections disponibles
 const availableSections = [
   { name: "Logo", component: Logo },
   { name: "Menu", component: Menu },
   { name: "Header", component: Header },
 ];
 
-// 🔹 Sections ajoutées
+// 🔹 Sections ajoutées au site
 const sections = ref([]);
 
 // 🔹 Afficher ou cacher le sélecteur
@@ -72,7 +80,7 @@ const addSection = (section) => {
 </script>
 
 <style scoped>
-/* Optionnel : scrollbar pour mobile si beaucoup de sections */
+/* Scroll si trop de sections ajoutées */
 div[ref="preview"] {
   max-height: 400px;
   overflow-y: auto;
