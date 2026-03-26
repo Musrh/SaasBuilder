@@ -6,6 +6,7 @@
       <div class="space-y-4 text-gray-700">
         <p><span class="font-semibold">Email :</span> {{ userEmail }}</p>
         <p><span class="font-semibold">Plan choisi :</span> {{ planName }}</p>
+        <p v-if="planExpiry"><span class="font-semibold">Date d'expiration :</span> {{ planExpiry }}</p>
       </div>
 
       <div class="mt-8 text-center">
@@ -22,25 +23,34 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 
 const router = useRouter();
-const route = useRoute();
 
-const userEmail = ref("");
-const planName = ref("");
+const userEmail = ref("client@example.com");
+const planName = ref("Plan Offert");
+const planExpiry = ref("");
 
 // Mapping plan ID → nom
 const planMap = { 1: "Plan Offert", 2: "Plan Pro", 3: "Plan Premium" };
 
+// 🔹 Charger les infos depuis localStorage
 onMounted(() => {
-  // Récupération du plan et email depuis query ou localStorage
-  userEmail.value = route.query.email || "client@example.com";
-  const planId = route.query.plan || 1;
-  planName.value = planMap[planId];
+  // Email et plan sauvegardés après AuthForm
+  const storedEmail = localStorage.getItem("emailUtilisateur");
+  const storedPlan = parseInt(localStorage.getItem("planChoisi")) || 1;
+  const storedExpiry = localStorage.getItem("planExpiry"); // timestamp optionnel
+
+  if (storedEmail) userEmail.value = storedEmail;
+  planName.value = planMap[storedPlan] || "Plan Offert";
+
+  if (storedExpiry) {
+    const date = new Date(parseInt(storedExpiry));
+    planExpiry.value = date.toLocaleDateString();
+  }
 });
 
-// Redirection vers Builder.vue
+// 🔹 Bouton pour aller à Builder.vue
 const startBuilder = () => {
   router.push({ name: "Builder" });
 };
