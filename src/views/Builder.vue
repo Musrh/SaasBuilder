@@ -41,9 +41,9 @@
 import { ref } from "vue";
 
 // 🔹 Import des sections
-import Logo from "../sections/Logo.vue";
-import Menu from "../sections/Menu.vue";
-import Header from "../sections/Header.vue";
+import Logo from "./sections/Logo.vue";
+import Menu from "./sections/Menu.vue";
+import Header from "./sections/Header.vue";
 
 // 🔹 Sections disponibles
 const availableSections = [
