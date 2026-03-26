@@ -5,8 +5,7 @@
 
       <div class="space-y-4 text-gray-700">
         <p><span class="font-semibold">Email :</span> {{ userEmail }}</p>
-        <p><span class="font-semibold">Plan :</span> {{ planName }}</p>
-        <p><span class="font-semibold">Date d'expiration :</span> {{ planExpiry }}</p>
+        <p><span class="font-semibold">Plan choisi :</span> {{ planName }}</p>
       </div>
 
       <div class="mt-8 text-center">
@@ -24,39 +23,24 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { auth, db } from "../firebase"; // Firebase Auth + Firestore
-import { doc, getDoc } from "firebase/firestore";
 
-// 🔹 Références Vue
 const router = useRouter();
 const route = useRoute();
 
 const userEmail = ref("");
 const planName = ref("");
-const planExpiry = ref("");
 
 // Mapping plan ID → nom
 const planMap = { 1: "Plan Offert", 2: "Plan Pro", 3: "Plan Premium" };
 
-// 🔹 Charger les infos du client connecté
-onMounted(async () => {
-  if (auth.currentUser) {
-    userEmail.value = auth.currentUser.email;
-
-    // Récupérer plan et date d'expiration depuis Firestore
-    const userDoc = doc(db, "users", auth.currentUser.uid);
-    const docSnap = await getDoc(userDoc);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      planName.value = planMap[data.plan] || "Non défini";
-      planExpiry.value = data.planExpiry
-        ? new Date(data.planExpiry.seconds * 1000).toLocaleDateString()
-        : "Non défini";
-    }
-  }
+onMounted(() => {
+  // Récupération du plan et email depuis query ou localStorage
+  userEmail.value = route.query.email || "client@example.com";
+  const planId = route.query.plan || 1;
+  planName.value = planMap[planId];
 });
 
-// 🔹 Redirection vers Builder
+// Redirection vers Builder.vue
 const startBuilder = () => {
   router.push({ name: "Builder" });
 };
