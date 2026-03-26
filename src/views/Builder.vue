@@ -36,9 +36,9 @@
 <script setup>
 import { ref } from "vue";
 import draggable from "vuedraggable";
-import ComponentEditor from "../components/ComponentEditor.vue";
-import FileTree from "../components/FileTree.vue";
-import LivePreview from "../components/LivePreview.vue";
+import ComponentEditor from "./components/ComponentEditor.vue";
+import FileTree from "./components/FileTree.vue";
+import LivePreview from "./components/LivePreview.vue";
 
 // Sections ajoutées
 const sections = ref([]);
