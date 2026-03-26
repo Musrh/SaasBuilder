@@ -1,45 +1,62 @@
 <template>
-  <div class="p-6">
+  <div class="flex min-h-screen">
 
-    <h1 class="text-2xl font-bold mb-4">
-      Builder
-    </h1>
+    <!-- SIDEBAR -->
+    <div class="w-1/4 bg-white p-4 shadow">
 
-    <!-- Loading -->
-    <div v-if="loading">
-      Chargement...
+      <h2 class="font-bold mb-4">Sections</h2>
+
+      <button
+        @click="addSection('Header')"
+        class="block w-full mb-2 bg-blue-500 text-white p-2"
+      >
+        + Header
+      </button>
+
+      <button
+        @click="addSection('Hero')"
+        class="block w-full mb-2 bg-purple-500 text-white p-2"
+      >
+        + Hero
+      </button>
+
     </div>
 
-    <div v-else>
+    <!-- PREVIEW -->
+    <div class="flex-1 p-6 bg-gray-100">
 
-      <!-- ACTIONS -->
-      <button
-        @click="addSection"
-        class="bg-blue-500 text-white px-4 py-2 rounded"
-      >
-        + Ajouter Header
-      </button>
-
-      <button
-        @click="saveSections"
-        class="ml-2 bg-green-500 text-white px-4 py-2 rounded"
-      >
-        Sauvegarder
-      </button>
-
-      <!-- LISTE -->
-      <div class="mt-6">
+      <div class="bg-white shadow min-h-[400px]">
 
         <div
           v-for="section in sections"
           :key="section.id"
-          class="border p-4 mb-2"
+          @click="selectSection(section)"
         >
-          <strong>{{ section.type }}</strong>
+
+          <component
+            :is="getComponent(section.type)"
+            v-bind="section.props"
+          />
+
+        </div>
+
+      </div>
+
+      <!-- EDITOR -->
+      <div v-if="selectedSection" class="mt-4 p-4 bg-white shadow">
+
+        <h3 class="font-bold mb-2">Edition</h3>
+
+        <div
+          v-for="(val, key) in selectedSection.props"
+          :key="key"
+        >
+          <label>{{ key }}</label>
 
           <input
-            v-model="section.props.title"
-            class="border p-2 w-full mt-2"
+            v-model="selectedSection.props[key]"
+            class="border p-2 w-full mb-2"
+            @input="autoSave"
           />
         </div>
 
@@ -52,22 +69,28 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-
 import { auth, db } from "../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
+// 🔹 IMPORT COMPONENTS
+import HeaderSection from "../components/sections/HeaderSection.vue";
+import HeroSection from "../components/sections/HeroSection.vue";
+
+// 🔹 STATE
 const sections = ref([]);
-const loading = ref(true);
+const selectedSection = ref(null);
 let userId = null;
 
-// 🔥 LOAD USER DATA
+// 🔹 REGISTRY
+const registry = {
+  Header: HeaderSection,
+  Hero: HeroSection
+};
+
+// 🔹 LOAD
 onMounted(() => {
   auth.onAuthStateChanged(async (user) => {
-
-    if (!user) {
-      alert("Non connecté");
-      return;
-    }
+    if (!user) return;
 
     userId = user.uid;
 
@@ -76,35 +99,44 @@ onMounted(() => {
     if (snap.exists()) {
       sections.value = snap.data().sections || [];
     }
-
-    loading.value = false;
   });
 });
 
-// ➕ ADD SECTION
-const addSection = () => {
+// 🔹 ADD
+const addSection = (type) => {
   sections.value.push({
     id: Date.now(),
-    type: "Header",
-    props: {
-      title: "Titre ici"
-    }
+    type,
+    props:
+      type === "Hero"
+        ? { title: "Hero title", subtitle: "Sous titre" }
+        : { title: "Titre" }
+  });
+
+  save();
+};
+
+// 🔹 SELECT
+const selectSection = (section) => {
+  selectedSection.value = section;
+};
+
+// 🔹 GET COMPONENT
+const getComponent = (type) => {
+  return registry[type] || null;
+};
+
+// 🔹 SAVE
+const save = async () => {
+  if (!userId) return;
+
+  await updateDoc(doc(db, "users", userId), {
+    sections: sections.value
   });
 };
 
-// 💾 SAVE FIRESTORE
-const saveSections = async () => {
-  if (!userId) return;
-
-  try {
-    await updateDoc(doc(db, "users", userId), {
-      sections: sections.value
-    });
-
-    alert("Sauvegardé !");
-  } catch (e) {
-    console.error(e);
-    alert("Erreur sauvegarde");
-  }
+// 🔹 AUTOSAVE
+const autoSave = () => {
+  save();
 };
 </script>
