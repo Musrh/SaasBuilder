@@ -1,20 +1,20 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center p-6">
-
+    
     <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-
+      
       <h2 class="text-3xl font-extrabold mb-6 text-center text-gray-800">
         {{ isLogin ? "Connexion" : "Inscription" }}
       </h2>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
-
+        
         <input
           v-model="email"
           type="email"
           placeholder="Email"
           required
-          class="w-full border rounded-lg px-4 py-2"
+          class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
         />
 
         <input
@@ -22,20 +22,20 @@
           type="password"
           placeholder="Mot de passe"
           required
-          class="w-full border rounded-lg px-4 py-2"
+          class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-400 outline-none"
         />
 
         <button
           type="submit"
-          class="w-full bg-blue-500 text-white py-2 rounded-lg"
+          class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-semibold"
         >
           {{ isLogin ? "Se connecter" : "S'inscrire" }}
         </button>
-
       </form>
 
-      <p class="mt-4 text-center text-sm">
-        <button @click="toggleMode" class="text-blue-500">
+      <p class="mt-4 text-center text-sm text-gray-600">
+        {{ isLogin ? "Pas de compte ?" : "Déjà inscrit ?" }}
+        <button @click="toggleMode" class="text-blue-500 font-semibold ml-1">
           {{ isLogin ? "Créer un compte" : "Se connecter" }}
         </button>
       </p>
@@ -61,15 +61,20 @@ const isLogin = ref(true);
 
 const router = useRouter();
 
+// 🔹 Switch login/register
 const toggleMode = () => {
   isLogin.value = !isLogin.value;
 };
 
+// 🔹 Submit form
 const handleSubmit = async () => {
   try {
     if (isLogin.value) {
+      // 🔐 LOGIN
       await signInWithEmailAndPassword(auth, email.value, password.value);
+
     } else {
+      // 📝 REGISTER
       const userCred = await createUserWithEmailAndPassword(
         auth,
         email.value,
@@ -78,30 +83,26 @@ const handleSubmit = async () => {
 
       const user = userCred.user;
 
-      const plan = localStorage.getItem("selectedPlan") || "free";
+      // 🔥 Récupérer plan depuis localStorage
+      const plan = parseInt(localStorage.getItem("planChoisi")) || 1;
+      const expiry = localStorage.getItem("planExpiry");
 
+      // 🔥 Sauvegarde Firestore
       await setDoc(doc(db, "users", user.uid), {
         email: email.value,
-        username: email.value.split("@")[0],
         plan: plan,
         createdAt: new Date(),
-        expiresAt: null,
-        sections: [
-          {
-            id: crypto.randomUUID(),
-            type: "Header",
-            props: {
-              title: "Bienvenue"
-            }
-          }
-        ]
+        expiresAt: expiry ? new Date(parseInt(expiry)) : null,
+        project: {
+          sections: [],
+        },
       });
     }
 
-    router.push("/dashboard");
+    // 🚀 Redirection
+    router.push({ name: "Dashboard" });
 
   } catch (err) {
-    console.error(err);
     alert(err.message);
   }
 };
