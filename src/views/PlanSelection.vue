@@ -1,35 +1,48 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col items-center p-6">
-    <h1 class="text-3xl font-bold mb-8">Choisissez votre plan</h1>
+  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex flex-col items-center p-6">
+    
+    <h1 class="text-4xl font-extrabold mb-10 text-gray-800">
+      Choisissez votre plan
+    </h1>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+      
       <div
         v-for="plan in plans"
         :key="plan.id"
-        class="p-6 border rounded-lg shadow-md hover:shadow-xl transition bg-white flex flex-col justify-between"
+        @click="selectedPlan = plan.id"
+        class="p-6 rounded-2xl shadow-lg cursor-pointer transition transform hover:scale-105"
+        :class="selectedPlan === plan.id 
+          ? 'bg-blue-600 text-white shadow-2xl' 
+          : 'bg-white'"
       >
-        <div>
-          <h2 class="text-2xl font-semibold mb-2">{{ plan.name }}</h2>
-          <p class="text-gray-600 mb-4">
-            {{ plan.price === 0 ? "Offert" : plan.price + "€ / mois" }}
-          </p>
-        </div>
+        <h2 class="text-2xl font-bold mb-2">{{ plan.name }}</h2>
+
+        <p class="mb-6 text-lg">
+          {{ plan.price === 0 ? "Offert" : plan.price + "€ / mois" }}
+        </p>
 
         <button
-          @click="selectPlan(plan)"
-          class="mt-auto bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-semibold"
+          @click.stop="selectPlan(plan)"
+          class="w-full py-2 rounded-lg font-semibold transition"
+          :class="selectedPlan === plan.id
+            ? 'bg-white text-blue-600'
+            : 'bg-blue-500 text-white hover:bg-blue-600'"
         >
-          Sélectionner
+          Commencer
         </button>
       </div>
+
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+const selectedPlan = ref(null);
 
 const plans = [
   { id: 1, name: "Plan Offert", price: 0 },
@@ -38,10 +51,19 @@ const plans = [
 ];
 
 const selectPlan = (plan) => {
-  // Vérifie que plan existe
-  if (!plan || !plan.id) return;
+  if (!plan) return;
 
-  // Redirection vers AuthForm.vue avec le plan choisi
-  router.push({ name: "AuthForm", query: { plan: plan.id } });
+  // 🔥 Sauvegarde locale (important pour Dashboard)
+  localStorage.setItem("planChoisi", plan.id);
+
+  // 🔥 Ajouter expiration simple
+  const now = new Date();
+  const days = plan.id === 1 ? 30 : 30; // tu peux changer
+  now.setDate(now.getDate() + days);
+
+  localStorage.setItem("planExpiry", now.getTime());
+
+  // 🔥 Redirection
+  router.push({ name: "AuthForm" });
 };
 </script>
