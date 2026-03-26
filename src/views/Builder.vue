@@ -1,88 +1,123 @@
 <template>
-  <div class="p-4">
-    <h1 class="text-2xl font-bold mb-4">Builder</h1>
+  <div class="min-h-screen bg-gray-100 flex flex-col md:flex-row">
 
-    <!-- 🔹 Bouton Ajouter une section -->
-    <button
-      @click="showSelector = !showSelector"
-      class="bg-blue-500 text-white px-4 py-2 rounded mb-4"
-    >
-      Ajouter une section
-    </button>
-
-    <!-- 🔹 Sélecteur de sections -->
-    <div v-if="showSelector" class="mb-4 border p-4 rounded bg-gray-50">
-      <p class="font-semibold mb-2">Choisir une section :</p>
+    <!-- 🔹 Sidebar -->
+    <div class="w-full md:w-1/4 bg-white p-4 shadow-md">
+      <h2 class="text-xl font-bold mb-4">Sections</h2>
 
       <button
-        v-for="section in availableSections"
-        :key="section.name"
-        @click="addSection(section)"
-        class="block w-full text-left p-2 border mb-2 rounded hover:bg-gray-100"
+        v-for="sec in availableSections"
+        :key="sec.type"
+        @click="addSection(sec.type)"
+        class="w-full mb-2 p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
       >
-        {{ section.name }}
+        + {{ sec.name }}
       </button>
     </div>
 
-    <!-- 🔹 Aperçu du site -->
-    <div class="border p-4 rounded bg-white mt-4">
-      <h2 class="font-bold mb-2">Aperçu du site</h2>
+    <!-- 🔹 Preview -->
+    <div class="flex-1 p-6">
+      <h2 class="text-xl font-bold mb-4">Aperçu du site</h2>
 
-      <div v-if="sections.length === 0" class="text-gray-400 text-center py-10">
-        Aucune section ajoutée pour le moment
+      <div class="bg-white rounded shadow p-4 min-h-[400px]">
+
+        <div v-if="sections.length === 0" class="text-gray-400 text-center py-10">
+          Aucune section pour le moment
+        </div>
+
+        <component
+          v-for="(sec, index) in sections"
+          :key="sec.id"
+          :is="getComponent(sec.type)"
+          :data="sec.props"
+        />
+
       </div>
-
-      <component
-        v-for="(sec, index) in sections"
-        :key="index"
-        :is="sec.component"
-      />
     </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, defineComponent } from "vue";
+import { ref, onMounted } from "vue";
+import { auth, db } from "../firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 
-// 🔹 Sections factices avec defineComponent pour que Vue les affiche correctement
-const Logo = defineComponent({
+/* 🔹 Sections UI (simples pour commencer) */
+const Logo = {
+  props: ["data"],
   template: `<div class="p-4 bg-blue-100 text-center font-bold">LOGO</div>`,
-});
+};
 
-const Menu = defineComponent({
-  template: `<div class="p-4 bg-gray-800 text-white text-center">Menu | Accueil | Produits | Contact</div>`,
-});
+const Menu = {
+  props: ["data"],
+  template: `<div class="p-4 bg-gray-800 text-white text-center">Menu | Accueil | Contact</div>`,
+};
 
-const Header = defineComponent({
+const Header = {
+  props: ["data"],
   template: `<div class="p-8 bg-gray-200 text-center">
-               <h1 class="text-2xl font-bold">Bienvenue sur mon site</h1>
+               <h1 class="text-2xl font-bold">Bienvenue</h1>
              </div>`,
-});
+};
 
-// 🔹 Liste des sections disponibles
+/* 🔹 Mapping */
+const componentMap = {
+  Logo,
+  Menu,
+  Header,
+};
+
+/* 🔹 Sections disponibles */
 const availableSections = [
-  { name: "Logo", component: Logo },
-  { name: "Menu", component: Menu },
-  { name: "Header", component: Header },
+  { name: "Logo", type: "Logo" },
+  { name: "Menu", type: "Menu" },
+  { name: "Header", type: "Header" },
 ];
 
-// 🔹 Sections ajoutées au site
+/* 🔹 State */
 const sections = ref([]);
+let userId = null;
 
-// 🔹 Afficher ou cacher le sélecteur
-const showSelector = ref(false);
+/* 🔹 Charger depuis Firestore */
+onMounted(async () => {
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) return;
 
-// 🔹 Ajouter une section
-const addSection = (section) => {
-  sections.value.push(section);
-  showSelector.value = false;
+    userId = user.uid;
+
+    const snap = await getDoc(doc(db, "users", user.uid));
+
+    if (snap.exists()) {
+      sections.value = snap.data().project?.sections || [];
+    }
+  });
+});
+
+/* 🔹 Ajouter section */
+const addSection = async (type) => {
+  const newSection = {
+    id: Date.now(),
+    type,
+    props: {},
+  };
+
+  sections.value.push(newSection);
+
+  await saveSections();
+};
+
+/* 🔹 Sauvegarde Firestore */
+const saveSections = async () => {
+  if (!userId) return;
+
+  await updateDoc(doc(db, "users", userId), {
+    "project.sections": sections.value,
+  });
+};
+
+/* 🔹 Mapper component */
+const getComponent = (type) => {
+  return componentMap[type];
 };
 </script>
-
-<style scoped>
-/* Scroll si trop de sections ajoutées */
-div[ref="preview"] {
-  max-height: 400px;
-  overflow-y: auto;
-}
-</style>
