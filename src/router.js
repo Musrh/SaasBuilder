@@ -1,4 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
+
 import PlanSelection from './views/PlanSelection.vue';
 import AuthForm from './views/AuthForm.vue';
 import Dashboard from './views/Dashboard.vue';
@@ -13,8 +14,8 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory('/SaasBuilder/'), // <-- ton base path GitHub Pages
-  routes
+  history: createWebHashHistory(), // 🔥 FIX CRITIQUE GITHUB PAGES
+  routes,
 });
 
 export default router;
