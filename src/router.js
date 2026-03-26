@@ -6,28 +6,13 @@ import Dashboard from "./views/Dashboard.vue";
 import Builder from "./views/Builder.vue";
 
 const routes = [
-
-  // 🧭 FLOW SAAS
-  { path: "/", name: "Plan", component: PlanSelection },
-  { path: "/auth", name: "Auth", component: AuthForm },
-  { path: "/dashboard", name: "Dashboard", component: Dashboard, meta: { requiresAuth: true } },
-  { path: "/builder", name: "Builder", component: Builder, meta: { requiresAuth: true } },
+  { path: "/", component: PlanSelection },
+  { path: "/auth", component: AuthForm },
+  { path: "/dashboard", component: Dashboard },
+  { path: "/builder", component: Builder },
 ];
 
-const router = createRouter({
-  history: createWebHashHistory(), // 🔥 GitHub Pages FIX
+export default createRouter({
+  history: createWebHashHistory(),
   routes,
 });
-
-// 🔐 SIMPLE AUTH GUARD (Firebase)
-router.beforeEach((to, from, next) => {
-  const user = JSON.parse(localStorage.getItem("user")); // simple fallback
-
-  if (to.meta.requiresAuth && !user) {
-    next("/auth");
-  } else {
-    next();
-  }
-});
-
-export default router; on
