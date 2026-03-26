@@ -24,34 +24,38 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { auth } from "../firebase"; // Assure-toi que firebase.js exporte auth
 
 const router = useRouter();
-
-const userEmail = ref("client@example.com");
+const userEmail = ref("");
 const planName = ref("Plan Offert");
 const planExpiry = ref("");
 
-// Mapping plan ID → nom
 const planMap = { 1: "Plan Offert", 2: "Plan Pro", 3: "Plan Premium" };
 
-// 🔹 Charger les infos depuis localStorage
+// 🔹 Charger les infos utilisateur
 onMounted(() => {
-  // Email et plan sauvegardés après AuthForm
-  const storedEmail = localStorage.getItem("emailUtilisateur");
-  const storedPlan = parseInt(localStorage.getItem("planChoisi")) || 1;
-  const storedExpiry = localStorage.getItem("planExpiry"); // timestamp optionnel
+  if (auth.currentUser) {
+    userEmail.value = auth.currentUser.email;
 
-  if (storedEmail) userEmail.value = storedEmail;
-  planName.value = planMap[storedPlan] || "Plan Offert";
+    // Récupération du plan et date depuis localStorage
+    const storedPlan = parseInt(localStorage.getItem("planChoisi")) || 1;
+    planName.value = planMap[storedPlan] || "Plan Offert";
 
-  if (storedExpiry) {
-    const date = new Date(parseInt(storedExpiry));
-    planExpiry.value = date.toLocaleDateString();
+    const storedExpiry = localStorage.getItem("planExpiry");
+    if (storedExpiry) {
+      const date = new Date(parseInt(storedExpiry));
+      planExpiry.value = date.toLocaleDateString();
+    }
+  } else {
+    // Redirection vers AuthForm si pas connecté
+    router.push({ name: "AuthForm" });
   }
 });
 
-// 🔹 Bouton pour aller à Builder.vue
+// 🔹 Bouton Start Building
 const startBuilder = () => {
+  // Vérifie si Builder est bien dans le router
   router.push({ name: "Builder" });
 };
 </script>
