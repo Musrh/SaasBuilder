@@ -1,21 +1,26 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex flex-col items-center p-6">
-    <h1 class="text-3xl font-bold mb-6">Choisissez votre plan</h1>
+    <h1 class="text-3xl font-bold mb-8">Choisissez votre plan</h1>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 w-full max-w-4xl">
       <div
         v-for="plan in plans"
         :key="plan.id"
-        class="p-6 border rounded-lg shadow-md hover:shadow-xl transition cursor-pointer bg-white"
-        @click="selectPlan(plan)"
+        class="p-6 border rounded-lg shadow-md hover:shadow-xl transition bg-white flex flex-col justify-between"
       >
-        <h2 class="text-2xl font-semibold mb-2">{{ plan.name }}</h2>
-        <p class="text-gray-600 mb-4">{{ plan.price === 0 ? "Offert" : plan.price + "€ / mois" }}</p>
-        <div class="text-center">
-          <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-            Sélectionner
-          </span>
+        <div>
+          <h2 class="text-2xl font-semibold mb-2">{{ plan.name }}</h2>
+          <p class="text-gray-600 mb-4">
+            {{ plan.price === 0 ? "Offert" : plan.price + "€ / mois" }}
+          </p>
         </div>
+
+        <button
+          @click="selectPlan(plan)"
+          class="mt-auto bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition font-semibold"
+        >
+          Sélectionner
+        </button>
       </div>
     </div>
   </div>
@@ -33,7 +38,14 @@ const plans = [
 ];
 
 const selectPlan = (plan) => {
-  // Redirection vers AuthForm avec le plan choisi
+  // Redirection vers AuthForm avec plan choisi
   router.push({ name: "AuthForm", query: { plan: plan.id } });
 };
 </script>
+
+<style scoped>
+/* Ajout d'une petite animation sur hover */
+div[role="plan-card"]:hover {
+  transform: translateY(-2px);
+}
+</style>
