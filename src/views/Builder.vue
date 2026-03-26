@@ -1,66 +1,88 @@
 <template>
-  <div class="flex min-h-screen">
+  <div class="flex flex-col min-h-screen">
 
-    <!-- SIDEBAR -->
-    <div class="w-1/4 bg-white p-4 shadow">
+    <!-- 🔹 TOP BAR -->
+    <div class="bg-white shadow p-4 flex gap-2">
 
-      <h2 class="font-bold mb-4">Sections</h2>
-
-      <button
-        @click="addSection('Header')"
-        class="block w-full mb-2 bg-blue-500 text-white p-2"
-      >
+      <button @click="addSection('Header')" class="bg-blue-500 text-white px-3 py-1 rounded">
         + Header
       </button>
 
-      <button
-        @click="addSection('Hero')"
-        class="block w-full mb-2 bg-purple-500 text-white p-2"
-      >
+      <button @click="addSection('Hero')" class="bg-purple-500 text-white px-3 py-1 rounded">
         + Hero
       </button>
 
     </div>
 
-    <!-- PREVIEW -->
-    <div class="flex-1 p-6 bg-gray-100">
+    <!-- 🔹 MAIN -->
+    <div class="flex flex-1">
 
-      <div class="bg-white shadow min-h-[400px]">
+      <!-- 🔹 LEFT (PREVIEW + EDITOR) -->
+      <div class="flex-1 p-4 bg-gray-100 flex flex-col">
 
-        <div
-          v-for="section in sections"
-          :key="section.id"
-          @click="selectSection(section)"
-        >
+        <!-- PREVIEW -->
+        <div class="bg-white shadow p-4 flex-1 overflow-auto">
 
-          <component
-            :is="getComponent(section.type)"
-            v-bind="section.props"
-          />
+          <div
+            v-for="section in sections"
+            :key="section.id"
+            @click="selectSection(section)"
+            class="cursor-pointer border mb-2"
+            :class="selectedSection?.id === section.id ? 'border-blue-500' : ''"
+          >
+            <component
+              :is="getComponent(section.type)"
+              v-bind="section.props"
+            />
+          </div>
+
+        </div>
+
+        <!-- EDITOR -->
+        <div v-if="selectedSection" class="bg-white p-4 mt-4 shadow">
+
+          <h3 class="font-bold mb-2">Edition</h3>
+
+          <div v-for="(val, key) in selectedSection.props" :key="key">
+            <label>{{ key }}</label>
+            <input
+              v-model="selectedSection.props[key]"
+              class="border p-2 w-full mb-2"
+              @input="autoSave"
+            />
+          </div>
 
         </div>
 
       </div>
 
-      <!-- EDITOR -->
-      <div v-if="selectedSection" class="mt-4 p-4 bg-white shadow">
+      <!-- 🔹 RIGHT (FILES TREE) -->
+      <div class="w-1/4 bg-white p-4 shadow">
 
-        <h3 class="font-bold mb-2">Edition</h3>
+        <h3 class="font-bold mb-4">Fichiers</h3>
 
-        <div
-          v-for="(val, key) in selectedSection.props"
-          :key="key"
-        >
-          <label>{{ key }}</label>
+        <ul class="text-sm space-y-1">
+          <li>📄 index.html</li>
+          <li>📄 App.vue</li>
+          <li>📄 main.js</li>
+          <li>📄 firebase.js</li>
+          <li>📄 package.json</li>
 
-          <input
-            v-model="selectedSection.props[key]"
-            class="border p-2 w-full mb-2"
-            @input="autoSave"
-          />
-        </div>
+          <li class="mt-2 font-semibold">Sections :</li>
+
+          <li v-for="sec in sections" :key="sec.id">
+            📄 {{ sec.type }}.vue
+          </li>
+        </ul>
 
       </div>
+
+    </div>
+
+    <!-- 🔹 BOTTOM (CODE VIEW) -->
+    <div class="bg-black text-green-400 p-4 text-xs h-48 overflow-auto font-mono">
+
+      {{ generatedCode }}
 
     </div>
 
@@ -68,11 +90,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { auth, db } from "../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
-// 🔹 IMPORT COMPONENTS
+// 🔹 IMPORT
 import HeaderSection from "../components/sections/HeaderSection.vue";
 import HeroSection from "../components/sections/HeroSection.vue";
 
@@ -122,9 +144,7 @@ const selectSection = (section) => {
 };
 
 // 🔹 GET COMPONENT
-const getComponent = (type) => {
-  return registry[type] || null;
-};
+const getComponent = (type) => registry[type];
 
 // 🔹 SAVE
 const save = async () => {
@@ -139,4 +159,23 @@ const save = async () => {
 const autoSave = () => {
   save();
 };
+
+// 🔥 GENERATE HTML (important)
+const generatedCode = computed(() => {
+  let html = `<html>\n<body>\n`;
+
+  sections.value.forEach(sec => {
+    if (sec.type === "Header") {
+      html += `<h1>${sec.props.title}</h1>\n`;
+    }
+
+    if (sec.type === "Hero") {
+      html += `<section>\n<h2>${sec.props.title}</h2>\n<p>${sec.props.subtitle}</p>\n</section>\n`;
+    }
+  });
+
+  html += `</body>\n</html>`;
+
+  return html;
+});
 </script>
