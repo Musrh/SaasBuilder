@@ -1,68 +1,147 @@
 <template>
-  <div class="min-h-screen bg-gray-100 p-6 flex flex-col items-center">
-    <div class="max-w-2xl w-full bg-white p-8 rounded-xl shadow">
-      <h1 class="text-3xl font-bold mb-6 text-center">Bienvenue sur votre Dashboard !</h1>
+  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 p-6 flex justify-center">
+    
+    <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-8">
 
-      <div class="space-y-4 text-gray-700">
-        <p v-if="userEmail"><span class="font-semibold">Email :</span> {{ userEmail }}</p>
-        <p v-if="planName"><span class="font-semibold">Plan choisi :</span> {{ planName }}</p>
-        <p v-if="planExpiry"><span class="font-semibold">Date d'expiration :</span> {{ planExpiry }}</p>
+      <h1 class="text-3xl font-extrabold mb-6 text-center text-gray-800">
+        Dashboard
+      </h1>
+
+      <!-- 🔹 Infos utilisateur -->
+      <div v-if="loading" class="text-center text-gray-500">
+        Chargement...
       </div>
 
-      <div class="mt-8 text-center">
+      <div v-else class="space-y-4 text-gray-700">
+
+        <p><span class="font-semibold">Email :</span> {{ user.email }}</p>
+
+        <p>
+          <span class="font-semibold">Plan :</span>
+          <span class="px-3 py-1 rounded-full text-white text-sm"
+            :class="planColor">
+            {{ planName }}
+          </span>
+        </p>
+
+        <p>
+          <span class="font-semibold">Expiration :</span>
+          {{ formattedDate }}
+        </p>
+
+        <p v-if="isExpired" class="text-red-500 font-semibold">
+          ⚠️ Votre plan est expiré
+        </p>
+
+      </div>
+
+      <!-- 🔹 Actions -->
+      <div class="mt-8 flex flex-col gap-4">
+
         <button
-          @click="startBuilder"
-          class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition font-semibold"
+          @click="goBuilder"
+          :disabled="isExpired"
+          class="bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition disabled:bg-gray-400"
         >
-          Start Building Your Site
+          Créer / Modifier mon site
         </button>
+
+        <button
+          @click="logout"
+          class="bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition"
+        >
+          Déconnexion
+        </button>
+
       </div>
+
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
-import { auth } from "../firebase"; // Assure-toi que firebase.js exporte auth
+
+import { auth, db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 
 const router = useRouter();
 
-// Références pour afficher infos utilisateur
-const userEmail = ref("");
-const planName = ref("");
-const planExpiry = ref("");
+const user = ref({});
+const loading = ref(true);
 
-const planMap = { 1: "Plan Offert", 2: "Plan Pro", 3: "Plan Premium" };
+// 🔹 Plan mapping
+const planMap = {
+  1: "Offert",
+  2: "Pro",
+  3: "Premium",
+};
 
-// 🔹 Charger les infos utilisateur au montage
-onMounted(() => {
-  const unsubscribe = auth.onAuthStateChanged(user => {
-    if (user) {
-      userEmail.value = user.email;
-
-      // Plan choisi stocké dans localStorage lors de l'inscription
-      const storedPlan = parseInt(localStorage.getItem("planChoisi")) || 1;
-      planName.value = planMap[storedPlan] || "Plan Offert";
-
-      const storedExpiry = localStorage.getItem("planExpiry");
-      if (storedExpiry) {
-        const date = new Date(parseInt(storedExpiry));
-        planExpiry.value = date.toLocaleDateString();
-      }
-    } else {
-      // Pas connecté → redirige vers AuthForm
+// 🔹 Charger données Firestore
+onMounted(async () => {
+  auth.onAuthStateChanged(async (u) => {
+    if (!u) {
       router.push({ name: "AuthForm" });
+      return;
     }
-  });
 
-  // Nettoyage si besoin
-  return () => unsubscribe();
+    const snap = await getDoc(doc(db, "users", u.uid));
+
+    if (snap.exists()) {
+      user.value = snap.data();
+    }
+
+    loading.value = false;
+  });
 });
 
-// 🔹 Bouton start builder
-const startBuilder = () => {
-  // Vérifie si la route Builder existe dans router
+// 🔹 Plan name
+const planName = computed(() => {
+  return planMap[user.value.plan] || "Offert";
+});
+
+// 🔹 Couleur plan
+const planColor = computed(() => {
+  return {
+    1: "bg-gray-500",
+    2: "bg-blue-500",
+    3: "bg-purple-500",
+  }[user.value.plan] || "bg-gray-500";
+});
+
+// 🔹 Format date
+const formattedDate = computed(() => {
+  if (!user.value.expiresAt) return "—";
+
+  const date = user.value.expiresAt.toDate
+    ? user.value.expiresAt.toDate()
+    : new Date(user.value.expiresAt);
+
+  return date.toLocaleDateString();
+});
+
+// 🔹 Expiration
+const isExpired = computed(() => {
+  if (!user.value.expiresAt) return false;
+
+  const now = new Date();
+  const expiry = user.value.expiresAt.toDate
+    ? user.value.expiresAt.toDate()
+    : new Date(user.value.expiresAt);
+
+  return now > expiry;
+});
+
+// 🔹 Aller au builder
+const goBuilder = () => {
   router.push({ name: "Builder" });
+};
+
+// 🔹 Logout
+const logout = async () => {
+  await signOut(auth);
+  router.push({ name: "AuthForm" });
 };
 </script>
