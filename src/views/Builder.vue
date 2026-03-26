@@ -73,8 +73,8 @@ import { auth, db } from "../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
 // 🔹 IMPORT COMPONENTS
-import HeaderSection from "../components/sections/HeaderSection.vue";
-import HeroSection from "../components/sections/HeroSection.vue";
+import HeaderSection from "./components/sections/HeaderSection.vue";
+import HeroSection from "./components/sections/HeroSection.vue";
 
 // 🔹 STATE
 const sections = ref([]);
