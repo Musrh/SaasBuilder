@@ -1,89 +1,164 @@
-
 <template>
-  <div class="p-6">
+  <div class="min-h-screen bg-gray-100 flex">
 
-    <h1 class="text-2xl font-bold mb-4">
-      Builder SaaS
-    </h1>
+    <!-- 🔹 Sidebar -->
+    <div class="w-1/4 bg-white p-4 shadow">
+      <h2 class="font-bold mb-4">Sections</h2>
 
-    <div v-if="!userId">
-      Loading user...
+      <button
+        v-for="sec in availableSections"
+        :key="sec.type"
+        @click="addSection(sec.type)"
+        class="w-full mb-2 p-2 bg-blue-500 text-white rounded"
+      >
+        + {{ sec.name }}
+      </button>
     </div>
 
-    <div v-else>
+    <!-- 🔹 Preview -->
+    <div class="flex-1 p-4">
+      <h2 class="font-bold mb-4">Aperçu</h2>
 
-      <button
-        @click="addHeader"
-        class="bg-blue-500 text-white px-4 py-2 rounded"
-      >
-        + Ajouter Header
-      </button>
+      <div class="bg-white p-4 rounded shadow">
 
-      <button
-        @click="save"
-        class="ml-2 bg-green-500 text-white px-4 py-2 rounded"
-      >
-        Save
-      </button>
-
-      <hr class="my-4" />
-
-      <div v-for="section in sections" :key="section.id" class="p-3 border mb-2">
-        <strong>{{ section.type }}</strong>
-
-        <div v-if="section.type === 'Header'">
-          <input
-            v-model="section.props.title"
-            class="border p-2 w-full mt-2"
+        <div
+          v-for="(sec, index) in sections"
+          :key="sec.id"
+          @click="selectSection(index)"
+          class="mb-2 border cursor-pointer"
+          :class="selectedIndex === index ? 'border-blue-500' : 'border-transparent'"
+        >
+          <component
+            :is="getComponent(sec.type)"
+            :data="sec.props"
           />
         </div>
 
       </div>
+    </div>
 
+    <!-- 🔹 Editor -->
+    <div class="w-1/4 bg-white p-4 shadow">
+      <h2 class="font-bold mb-4">Édition</h2>
+
+      <div v-if="selectedSection">
+
+        <label class="block mb-2">Titre</label>
+        <input
+          v-model="selectedSection.props.title"
+          @input="updateSection"
+          class="w-full border p-2 mb-4"
+        />
+
+        <label class="block mb-2">Sous-titre</label>
+        <input
+          v-model="selectedSection.props.subtitle"
+          @input="updateSection"
+          class="w-full border p-2"
+        />
+
+      </div>
+
+      <div v-else class="text-gray-400">
+        Sélectionne une section
+      </div>
     </div>
 
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { auth, db } from "../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
-const userId = ref(null);
+/* 🔹 Sections */
+const Header = {
+  props: ["data"],
+  template: `
+    <div class="p-6 bg-gray-200 text-center">
+      <h1 class="text-2xl font-bold">{{ data.title || "Titre" }}</h1>
+      <p>{{ data.subtitle || "Sous-titre" }}</p>
+    </div>
+  `,
+};
+
+const Logo = {
+  template: `<div class="p-4 bg-blue-100 text-center">LOGO</div>`,
+};
+
+const Menu = {
+  template: `<div class="p-4 bg-gray-800 text-white text-center">Menu</div>`,
+};
+
+/* 🔹 Mapping */
+const componentMap = { Header, Logo, Menu };
+
+/* 🔹 Sections disponibles */
+const availableSections = [
+  { name: "Header", type: "Header" },
+  { name: "Logo", type: "Logo" },
+  { name: "Menu", type: "Menu" },
+];
+
+/* 🔹 State */
 const sections = ref([]);
+const selectedIndex = ref(null);
+let userId = null;
 
+/* 🔹 Selected section */
+const selectedSection = computed(() => {
+  return sections.value[selectedIndex.value];
+});
+
+/* 🔹 Load Firestore */
 onMounted(() => {
-  auth.onAuthStateChanged(async (u) => {
-    if (!u) return;
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) return;
 
-    userId.value = u.uid;
+    userId = user.uid;
 
-    const snap = await getDoc(doc(db, "users", u.uid));
+    const snap = await getDoc(doc(db, "users", user.uid));
 
     if (snap.exists()) {
-      sections.value = snap.data().sections || [];
+      sections.value = snap.data().project?.sections || [];
     }
   });
 });
 
-const addHeader = () => {
+/* 🔹 Add section */
+const addSection = async (type) => {
   sections.value.push({
-    id: crypto.randomUUID(),
-    type: "Header",
+    id: Date.now(),
+    type,
     props: {
-      title: "Bienvenue"
-    }
+      title: "",
+      subtitle: "",
+    },
   });
+
+  await save();
 };
 
+/* 🔹 Select */
+const selectSection = (index) => {
+  selectedIndex.value = index;
+};
+
+/* 🔹 Update */
+const updateSection = async () => {
+  await save();
+};
+
+/* 🔹 Save Firestore */
 const save = async () => {
-  if (!userId.value) return;
+  if (!userId) return;
 
-  await updateDoc(doc(db, "users", userId.value), {
-    sections: sections.value
+  await updateDoc(doc(db, "users", userId), {
+    "project.sections": sections.value,
   });
-
-  alert("Saved !");
 };
+
+/* 🔹 Mapper */
+const getComponent = (type) => componentMap[type];
 </script>
