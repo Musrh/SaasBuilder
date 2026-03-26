@@ -10,7 +10,7 @@ const routes = [
   { path: "/auth", name: "AuthForm", component: AuthForm },
   { path: "/dashboard", name: "Dashboard", component: Dashboard },
 
-{ path: "/dashboard", name: "Dashboard", component: Dashboard }
+{ path: "/builder", name: "Builder", component: Builder }
 ];
 
 const router = createRouter({
