@@ -1,137 +1,109 @@
 <template>
-  <div
-    class="min-h-screen w-full bg-gray-100 flex flex-col"
-    @click.self="selectedSection = null"
-  >
+  <div class="h-screen w-full flex bg-[#f6f7fb]">
 
-    <!-- 🔥 TOP BAR -->
-    <div class="flex justify-center gap-2 p-3 bg-white shadow">
+    <!-- ================= LEFT SIDEBAR ================= -->
+    <div class="w-64 bg-white border-r p-4">
 
-      <button
-        v-if="mode === 'edit'"
-        @click="saveAndPreview"
-        class="bg-green-500 text-white px-4 py-2 rounded-lg shadow"
-      >
-        💾 Preview
-      </button>
+      <h2 class="font-bold text-lg mb-4">🧱 Sections</h2>
 
-      <button
-        v-else
-        @click="mode = 'edit'"
-        class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow"
-      >
-        ✏️ Edit
-      </button>
+      <div class="space-y-2">
+
+        <button
+          v-for="sec in availableSections"
+          :key="sec.type"
+          @click="addSection(sec)"
+          class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg"
+        >
+          + {{ sec.name }}
+        </button>
+
+      </div>
 
     </div>
 
-    <!-- 🔥 SECTION BUTTONS -->
-    <div
-      v-if="mode === 'edit'"
-      class="p-2 flex gap-2 flex-wrap justify-center bg-white"
-    >
-      <button
-        v-for="sec in availableSections"
-        :key="sec.type"
-        @click="addSection(sec)"
-        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg"
-      >
-        + {{ sec.name }}
-      </button>
-    </div>
+    <!-- ================= CENTER CANVAS ================= -->
+    <div class="flex-1 p-6 overflow-auto">
 
-    <!-- ================= FULL BUILDER ================= -->
-    <div class="flex-1 w-full">
+      <!-- PAGE -->
+      <div class="bg-white shadow-xl rounded-2xl min-h-full p-6">
 
-      <div class="w-full min-h-screen bg-white flex flex-col">
+        <!-- TITLE -->
+        <input
+          v-model="pageTitle"
+          class="w-full text-3xl font-bold border-b p-3 mb-6"
+          placeholder="Page title..."
+          @input="autoSave"
+        />
 
-        <!-- TITLE FULL WIDTH -->
-        <div class="w-full p-4 border-b">
-          <input
-            v-if="mode === 'edit'"
-            v-model="pageTitle"
-            class="w-full text-3xl font-bold p-3 border rounded-lg"
-            placeholder="Titre du site..."
-          />
+        <!-- DRAG AREA -->
+        <draggable
+          v-model="sections"
+          item-key="id"
+          class="space-y-4"
+          @change="autoSave"
+        >
 
-          <h1 v-else class="text-3xl font-bold text-center">
-            {{ pageTitle }}
-          </h1>
-        </div>
+          <template #item="{ element }">
 
-        <!-- MAIN AREA -->
-        <div class="flex-1 w-full p-4">
-
-          <!-- MAIN CONTENT FULL SCREEN -->
-          <textarea
-            v-if="mode === 'edit'"
-            v-model="mainContent"
-            class="w-full h-[70vh] p-4 border rounded-lg text-lg resize-none"
-            placeholder="Écris ton contenu principal..."
-          />
-
-          <div
-            v-else
-            class="w-full min-h-[70vh] p-4"
-            v-html="mainContent"
-          />
-
-          <!-- ================= SECTIONS ================= -->
-          <div
-            v-for="section in sections"
-            :key="section.id"
-            @click.stop="selectSection(section)"
-            class="relative border rounded-lg my-4 p-4 transition"
-            :class="selectedSection?.id === section.id
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-gray-200'"
-          >
-
-            <!-- DELETE -->
-            <button
-              v-if="mode === 'edit'"
-              @click.stop="deleteSection(section.id)"
-              class="absolute top-2 right-2 text-red-500 text-xs bg-white border px-2 py-1 rounded"
-            >
-              🗑
-            </button>
-
-            <!-- TOOLBAR -->
             <div
-              v-if="mode === 'edit' && selectedSection?.id === section.id"
-              class="flex gap-2 mb-3 border-b pb-2"
+              class="border rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition cursor-move"
+              @click="selectSection(element)"
             >
-              <button @click="applyBold(section)" class="tool">B</button>
-              <button @click="applyUppercase(section)" class="tool">Aa</button>
-              <button @click="applyEmoji(section)" class="tool">😊</button>
 
-              <input type="color" v-model="section.props.color" />
+              <textarea
+                v-model="element.props.title"
+                class="w-full min-h-[120px] border p-3 rounded-lg"
+                @input="autoSave"
+              />
+
+              <div class="flex justify-between mt-2">
+
+                <input type="color" v-model="element.props.color" @input="autoSave" />
+
+                <button
+                  @click.stop="deleteSection(element.id)"
+                  class="text-red-500 text-sm"
+                >
+                  🗑 Delete
+                </button>
+
+              </div>
+
             </div>
 
-            <!-- TEXTAREA EDIT -->
-            <textarea
-              v-if="mode === 'edit' && selectedSection?.id === section.id"
-              v-model="section.props.title"
-              class="w-full min-h-[200px] p-3 border rounded-lg text-lg"
-            />
+          </template>
 
-            <!-- PREVIEW -->
-            <div
-              v-else
-              class="w-full"
-              :style="{ color: section.props.color }"
-              v-html="section.props.title"
-            />
+        </draggable>
 
-          </div>
+      </div>
 
+    </div>
+
+    <!-- ================= RIGHT PANEL ================= -->
+    <div class="w-72 bg-white border-l p-4">
+
+      <h2 class="font-bold mb-4">⚙ Settings</h2>
+
+      <div v-if="selectedSection">
+
+        <p class="text-sm text-gray-500 mb-2">Section ID</p>
+        <div class="text-xs bg-gray-100 p-2 rounded">
+          {{ selectedSection.id }}
         </div>
 
-        <!-- FOOTER -->
-        <div class="p-4 text-center border-t bg-white">
-          <FooterSection />
-        </div>
+        <p class="mt-4 text-sm">Text color</p>
 
+        <input
+          type="color"
+          v-model="selectedSection.props.color"
+          @input="autoSave"
+          class="w-full h-10"
+        />
+
+      </div>
+
+      <div v-else class="text-gray-400 text-sm">
+        Select a section
       </div>
 
     </div>
@@ -140,81 +112,67 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
+import { ref, watch } from "vue"
+import draggable from "vuedraggable"
 
-import FooterSection from "../components/sections/FooterSection.vue"
-
-/* STATE */
-const mode = ref("edit")
+/* ================= STATE ================= */
 const sections = ref([])
 const selectedSection = ref(null)
+const pageTitle = ref("My Wix Builder")
 
-const pageTitle = ref("Titre par défaut")
-const mainContent = ref("Mon site créé avec mon builder")
-
-/* SECTIONS */
+/* ================= SECTIONS ================= */
 const availableSections = [
-  { name: "Texte", type: "Text" },
-  { name: "Titre", type: "Heading" },
-  { name: "Paragraphe", type: "Paragraph" }
+  { name: "Text Block", type: "text" },
+  { name: "Heading", type: "heading" },
+  { name: "Paragraph", type: "paragraph" }
 ]
 
-/* ADD SECTION */
+/* ================= ADD SECTION ================= */
 const addSection = (sec) => {
   sections.value.push({
     id: Date.now(),
     type: sec.type,
     props: {
-      title: "Nouveau contenu",
+      title: "New section",
       color: "#000000"
     }
   })
+
+  autoSave()
 }
 
-/* SELECT */
+/* ================= SELECT ================= */
 const selectSection = (section) => {
-  if (mode.value === "preview") return
   selectedSection.value = section
 }
 
-/* DELETE */
+/* ================= DELETE ================= */
 const deleteSection = (id) => {
   sections.value = sections.value.filter(s => s.id !== id)
-
-  if (selectedSection.value?.id === id) {
-    selectedSection.value = null
-  }
-}
-
-/* TOOLS */
-const applyBold = (section) => {
-  section.props.title = `<b>${section.props.title}</b>`
-}
-
-const applyUppercase = (section) => {
-  section.props.title = section.props.title.toUpperCase()
-}
-
-const applyEmoji = (section) => {
-  section.props.title += " 😊"
-}
-
-/* MODE SWITCH */
-const saveAndPreview = () => {
   selectedSection.value = null
-  mode.value = "preview"
+  autoSave()
 }
+
+/* ================= AUTOSAVE FIRESTORE ================= */
+let timeout = null
+
+const autoSave = () => {
+  clearTimeout(timeout)
+
+  timeout = setTimeout(async () => {
+
+    // 🔥 ici tu branches Firestore
+    console.log("Saving...", {
+      pageTitle: pageTitle.value,
+      sections: sections.value
+    })
+
+    // EXEMPLE FIRESTORE :
+    // await updateDoc(doc(db, "users", userId), {...})
+
+  }, 500)
+}
+
+/* ================= WATCH GLOBAL ================= */
+watch(pageTitle, autoSave)
 </script>
-
-<style>
-.tool {
-  padding: 6px 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.tool:hover {
-  background: #eee;
-}
-</style>
