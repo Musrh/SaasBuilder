@@ -131,7 +131,7 @@ import FooterSection from "../components/sections/FooterSection.vue"
 import MainSection from "../components/sections/MainSection.vue"
 import LogoSection from "../components/sections/LogoSection.vue"
 import MenuSection from "../components/sections/MenuSection.vue"
-import HeaderSearch from "../components/sections/HeaderSearch.vue"
+
 
 /* 🔹 STATE */
 const sections = ref([])
