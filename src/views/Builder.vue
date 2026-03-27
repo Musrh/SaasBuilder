@@ -23,14 +23,13 @@
 
           <HeaderSection />
 
-          <!-- 🔥 MAIN BUILDER ZONE -->
+          <!-- 🔥 BUILDER ZONE -->
           <MainSection class="border-4 border-dashed border-blue-400 bg-white p-4 rounded-xl min-h-[300px]">
 
             <div class="text-xs text-gray-500 mb-3">
-              ✏️ Mode Builder actif - Clique une section pour l’éditer
+              ✏️ Mode Builder - Clique une section pour l’éditer
             </div>
 
-            <!-- 🔹 SECTIONS -->
             <div
               v-for="section in filteredSections"
               :key="section.id"
@@ -48,29 +47,34 @@
               <!-- 🔥 EDIT MODE -->
               <div
                 v-if="selectedSection?.id === section.id"
-                class="mb-3 bg-white p-2 border rounded"
+                class="flex justify-between items-center mb-2 bg-white p-2 border rounded"
               >
 
-                <!-- Toolbar -->
-                <div class="flex justify-between items-center mb-2 border-b pb-2">
-
-                  <div class="flex gap-2">
-                    <button @click="makeBold" class="px-2 border rounded font-bold">B</button>
-                    <button @click="makeUppercase" class="px-2 border rounded">Aa</button>
-                    <button @click="addEmoji" class="px-2 border rounded">😊</button>
-                  </div>
-
-                  <button
-                    @click="deleteSection(section.id)"
-                    class="text-red-500 text-xs border px-2 py-1 rounded"
-                  >
-                    🗑 Delete
-                  </button>
-
+                <div class="flex gap-2">
+                  <button @click="makeBold" class="px-2 border rounded font-bold">B</button>
+                  <button @click="makeUppercase" class="px-2 border rounded">Aa</button>
+                  <button @click="addEmoji" class="px-2 border rounded">😊</button>
                 </div>
 
-                <!-- Props editor -->
-                <div v-for="(val, key) in section.props" :key="key" class="mb-2">
+                <button
+                  @click="deleteSection(section.id)"
+                  class="text-red-500 text-xs border px-2 py-1 rounded"
+                >
+                  🗑 Delete
+                </button>
+
+              </div>
+
+              <!-- 🔥 PROPS EDIT -->
+              <div
+                v-if="selectedSection?.id === section.id"
+                class="mb-3 bg-white p-2 border rounded"
+              >
+                <div
+                  v-for="(val, key) in section.props"
+                  :key="key"
+                  class="mb-2"
+                >
                   <label class="text-xs font-bold">{{ key }}</label>
                   <input
                     v-model="section.props[key]"
@@ -78,7 +82,6 @@
                     @input="autoSave"
                   />
                 </div>
-
               </div>
 
               <!-- 🔹 RENDER SECTION -->
@@ -94,6 +97,7 @@
           <FooterSection />
 
         </div>
+
       </div>
 
       <!-- 🔹 ARBORESCENCE -->
@@ -107,19 +111,17 @@
             v-for="file in files"
             :key="file.name"
             @click="selectFile(file.name)"
-            class="cursor-pointer p-2 rounded flex justify-between items-center"
+            class="cursor-pointer p-2 rounded flex justify-between"
             :class="selectedFile === file.name ? 'bg-blue-100 font-bold' : ''"
           >
             <span>📄 {{ file.name }}</span>
 
             <button
-              v-if="file.deletable"
               @click.stop="deleteFile(file.name)"
               class="text-red-500 text-xs"
             >
               ✕
             </button>
-
           </div>
 
         </div>
@@ -131,7 +133,9 @@
             {{ selectedFile }}
           </div>
 
-          <pre class="whitespace-pre-wrap">{{ getFileContent(selectedFile) }}</pre>
+          <pre class="whitespace-pre-wrap">
+{{ getFileContent(selectedFile) }}
+          </pre>
 
         </div>
 
@@ -158,7 +162,7 @@ const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref("App.vue")
 
-/* 🔹 SECTIONS */
+/* 🔹 AVAILABLE SECTIONS */
 const availableSections = [
   { name: "Menu", type: "Menu" },
   { name: "Logo", type: "Logo" }
@@ -184,23 +188,20 @@ const files = ref([
   {
     name: "App.vue",
     content: `<template>
-  <div>App.vue</div>
-</template>`,
-    deletable: false
+  <div>App</div>
+</template>`
   },
   {
     name: "MainSection.vue",
     content: `<template>
   <section>Main Section</section>
-</template>`,
-    deletable: false
+</template>`
   },
   {
     name: "MenuSection.vue",
     content: `<template>
   <nav>Menu</nav>
-</template>`,
-    deletable: true
+</template>`
   }
 ])
 
@@ -216,7 +217,7 @@ const addSection = (sec) => {
   })
 }
 
-/* 🔹 SELECT SECTION */
+/* 🔹 SELECT */
 const selectSection = (section) => {
   selectedSection.value = section
 }
@@ -229,7 +230,6 @@ const selectFile = (name) => {
 /* 🔹 DELETE SECTION */
 const deleteSection = (id) => {
   sections.value = sections.value.filter(s => s.id !== id)
-
   if (selectedSection.value?.id === id) {
     selectedSection.value = null
   }
@@ -238,7 +238,6 @@ const deleteSection = (id) => {
 /* 🔹 DELETE FILE */
 const deleteFile = (name) => {
   files.value = files.value.filter(f => f.name !== name)
-
   if (selectedFile.value === name) {
     selectedFile.value = "App.vue"
   }
