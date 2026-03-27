@@ -41,14 +41,19 @@
             >
 
               <!-- 🔥 MODE ÉDITION -->
-              <div v-if="selectedSection?.id === section.id" class="mb-3 bg-white p-2 border rounded">
+              <div
+                v-if="selectedSection?.id === section.id"
+                class="mb-3 bg-white p-2 border rounded"
+              >
 
+                <!-- Toolbar -->
                 <div class="flex gap-2 mb-2 border-b pb-2">
-                  <button @click="makeBold" class="px-2 border rounded">B</button>
+                  <button @click="makeBold" class="px-2 border rounded font-bold">B</button>
                   <button @click="makeUppercase" class="px-2 border rounded">Aa</button>
                   <button @click="addEmoji" class="px-2 border rounded">😊</button>
                 </div>
 
+                <!-- Props editor -->
                 <div
                   v-for="(val, key) in section.props"
                   :key="key"
@@ -80,7 +85,7 @@
 
       </div>
 
-      <!-- 🔹 ARBORESCENCE INTERACTIVE -->
+      <!-- 🔹 ARBORESCENCE + CODE -->
       <div class="w-80 bg-white border-l p-3">
 
         <h3 class="font-bold mb-2">📁 Arborescence</h3>
@@ -102,11 +107,11 @@
         <!-- 🔥 CODE VIEW -->
         <div class="mt-4 bg-black text-green-400 p-2 h-64 overflow-auto text-xs rounded">
 
-          <div class="text-white mb-2">
+          <div class="text-white mb-2 font-bold">
             {{ selectedFile }}
           </div>
 
-          <pre>{{ getFileContent(selectedFile) }}</pre>
+          <pre class="whitespace-pre-wrap">{{ getFileContent(selectedFile) }}</pre>
 
         </div>
 
@@ -120,13 +125,13 @@
 <script setup>
 import { ref, reactive, computed } from "vue"
 
-/* 🔥 IMPORT DES SECTIONS (CHEMIN CORRIGÉ) */
-import HeaderSection from "./components/sections/HeaderSection.vue"
-import FooterSection from "./components/sections/FooterSection.vue"
-import MainSection from "./components/sections/MainSection.vue"
-import LogoSection from "./components/sections/LogoSection.vue"
-import MenuSection from "./components/sections/MenuSection.vue"
-import HeaderSearch from "./components/sections/HeaderSearch.vue"
+/* 🔥 IMPORTS CORRIGÉS */
+import HeaderSection from "../components/sections/HeaderSection.vue"
+import FooterSection from "../components/sections/FooterSection.vue"
+import MainSection from "../components/sections/MainSection.vue"
+import LogoSection from "../components/sections/LogoSection.vue"
+import MenuSection from "../components/sections/MenuSection.vue"
+import HeaderSearch from "../components/sections/HeaderSearch.vue"
 
 /* 🔹 STATE */
 const sections = ref([])
@@ -139,40 +144,45 @@ const availableSections = [
   { name: "Logo", type: "Logo" }
 ]
 
-/* ❌ EXCLUSIONS DANS MAINSECTION */
+/* ❌ EXCLUSION */
 const excludedInMain = ["HeaderSearch", "Footer"]
 
 const filteredSections = computed(() =>
   sections.value.filter(s => !excludedInMain.includes(s.type))
 )
 
-/* 🔹 COMPONENT MAP */
+/* 🔹 MAP COMPONENTS */
 const componentMap = {
   Menu: MenuSection,
   Logo: LogoSection
 }
 
-const safeGetComponent = (type) => componentMap[type] || null
+const safeGetComponent = (type) => componentMap[type] || "div"
 
-/* 🔹 FILES ARBORESCENCE */
+/* 🔹 ARBORESCENCE */
 const files = ref([
   {
     name: "App.vue",
-    content: "<template>\n  <div>App</div>\n</template>"
+    content: `<template>
+  <div>App.vue</div>
+</template>`
   },
   {
     name: "MainSection.vue",
-    content: "<template>\n  <section>Main Section</section>\n</template>"
+    content: `<template>
+  <section>Main Section</section>
+</template>`
   },
   {
     name: "MenuSection.vue",
-    content: "<template>\n  <nav>Menu</nav>\n</template>"
+    content: `<template>
+  <nav>Menu</nav>
+</template>`
   }
 ])
 
-const getFileContent = (name) => {
-  return files.value.find(f => f.name === name)?.content || "// vide"
-}
+const getFileContent = (name) =>
+  files.value.find(f => f.name === name)?.content || "// vide"
 
 /* 🔹 ADD SECTION */
 const addSection = (sec) => {
@@ -193,7 +203,7 @@ const selectFile = (name) => {
   selectedFile.value = name
 }
 
-/* 🔹 DRAG DROP */
+/* 🔹 DRAG & DROP */
 let draggedId = null
 
 const dragStart = (id) => {
@@ -211,10 +221,31 @@ const drop = (targetId) => {
 }
 
 /* 🔹 EDITOR ACTIONS */
-const makeBold = () => {}
-const makeUppercase = () => {}
-const addEmoji = () => {}
-const autoSave = () => {}
+const makeBold = () => {
+  if (!selectedSection.value) return
+  for (const k in selectedSection.value.props) {
+    selectedSection.value.props[k] = `**${selectedSection.value.props[k]}**`
+  }
+}
+
+const makeUppercase = () => {
+  if (!selectedSection.value) return
+  for (const k in selectedSection.value.props) {
+    selectedSection.value.props[k] =
+      selectedSection.value.props[k].toUpperCase()
+  }
+}
+
+const addEmoji = () => {
+  if (!selectedSection.value) return
+  for (const k in selectedSection.value.props) {
+    selectedSection.value.props[k] += " 😊"
+  }
+}
+
+const autoSave = () => {
+  console.log("autosave:", sections.value)
+}
 </script>
 
 <style scoped>
