@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col min-h-screen">
 
-    <!-- 🔹 TOP BAR -->
+    <!-- 🔹 TOP BAR (SECTIONS EN HAUT) -->
     <div class="bg-white shadow p-3 flex flex-wrap gap-2">
       <button
         v-for="sec in availableSections"
@@ -15,7 +15,7 @@
 
     <div class="flex flex-1">
 
-      <!-- 🔹 MAIN -->
+      <!-- 🔹 MAIN AREA -->
       <div class="flex-1 flex flex-col bg-gray-100 p-4">
 
         <!-- 🔹 PREVIEW -->
@@ -29,6 +29,7 @@
           <!-- MAIN -->
           <MainSection>
 
+            <!-- 🔥 SECTIONS DYNAMIQUES -->
             <div
               v-for="(section, index) in sections"
               :key="section.id"
@@ -37,13 +38,12 @@
               @dragover.prevent
               @drop="drop(index)"
               @click="selectSection(section)"
-              class="border mb-3 p-2 rounded cursor-move"
+              class="border mb-3 p-3 rounded cursor-move hover:bg-gray-50 transition"
               :class="selectedSection?.id === section.id ? 'border-blue-500' : ''"
             >
               <component
                 :is="getComponent(section.type)"
                 v-bind="section.props"
-                :key="section.id + JSON.stringify(section.props)"
               />
             </div>
 
@@ -66,7 +66,7 @@
 
           <!-- INPUTS -->
           <div v-for="(val, key) in selectedSection.props" :key="key">
-            <label class="text-sm">{{ key }}</label>
+            <label class="text-sm font-medium">{{ key }}</label>
             <input
               v-model="selectedSection.props[key]"
               class="input"
@@ -80,7 +80,7 @@
 
       </div>
 
-      <!-- 🔹 FILE TREE -->
+      <!-- 🔹 FILE TREE (DROITE) -->
       <div class="w-72 bg-white border-l p-4">
 
         <h3 class="font-bold mb-3">📁 Fichiers</h3>
@@ -104,144 +104,18 @@
 
         </ul>
 
+        <!-- 🔴 DELETE -->
         <button
           v-if="selectedSectionFromFile"
           @click="deleteFromTree"
-          class="w-full bg-red-500 text-white mt-4 py-2 rounded"
+          class="w-full bg-red-500 text-white mt-4 py-2 rounded hover:bg-red-600"
         >
-          Supprimer
+          Supprimer section
         </button>
 
       </div>
 
     </div>
 
-    <!-- 🔹 CODE -->
-    <div class="bg-black text-green-400 p-4 h-52 overflow-auto text-xs font-mono">
-      <pre>{{ generatedCode }}</pre>
-    </div>
-
-  </div>
-</template>
-
-<script setup>
-import { ref, computed } from "vue";
-
-import HeaderSection from "../components/sections/HeaderSection.vue";
-import FooterSection from "../components/sections/FooterSection.vue";
-import LogoSection from "../components/sections/LogoSection.vue";
-import MainSection from "../components/sections/MainSection.vue";
-
-// 🔥 AUTO IMPORT
-const modules = import.meta.glob("../components/sections/*.vue", { eager: true });
-
-const excluded = ["HeaderSection","FooterSection","LogoSection","MainSection"];
-
-const registry = {};
-
-Object.entries(modules).forEach(([path, module]) => {
-  const name = path.split("/").pop().replace(".vue", "");
-  if (!excluded.includes(name)) {
-    registry[name] = module.default;
-  }
-});
-
-const availableSections = Object.keys(registry);
-
-// STATE
-const sections = ref([]);
-const selectedSection = ref(null);
-const selectedFile = ref("index.html");
-const selectedSectionFromFile = ref(null);
-
-let draggedIndex = null;
-
-// ADD
-const addSection = (type) => {
-  sections.value.push({
-    id: Date.now(),
-    type,
-    props: { title: "Titre", subtitle: "Sous titre" }
-  });
-};
-
-// SELECT
-const selectSection = (sec) => selectedSection.value = sec;
-const closeEditor = () => selectedSection.value = null;
-
-// DRAG
-const dragStart = (i) => draggedIndex = i;
-const drop = (i) => {
-  const item = sections.value.splice(draggedIndex, 1)[0];
-  sections.value.splice(i, 0, item);
-};
-
-// FILE SELECT
-const selectFile = (file) => {
-  selectedFile.value = file;
-  selectedSectionFromFile.value =
-    sections.value.find((s,i)=>s.type+i===file) || null;
-};
-
-// DELETE
-const deleteFromTree = () => {
-  sections.value = sections.value.filter(
-    s => s.id !== selectedSectionFromFile.value.id
-  );
-  selectedSectionFromFile.value = null;
-};
-
-// COMPONENT
-const getComponent = (type) => registry[type];
-
-// TOOLBAR
-const makeBold = () => {
-  Object.keys(selectedSection.value.props).forEach(k=>{
-    selectedSection.value.props[k] =
-      "<b>"+selectedSection.value.props[k]+"</b>";
-  });
-};
-
-const makeUppercase = () => {
-  Object.keys(selectedSection.value.props).forEach(k=>{
-    selectedSection.value.props[k] =
-      selectedSection.value.props[k].toUpperCase();
-  });
-};
-
-const addEmoji = () => {
-  Object.keys(selectedSection.value.props).forEach(k=>{
-    selectedSection.value.props[k] += " 😊";
-  });
-};
-
-// STYLE
-const fileClass = (file) =>
-  selectedFile.value === file
-    ? "text-blue-500 font-bold cursor-pointer"
-    : "cursor-pointer hover:text-blue-500";
-
-// CODE VIEW
-const generatedCode = computed(()=>{
-  if(selectedFile.value==="index.html"){
-    let html="<body>\n";
-    sections.value.forEach(sec=>{
-      html+=`<div>${sec.type}</div>\n`;
-    });
-    html+="</body>";
-    return html;
-  }
-
-  const sec = sections.value.find((s,i)=>s.type+i===selectedFile.value);
-  if(sec){
-    return JSON.stringify(sec.props,null,2);
-  }
-
-  return "// fichier";
-});
-</script>
-
-<style>
-.input { border:1px solid #ccc; padding:8px; width:100%; margin-bottom:8px; }
-.tool { background:#eee; padding:5px 8px; border-radius:6px; }
-</style>
+    <!-- 🔹 CODE VIEW -->
+    <div class="bg-black text-green-400 p-4 h-52 overflow-auto text-xs
