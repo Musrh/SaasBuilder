@@ -40,24 +40,20 @@
         <LogoSection />
       </div>
 
-      <!-- 📝 TITRE MODIFIABLE -->
+      <!-- 📝 TITRE -->
       <div class="mb-6 text-center">
         <input
           v-if="mode === 'edit'"
           v-model="pageTitle"
           class="text-3xl font-bold border p-2 w-full text-center"
         />
-
         <h1 v-else class="text-3xl font-bold">
           {{ pageTitle }}
         </h1>
       </div>
 
       <!-- 🧱 MAIN SECTION -->
-      <div
-        class="mx-auto border-2 border-gray-300 bg-gray-50 rounded p-6"
-        style="width: 700px; min-height: 1000px;"
-      >
+      <div class="w-full border-2 border-gray-300 bg-white rounded p-6 min-h-[80vh]">
 
         <div class="text-center text-xs text-gray-400 mb-4">
           🧱 MainSection (zone éditable)
@@ -67,42 +63,44 @@
         <div
           v-for="section in sections"
           :key="section.id"
-          class="border p-4 mb-3 rounded cursor-pointer"
+          class="w-full border mb-4 rounded transition relative"
           :class="selectedSection?.id === section.id
             ? 'border-blue-500 bg-blue-50'
             : 'border-gray-200'"
           @click="selectSection(section)"
         >
 
+          <!-- 🔴 DELETE -->
+          <button
+            v-if="mode === 'edit'"
+            @click.stop="deleteSection(section.id)"
+            class="absolute top-2 right-2 text-red-500 text-xs border px-2 py-1 rounded bg-white"
+          >
+            🗑
+          </button>
+
           <!-- ✏️ EDIT MODE -->
-          <div v-if="mode === 'edit' && selectedSection?.id === section.id">
+          <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="p-4">
 
             <!-- TOOLBAR -->
-            <div class="flex gap-2 mb-2">
-              <button @click="applyBold(section)" class="border px-2 rounded font-bold">B</button>
-              <button @click="applyUppercase(section)" class="border px-2 rounded">Aa</button>
-              <button @click="applyEmoji(section)" class="border px-2 rounded">😊</button>
+            <div class="flex gap-2 mb-3 border-b pb-2">
+              <button @click="applyBold(section)" class="px-2 border rounded font-bold">B</button>
+              <button @click="applyUppercase(section)" class="px-2 border rounded">Aa</button>
+              <button @click="applyEmoji(section)" class="px-2 border rounded">😊</button>
               <input type="color" v-model="section.props.color" />
             </div>
 
-            <!-- INPUT -->
-            <input
+            <!-- TEXTAREA -->
+            <textarea
               v-model="section.props.title"
-              class="border p-2 w-full rounded"
+              class="w-full border p-3 rounded min-h-[120px]"
+              placeholder="Écris ton contenu ici..."
             />
-
-            <!-- DELETE -->
-            <button
-              @click.stop="deleteSection(section.id)"
-              class="text-red-500 text-xs mt-2"
-            >
-              🗑 Supprimer
-            </button>
 
           </div>
 
           <!-- 👁 PREVIEW -->
-          <div v-else :style="{ color: section.props.color }">
+          <div v-else class="p-4 whitespace-pre-line" :style="{ color: section.props.color }">
             {{ section.props.title }}
           </div>
 
@@ -144,7 +142,7 @@
 
       </div>
 
-      <!-- CODE -->
+      <!-- CODE VIEW -->
       <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded">
         <div class="text-white mb-2 font-bold">
           {{ selectedFile?.name }}
