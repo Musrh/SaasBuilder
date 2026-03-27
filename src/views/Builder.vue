@@ -24,8 +24,13 @@
           <HeaderSection />
 
           <!-- 🔥 MAIN BUILDER ZONE -->
-          <MainSection class="border-4 border-dashed border-blue-400 p-4 rounded-lg min-h-[300px]">
+          <MainSection class="border-4 border-dashed border-blue-400 bg-white p-4 rounded-xl min-h-[300px]">
 
+            <div class="text-xs text-gray-500 mb-3">
+              ✏️ Mode Builder actif - Clique une section pour l’éditer
+            </div>
+
+            <!-- 🔹 SECTIONS -->
             <div
               v-for="section in filteredSections"
               :key="section.id"
@@ -34,31 +39,38 @@
               @dragover.prevent
               @drop="drop(section.id)"
               @click="selectSection(section)"
-              class="p-3 mb-3 rounded border cursor-move transition"
+              class="p-3 mb-3 rounded border cursor-move transition relative"
               :class="selectedSection?.id === section.id
-                ? 'border-blue-500 bg-blue-50'
+                ? 'border-blue-500 bg-blue-50 shadow'
                 : 'border-gray-200'"
             >
 
-              <!-- 🔥 MODE ÉDITION -->
+              <!-- 🔥 EDIT MODE -->
               <div
                 v-if="selectedSection?.id === section.id"
                 class="mb-3 bg-white p-2 border rounded"
               >
 
                 <!-- Toolbar -->
-                <div class="flex gap-2 mb-2 border-b pb-2">
-                  <button @click="makeBold" class="px-2 border rounded font-bold">B</button>
-                  <button @click="makeUppercase" class="px-2 border rounded">Aa</button>
-                  <button @click="addEmoji" class="px-2 border rounded">😊</button>
+                <div class="flex justify-between items-center mb-2 border-b pb-2">
+
+                  <div class="flex gap-2">
+                    <button @click="makeBold" class="px-2 border rounded font-bold">B</button>
+                    <button @click="makeUppercase" class="px-2 border rounded">Aa</button>
+                    <button @click="addEmoji" class="px-2 border rounded">😊</button>
+                  </div>
+
+                  <button
+                    @click="deleteSection(section.id)"
+                    class="text-red-500 text-xs border px-2 py-1 rounded"
+                  >
+                    🗑 Delete
+                  </button>
+
                 </div>
 
                 <!-- Props editor -->
-                <div
-                  v-for="(val, key) in section.props"
-                  :key="key"
-                  class="mb-2"
-                >
+                <div v-for="(val, key) in section.props" :key="key" class="mb-2">
                   <label class="text-xs font-bold">{{ key }}</label>
                   <input
                     v-model="section.props[key]"
@@ -82,10 +94,9 @@
           <FooterSection />
 
         </div>
-
       </div>
 
-      <!-- 🔹 ARBORESCENCE + CODE -->
+      <!-- 🔹 ARBORESCENCE -->
       <div class="w-80 bg-white border-l p-3">
 
         <h3 class="font-bold mb-2">📁 Arborescence</h3>
@@ -96,10 +107,19 @@
             v-for="file in files"
             :key="file.name"
             @click="selectFile(file.name)"
-            class="cursor-pointer p-2 rounded"
+            class="cursor-pointer p-2 rounded flex justify-between items-center"
             :class="selectedFile === file.name ? 'bg-blue-100 font-bold' : ''"
           >
-            📄 {{ file.name }}
+            <span>📄 {{ file.name }}</span>
+
+            <button
+              v-if="file.deletable"
+              @click.stop="deleteFile(file.name)"
+              class="text-red-500 text-xs"
+            >
+              ✕
+            </button>
+
           </div>
 
         </div>
@@ -125,33 +145,33 @@
 <script setup>
 import { ref, reactive, computed } from "vue"
 
-/* 🔥 IMPORTS CORRIGÉS */
+/* 🔥 IMPORTS */
 import HeaderSection from "../components/sections/HeaderSection.vue"
 import FooterSection from "../components/sections/FooterSection.vue"
 import MainSection from "../components/sections/MainSection.vue"
 import LogoSection from "../components/sections/LogoSection.vue"
 import MenuSection from "../components/sections/MenuSection.vue"
-
+import HeaderSearch from "../components/sections/HeaderSearch.vue"
 
 /* 🔹 STATE */
 const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref("App.vue")
 
-/* 🔹 SECTIONS DISPONIBLES */
+/* 🔹 SECTIONS */
 const availableSections = [
   { name: "Menu", type: "Menu" },
   { name: "Logo", type: "Logo" }
 ]
 
-/* ❌ EXCLUSION */
+/* 🔹 FILTER */
 const excludedInMain = ["HeaderSearch", "Footer"]
 
 const filteredSections = computed(() =>
   sections.value.filter(s => !excludedInMain.includes(s.type))
 )
 
-/* 🔹 MAP COMPONENTS */
+/* 🔹 COMPONENT MAP */
 const componentMap = {
   Menu: MenuSection,
   Logo: LogoSection
@@ -159,25 +179,28 @@ const componentMap = {
 
 const safeGetComponent = (type) => componentMap[type] || "div"
 
-/* 🔹 ARBORESCENCE */
+/* 🔹 FILES */
 const files = ref([
   {
     name: "App.vue",
     content: `<template>
   <div>App.vue</div>
-</template>`
+</template>`,
+    deletable: false
   },
   {
     name: "MainSection.vue",
     content: `<template>
   <section>Main Section</section>
-</template>`
+</template>`,
+    deletable: false
   },
   {
     name: "MenuSection.vue",
     content: `<template>
   <nav>Menu</nav>
-</template>`
+</template>`,
+    deletable: true
   }
 ])
 
@@ -203,7 +226,25 @@ const selectFile = (name) => {
   selectedFile.value = name
 }
 
-/* 🔹 DRAG & DROP */
+/* 🔹 DELETE SECTION */
+const deleteSection = (id) => {
+  sections.value = sections.value.filter(s => s.id !== id)
+
+  if (selectedSection.value?.id === id) {
+    selectedSection.value = null
+  }
+}
+
+/* 🔹 DELETE FILE */
+const deleteFile = (name) => {
+  files.value = files.value.filter(f => f.name !== name)
+
+  if (selectedFile.value === name) {
+    selectedFile.value = "App.vue"
+  }
+}
+
+/* 🔹 DRAG DROP */
 let draggedId = null
 
 const dragStart = (id) => {
