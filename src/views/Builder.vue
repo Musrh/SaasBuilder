@@ -2,8 +2,10 @@
   <div class="h-screen flex bg-gray-100">
 
     <!-- 🧭 LEFT PANEL (SECTIONS) -->
-    <div class="w-64 bg-white border-r p-4 overflow-y-auto">
-
+    <div
+      v-if="mode === 'edit'"
+      class="w-64 bg-white border-r p-4 overflow-y-auto"
+    >
       <h2 class="text-lg font-bold mb-4">🧱 Sections</h2>
 
       <button
@@ -14,27 +16,21 @@
       >
         + {{ name }}
       </button>
-
     </div>
 
-    <!-- 🖥 CENTER (BUILDER) -->
+    <!-- 🖥 CENTER -->
     <div class="flex-1 flex flex-col">
 
       <!-- TOP BAR -->
-      <div class="bg-white border-b p-3 flex justify-between items-center shadow-sm">
-
+      <div
+        v-if="mode === 'edit'"
+        class="bg-white border-b p-3 flex justify-between items-center shadow-sm"
+      >
         <div class="flex gap-2">
-          <button
-            @click="mode = 'edit'"
-            :class="modeBtn('edit')"
-          >
+          <button @click="mode = 'edit'" :class="modeBtn('edit')">
             ✏️ Edit
           </button>
-
-          <button
-            @click="mode = 'preview'"
-            :class="modeBtn('preview')"
-          >
+          <button @click="mode = 'preview'" :class="modeBtn('preview')">
             👁 Preview
           </button>
         </div>
@@ -42,15 +38,20 @@
         <div class="font-semibold text-gray-600">
           Builder SaaS
         </div>
-
       </div>
 
       <!-- CANVAS -->
-      <div class="flex-1 p-6 overflow-y-auto">
+      <div
+        class="flex-1 overflow-y-auto"
+        :class="mode === 'preview' ? 'p-0' : 'p-6'"
+      >
+        <div
+          :class="mode === 'preview'
+            ? 'w-full min-h-screen bg-white'
+            : 'max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6'"
+        >
 
-        <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6">
-
-          <!-- PAGE TITLE -->
+          <!-- TITLE -->
           <input
             v-if="mode === 'edit'"
             v-model="pageTitle"
@@ -65,12 +66,16 @@
           <textarea
             v-if="mode === 'edit'"
             v-model="mainContent"
-            class="w-full border p-3 rounded-lg mb-6"
+            class="w-full min-h-[60vh] border p-4 rounded-lg mb-6 resize-none"
           />
 
-          <div v-else v-html="mainContent" class="mb-6"></div>
+          <div
+            v-else
+            v-html="mainContent"
+            class="w-full min-h-[60vh]"
+          ></div>
 
-          <!-- 🔥 SECTIONS -->
+          <!-- SECTIONS -->
           <div
             v-for="section in sections"
             :key="section.id"
@@ -78,21 +83,24 @@
             @click="selectSection(section)"
           >
 
-            <!-- HOVER BAR -->
-            <div class="absolute top-2 right-2 hidden group-hover:flex gap-2 z-10">
-
+            <!-- DELETE -->
+            <div
+              v-if="mode === 'edit'"
+              class="absolute top-2 right-2 hidden group-hover:flex gap-2"
+            >
               <button
                 @click.stop="deleteSection(section.id)"
                 class="bg-white shadow px-2 py-1 text-xs rounded text-red-500"
               >
                 🗑
               </button>
-
             </div>
 
-            <!-- EDIT MODE -->
-            <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="p-4 bg-blue-50">
-
+            <!-- EDIT -->
+            <div
+              v-if="mode === 'edit' && selectedSection?.id === section.id"
+              class="p-4 bg-blue-50"
+            >
               <!-- TOOLBAR -->
               <div class="flex gap-2 mb-3">
                 <button @click="bold(section)" class="tool">B</button>
@@ -105,7 +113,6 @@
                 v-model="section.props.content"
                 class="w-full border p-3 rounded-lg"
               />
-
             </div>
 
             <!-- PREVIEW -->
@@ -118,19 +125,23 @@
           </div>
 
         </div>
-
       </div>
 
-      <!-- CODE PREVIEW -->
-      <div class="h-56 bg-black text-green-400 text-xs p-3 overflow-auto">
+      <!-- CODE (EDIT ONLY) -->
+      <div
+        v-if="mode === 'edit'"
+        class="h-56 bg-black text-green-400 text-xs p-3 overflow-auto"
+      >
         <pre>{{ generatedCode }}</pre>
       </div>
 
     </div>
 
     <!-- 📁 RIGHT PANEL (FILES) -->
-    <div class="w-72 bg-white border-l p-4 overflow-y-auto">
-
+    <div
+      v-if="mode === 'edit'"
+      class="w-72 bg-white border-l p-4 overflow-y-auto"
+    >
       <h2 class="text-lg font-bold mb-4">📁 Fichiers</h2>
 
       <div
@@ -146,7 +157,6 @@
       <div class="mt-4 bg-gray-900 text-green-400 p-3 text-xs h-40 overflow-auto rounded">
         <pre>{{ selectedFile?.content }}</pre>
       </div>
-
     </div>
 
   </div>
@@ -155,7 +165,7 @@
 <script setup>
 import { ref, computed } from "vue"
 
-/* 🔥 AUTO IMPORT ALL SECTIONS */
+/* 🔥 AUTO LOAD SECTIONS */
 const modules = import.meta.glob("../components/sections/*.vue", { eager: true })
 
 const sectionRegistry = {}
@@ -218,7 +228,7 @@ const files = computed(() => {
   ]
 })
 
-/* GENERATED HTML */
+/* GENERATED CODE */
 const generatedCode = computed(() => {
   return `
 <html>
@@ -239,7 +249,6 @@ const generatedCode = computed(() => {
   border-radius: 6px;
   background: white;
 }
-
 .tool:hover {
   background: #eee;
 }
