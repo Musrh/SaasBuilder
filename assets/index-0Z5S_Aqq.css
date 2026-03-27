@@ -1,0 +1,1 @@
+@apply bg-blue-500 text-white px-3 py-1 rounded;@apply bg-purple-500 text-white px-3 py-1 rounded;@apply border p-2 w-full mb-2 rounded;[draggable=true]:active{opacity:.5}
