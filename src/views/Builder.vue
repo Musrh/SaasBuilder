@@ -121,12 +121,12 @@
 import { ref, reactive, computed } from "vue"
 
 /* 🔥 IMPORT DES SECTIONS (CHEMIN CORRIGÉ) */
-import HeaderSection from "../components/sections/HeaderSection.vue"
-import FooterSection from "../components/sections/FooterSection.vue"
-import MainSection from "../components/sections/MainSection.vue"
-import LogoSection from "../components/sections/LogoSection.vue"
-import MenuSection from "../components/sections/MenuSection.vue"
-import HeaderSearch from "../components/sections/HeaderSearch.vue"
+import HeaderSection from "./components/sections/HeaderSection.vue"
+import FooterSection from "./components/sections/FooterSection.vue"
+import MainSection from "./components/sections/MainSection.vue"
+import LogoSection from "./components/sections/LogoSection.vue"
+import MenuSection from "./components/sections/MenuSection.vue"
+import HeaderSearch from "./components/sections/HeaderSearch.vue"
 
 /* 🔹 STATE */
 const sections = ref([])
