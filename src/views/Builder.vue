@@ -1,210 +1,246 @@
 <template>
-  <div class="flex min-h-screen bg-gray-100">
+  <div class="h-screen flex bg-gray-100">
 
-    <!-- ================= SIDEBAR ================= -->
-    <div class="w-64 bg-white shadow-lg p-4 hidden md:block">
+    <!-- 🧭 LEFT PANEL (SECTIONS) -->
+    <div class="w-64 bg-white border-r p-4 overflow-y-auto">
 
-      <h2 class="text-lg font-bold mb-4">🧩 Sections</h2>
-
-      <button
-        v-for="sec in availableSections"
-        :key="sec.name"
-        @click="addSection(sec)"
-        class="w-full mb-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm"
-      >
-        + {{ sec.name }}
-      </button>
-
-      <hr class="my-4" />
+      <h2 class="text-lg font-bold mb-4">🧱 Sections</h2>
 
       <button
-        v-if="mode === 'edit'"
-        @click="saveAndPreview"
-        class="w-full bg-green-500 text-white py-2 rounded-lg"
+        v-for="(comp, name) in sectionRegistry"
+        :key="name"
+        @click="addSection(name)"
+        class="w-full text-left px-3 py-2 mb-2 rounded-lg border hover:bg-blue-50 hover:border-blue-400 transition"
       >
-        💾 Preview
-      </button>
-
-      <button
-        v-else
-        @click="mode = 'edit'"
-        class="w-full bg-blue-500 text-white py-2 rounded-lg mt-2"
-      >
-        ✏️ Edit
+        + {{ name }}
       </button>
 
     </div>
 
-    <!-- ================= MAIN AREA ================= -->
-    <div class="flex-1 flex justify-center p-4">
+    <!-- 🖥 CENTER (BUILDER) -->
+    <div class="flex-1 flex flex-col">
 
-      <div class="w-full max-w-[1000px] bg-white rounded-2xl shadow-xl p-6">
+      <!-- TOP BAR -->
+      <div class="bg-white border-b p-3 flex justify-between items-center shadow-sm">
 
-        <!-- ================= HEADER ================= -->
-        <div class="text-center mb-4">
-          <LogoSection />
+        <div class="flex gap-2">
+          <button
+            @click="mode = 'edit'"
+            :class="modeBtn('edit')"
+          >
+            ✏️ Edit
+          </button>
+
+          <button
+            @click="mode = 'preview'"
+            :class="modeBtn('preview')"
+          >
+            👁 Preview
+          </button>
         </div>
 
-        <!-- ================= TITLE ================= -->
-        <div class="text-center mb-6">
+        <div class="font-semibold text-gray-600">
+          Builder SaaS
+        </div>
+
+      </div>
+
+      <!-- CANVAS -->
+      <div class="flex-1 p-6 overflow-y-auto">
+
+        <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6">
+
+          <!-- PAGE TITLE -->
           <input
             v-if="mode === 'edit'"
             v-model="pageTitle"
-            class="text-3xl font-bold text-center w-full border rounded-lg p-2"
+            class="text-3xl font-bold w-full border-b mb-6 outline-none"
           />
-          <h1 v-else class="text-3xl font-bold">
+
+          <h1 v-else class="text-3xl font-bold mb-6">
             {{ pageTitle }}
           </h1>
-        </div>
 
-        <!-- ================= MAIN CONTENT ================= -->
-        <div class="bg-gray-50 border rounded-xl p-6 min-h-[200px] mb-6">
-
+          <!-- MAIN CONTENT -->
           <textarea
             v-if="mode === 'edit'"
             v-model="mainContent"
-            class="w-full border rounded-lg p-3 min-h-[120px]"
+            class="w-full border p-3 rounded-lg mb-6"
           />
 
-          <div v-else v-html="mainContent" class="text-gray-700"></div>
+          <div v-else v-html="mainContent" class="mb-6"></div>
 
-        </div>
-
-        <!-- ================= SECTIONS ================= -->
-        <div class="grid gap-4">
-
+          <!-- 🔥 SECTIONS -->
           <div
             v-for="section in sections"
             :key="section.id"
-            class="relative bg-white border rounded-xl p-4 shadow-sm"
+            class="relative group border rounded-xl mb-4 overflow-hidden"
             @click="selectSection(section)"
           >
 
-            <!-- DELETE -->
-            <button
-              v-if="mode === 'edit'"
-              @click.stop="deleteSection(section.id)"
-              class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-xs rounded"
-            >
-              ✕
-            </button>
+            <!-- HOVER BAR -->
+            <div class="absolute top-2 right-2 hidden group-hover:flex gap-2 z-10">
 
-            <!-- ================= IMAGE UPLOAD ================= -->
-            <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="mb-3">
-              <input
-                type="file"
-                accept="image/*"
-                @change="(e) => uploadImage(e, section)"
-                class="text-sm"
-              />
+              <button
+                @click.stop="deleteSection(section.id)"
+                class="bg-white shadow px-2 py-1 text-xs rounded text-red-500"
+              >
+                🗑
+              </button>
+
             </div>
 
-            <!-- IMAGE PREVIEW -->
-            <img
-              v-if="section.props.image"
-              :src="section.props.image"
-              class="w-full max-h-64 object-cover rounded-lg mb-3"
-            />
+            <!-- EDIT MODE -->
+            <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="p-4 bg-blue-50">
 
-            <!-- ================= EDIT MODE ================= -->
-            <textarea
-              v-if="mode === 'edit' && selectedSection?.id === section.id"
-              v-model="section.props.content"
-              class="w-full border rounded-lg p-3 min-h-[100px]"
-            />
+              <!-- TOOLBAR -->
+              <div class="flex gap-2 mb-3">
+                <button @click="bold(section)" class="tool">B</button>
+                <button @click="upper(section)" class="tool">Aa</button>
+                <button @click="emoji(section)" class="tool">😊</button>
+                <input type="color" v-model="section.props.color" />
+              </div>
 
-            <!-- ================= PREVIEW MODE ================= -->
-            <div
+              <textarea
+                v-model="section.props.content"
+                class="w-full border p-3 rounded-lg"
+              />
+
+            </div>
+
+            <!-- PREVIEW -->
+            <component
               v-else
-              v-html="section.props.content"
-              class="text-gray-700"
-            ></div>
+              :is="sectionRegistry[section.type]"
+              v-bind="section.props"
+            />
 
           </div>
 
         </div>
 
-        <!-- ================= FOOTER ================= -->
-        <div class="text-center mt-6 text-gray-500">
-          <FooterSection />
-        </div>
-
       </div>
+
+      <!-- CODE PREVIEW -->
+      <div class="h-56 bg-black text-green-400 text-xs p-3 overflow-auto">
+        <pre>{{ generatedCode }}</pre>
+      </div>
+
+    </div>
+
+    <!-- 📁 RIGHT PANEL (FILES) -->
+    <div class="w-72 bg-white border-l p-4 overflow-y-auto">
+
+      <h2 class="text-lg font-bold mb-4">📁 Fichiers</h2>
+
+      <div
+        v-for="file in files"
+        :key="file.name"
+        @click="selectedFile = file"
+        class="p-2 rounded cursor-pointer hover:bg-gray-100"
+        :class="selectedFile?.name === file.name && 'bg-blue-100 font-bold'"
+      >
+        📄 {{ file.name }}
+      </div>
+
+      <div class="mt-4 bg-gray-900 text-green-400 p-3 text-xs h-40 overflow-auto rounded">
+        <pre>{{ selectedFile?.content }}</pre>
+      </div>
+
     </div>
 
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue"
+import { ref, computed } from "vue"
 
-/* ================= IMPORT SECTIONS ================= */
-import LogoSection from "../components/sections/LogoSection.vue"
-import FooterSection from "../components/sections/FooterSection.vue"
+/* 🔥 AUTO IMPORT ALL SECTIONS */
+const modules = import.meta.glob("../components/sections/*.vue", { eager: true })
 
-/* ================= STATE ================= */
+const sectionRegistry = {}
+
+for (const path in modules) {
+  const name = path.split("/").pop().replace(".vue", "")
+  sectionRegistry[name] = modules[path].default
+}
+
+/* STATE */
 const mode = ref("edit")
 const sections = ref([])
 const selectedSection = ref(null)
+const selectedFile = ref(null)
 
-const pageTitle = ref("SaaS Builder")
-const mainContent = ref("Créer votre site moderne ici 🚀")
+const pageTitle = ref("Mon site")
+const mainContent = ref("<p>Bienvenue sur mon site</p>")
 
-/* ================= AVAILABLE SECTIONS ================= */
-const availableSections = [
-  { name: "Texte", type: "text" },
-  { name: "Titre", type: "title" },
-  { name: "Image", type: "image" }
-]
-
-/* ================= ADD SECTION ================= */
-const addSection = (sec) => {
+/* ADD */
+const addSection = (type) => {
   sections.value.push({
     id: Date.now(),
-    name: sec.name,
-    type: sec.type,
+    type,
     props: {
-      content: `Nouveau bloc ${sec.name}`,
-      image: null
+      content: "Nouveau contenu",
+      color: "#000000"
     }
   })
 }
 
-/* ================= SELECT SECTION ================= */
-const selectSection = (section) => {
-  if (mode.value !== "edit") return
-  selectedSection.value = section
+/* SELECT */
+const selectSection = (s) => {
+  if (mode.value === "preview") return
+  selectedSection.value = s
 }
 
-/* ================= DELETE SECTION ================= */
+/* DELETE */
 const deleteSection = (id) => {
   sections.value = sections.value.filter(s => s.id !== id)
   if (selectedSection.value?.id === id) selectedSection.value = null
 }
 
-/* ================= IMAGE UPLOAD ================= */
-const uploadImage = (event, section) => {
-  const file = event.target.files[0]
-  if (!file) return
+/* TOOLS */
+const bold = (s) => s.props.content = `<b>${s.props.content}</b>`
+const upper = (s) => s.props.content = s.props.content.toUpperCase()
+const emoji = (s) => s.props.content += " 🚀"
 
-  const reader = new FileReader()
+/* UI */
+const modeBtn = (m) =>
+  `px-3 py-1 rounded ${mode.value === m ? "bg-blue-500 text-white" : "bg-gray-200"}`
 
-  reader.onload = (e) => {
-    section.props.image = e.target.result
-  }
+/* FILES */
+const files = computed(() => {
+  return [
+    { name: "index.html", content: generatedCode.value },
+    ...sections.value.map((s, i) => ({
+      name: `${s.type}${i + 1}.vue`,
+      content: `<template><div>${s.props.content}</div></template>`
+    }))
+  ]
+})
 
-  reader.readAsDataURL(file)
-}
-
-/* ================= SAVE ================= */
-const saveAndPreview = () => {
-  selectedSection.value = null
-  mode.value = "preview"
-}
+/* GENERATED HTML */
+const generatedCode = computed(() => {
+  return `
+<html>
+  <body>
+    <h1>${pageTitle.value}</h1>
+    ${mainContent.value}
+    ${sections.value.map(s => `<div>${s.props.content}</div>`).join("")}
+  </body>
+</html>
+  `
+})
 </script>
 
 <style>
-body {
-  font-family: system-ui;
+.tool {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: white;
+}
+
+.tool:hover {
+  background: #eee;
 }
 </style>
