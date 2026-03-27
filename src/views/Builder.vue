@@ -1,10 +1,16 @@
 <template>
   <div class="flex flex-col min-h-screen">
 
-    <!-- 🔹 TOP -->
-    <div class="bg-white shadow p-3 flex gap-2">
-      <button @click="addSection('Header')" class="btn-blue">+ Header</button>
-      <button @click="addSection('Hero')" class="btn-purple">+ Hero</button>
+    <!-- 🔹 TOP BAR -->
+    <div class="bg-white shadow p-3 flex flex-wrap gap-2">
+      <button
+        v-for="sec in availableSections"
+        :key="sec"
+        @click="addSection(sec)"
+        class="bg-blue-500 text-white px-3 py-1 rounded"
+      >
+        + {{ sec }}
+      </button>
     </div>
 
     <div class="flex flex-1">
@@ -13,36 +19,52 @@
       <div class="flex-1 flex flex-col bg-gray-100 p-4">
 
         <!-- 🔹 PREVIEW -->
-        <div class="bg-white p-4 rounded shadow flex-1 overflow-auto">
+        <div class="bg-white rounded shadow p-4 flex-1 overflow-auto">
 
-          <div
-            v-for="(section, index) in sections"
-            :key="section.id"
-            draggable="true"
-            @dragstart="dragStart(index)"
-            @dragover.prevent
-            @drop="drop(index)"
-            @click="selectSection(section)"
-            class="border mb-3 p-2 cursor-move rounded"
-            :class="selectedSection?.id === section.id ? 'border-blue-500' : ''"
-          >
-            <component
-              :is="getComponent(section.type)"
-              v-bind="section.props"
-              :key="section.id + JSON.stringify(section.props)"
-            />
-          </div>
+          <!-- HEADER -->
+          <HeaderSection>
+            <LogoSection />
+          </HeaderSection>
+
+          <!-- MAIN -->
+          <MainSection>
+
+            <div
+              v-for="(section, index) in sections"
+              :key="section.id"
+              draggable="true"
+              @dragstart="dragStart(index)"
+              @dragover.prevent
+              @drop="drop(index)"
+              @click="selectSection(section)"
+              class="border mb-3 p-2 rounded cursor-move"
+              :class="selectedSection?.id === section.id ? 'border-blue-500' : ''"
+            >
+              <component
+                :is="getComponent(section.type)"
+                v-bind="section.props"
+                :key="section.id + JSON.stringify(section.props)"
+              />
+            </div>
+
+          </MainSection>
+
+          <!-- FOOTER -->
+          <FooterSection />
 
         </div>
 
         <!-- 🔹 EDITOR -->
-        <div v-if="selectedSection" class="bg-white p-4 mt-4 shadow rounded">
+        <div v-if="selectedSection" class="bg-white p-4 mt-4 rounded shadow">
 
           <!-- TOOLBAR -->
           <div class="flex gap-2 mb-3 border-b pb-2">
-            <span class="text-sm font-semibold">Mode édition</span>
+            <button @click="makeBold" class="tool">B</button>
+            <button @click="makeUppercase" class="tool">Aa</button>
+            <button @click="addEmoji" class="tool">😊</button>
           </div>
 
+          <!-- INPUTS -->
           <div v-for="(val, key) in selectedSection.props" :key="key">
             <label class="text-sm">{{ key }}</label>
             <input
@@ -58,17 +80,16 @@
 
       </div>
 
-      <!-- 🔹 FILE TREE RIGHT -->
+      <!-- 🔹 FILE TREE -->
       <div class="w-72 bg-white border-l p-4">
 
         <h3 class="font-bold mb-3">📁 Fichiers</h3>
 
         <ul class="space-y-1 text-sm">
 
-          <li @click="selectFile('index.html')" :class="fileClass('index.html')">📄 index.html</li>
-          <li @click="selectFile('App.vue')" :class="fileClass('App.vue')">📄 App.vue</li>
-          <li @click="selectFile('main.js')" :class="fileClass('main.js')">📄 main.js</li>
-          <li @click="selectFile('firebase.js')" :class="fileClass('firebase.js')">📄 firebase.js</li>
+          <li @click="selectFile('index.html')" :class="fileClass('index.html')">index.html</li>
+          <li @click="selectFile('App.vue')" :class="fileClass('App.vue')">App.vue</li>
+          <li @click="selectFile('main.js')" :class="fileClass('main.js')">main.js</li>
 
           <li class="mt-2 font-semibold">Sections</li>
 
@@ -78,25 +99,24 @@
             @click="selectFile(sec.type + i)"
             :class="fileClass(sec.type + i)"
           >
-            📄 {{ sec.type }}{{ i + 1 }}.vue
+            {{ sec.type }}{{ i + 1 }}.vue
           </li>
 
         </ul>
 
-        <!-- 🔥 DELETE FROM TREE -->
         <button
           v-if="selectedSectionFromFile"
           @click="deleteFromTree"
           class="w-full bg-red-500 text-white mt-4 py-2 rounded"
         >
-          Supprimer section
+          Supprimer
         </button>
 
       </div>
 
     </div>
 
-    <!-- 🔹 CODE VIEW -->
+    <!-- 🔹 CODE -->
     <div class="bg-black text-green-400 p-4 h-52 overflow-auto text-xs font-mono">
       <pre>{{ generatedCode }}</pre>
     </div>
@@ -105,142 +125,116 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { auth, db } from "../firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { ref, computed } from "vue";
 
 import HeaderSection from "../components/sections/HeaderSection.vue";
-import HeroSection from "../components/sections/HeroSection.vue";
+import FooterSection from "../components/sections/FooterSection.vue";
+import LogoSection from "../components/sections/LogoSection.vue";
+import MainSection from "../components/sections/MainSection.vue";
 
+// 🔥 AUTO IMPORT
+const modules = import.meta.glob("../components/sections/*.vue", { eager: true });
+
+const excluded = ["HeaderSection","FooterSection","LogoSection","MainSection"];
+
+const registry = {};
+
+Object.entries(modules).forEach(([path, module]) => {
+  const name = path.split("/").pop().replace(".vue", "");
+  if (!excluded.includes(name)) {
+    registry[name] = module.default;
+  }
+});
+
+const availableSections = Object.keys(registry);
+
+// STATE
 const sections = ref([]);
 const selectedSection = ref(null);
 const selectedFile = ref("index.html");
 const selectedSectionFromFile = ref(null);
 
-let userId = null;
 let draggedIndex = null;
 
-const registry = {
-  Header: HeaderSection,
-  Hero: HeroSection
-};
-
-// 🔹 LOAD
-onMounted(() => {
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) return;
-
-    userId = user.uid;
-    const snap = await getDoc(doc(db, "users", user.uid));
-
-    if (snap.exists()) {
-      sections.value = snap.data().sections || [];
-    }
-  });
-});
-
-// 🔹 ADD
+// ADD
 const addSection = (type) => {
   sections.value.push({
     id: Date.now(),
     type,
-    props: type === "Hero"
-      ? { title: "Hero title", subtitle: "Sous titre" }
-      : { title: "Titre" }
+    props: { title: "Titre", subtitle: "Sous titre" }
   });
-
-  save();
 };
 
-// 🔹 SELECT SECTION
-const selectSection = (sec) => {
-  selectedSection.value = sec;
-};
+// SELECT
+const selectSection = (sec) => selectedSection.value = sec;
+const closeEditor = () => selectedSection.value = null;
 
-// 🔹 CLOSE EDITOR
-const closeEditor = () => {
-  selectedSection.value = null;
-};
-
-// 🔹 DRAG
+// DRAG
 const dragStart = (i) => draggedIndex = i;
-
-const drop = async (i) => {
+const drop = (i) => {
   const item = sections.value.splice(draggedIndex, 1)[0];
   sections.value.splice(i, 0, item);
-  draggedIndex = null;
-  await save();
 };
 
-// 🔹 FILE SELECT
+// FILE SELECT
 const selectFile = (file) => {
   selectedFile.value = file;
-
-  const sec = sections.value.find((s, i) => s.type + i === file);
-  selectedSectionFromFile.value = sec || null;
+  selectedSectionFromFile.value =
+    sections.value.find((s,i)=>s.type+i===file) || null;
 };
 
-// 🔹 DELETE FROM TREE
-const deleteFromTree = async () => {
-  if (!selectedSectionFromFile.value) return;
-
+// DELETE
+const deleteFromTree = () => {
   sections.value = sections.value.filter(
     s => s.id !== selectedSectionFromFile.value.id
   );
-
   selectedSectionFromFile.value = null;
-  await save();
 };
 
-// 🔹 CLASS ACTIVE FILE
-const fileClass = (file) => {
-  return selectedFile.value === file
-    ? "text-blue-500 font-bold cursor-pointer"
-    : "cursor-pointer hover:text-blue-500";
-};
+// COMPONENT
+const getComponent = (type) => registry[type];
 
-// 🔹 SAVE
-const save = async () => {
-  if (!userId) return;
-
-  await updateDoc(doc(db, "users", userId), {
-    sections: sections.value
+// TOOLBAR
+const makeBold = () => {
+  Object.keys(selectedSection.value.props).forEach(k=>{
+    selectedSection.value.props[k] =
+      "<b>"+selectedSection.value.props[k]+"</b>";
   });
 };
 
-// 🔹 AUTOSAVE
-const autoSave = () => save();
+const makeUppercase = () => {
+  Object.keys(selectedSection.value.props).forEach(k=>{
+    selectedSection.value.props[k] =
+      selectedSection.value.props[k].toUpperCase();
+  });
+};
 
-// 🔹 COMPONENT
-const getComponent = (type) => registry[type];
+const addEmoji = () => {
+  Object.keys(selectedSection.value.props).forEach(k=>{
+    selectedSection.value.props[k] += " 😊";
+  });
+};
 
-// 🔹 CODE GENERATOR
-const generatedCode = computed(() => {
+// STYLE
+const fileClass = (file) =>
+  selectedFile.value === file
+    ? "text-blue-500 font-bold cursor-pointer"
+    : "cursor-pointer hover:text-blue-500";
 
-  if (selectedFile.value === "index.html") {
-    let html = `<html>\n<body>\n`;
-
-    sections.value.forEach(sec => {
-      if (sec.type === "Header") {
-        html += `<h1>${sec.props.title}</h1>\n`;
-      }
-      if (sec.type === "Hero") {
-        html += `<section><h2>${sec.props.title}</h2><p>${sec.props.subtitle}</p></section>\n`;
-      }
+// CODE VIEW
+const generatedCode = computed(()=>{
+  if(selectedFile.value==="index.html"){
+    let html="<body>\n";
+    sections.value.forEach(sec=>{
+      html+=`<div>${sec.type}</div>\n`;
     });
-
-    html += `</body>\n</html>`;
+    html+="</body>";
     return html;
   }
 
-  const sec = sections.value.find((s, i) => s.type + i === selectedFile.value);
-
-  if (sec) {
-    return `<template>
-  <div>
-    ${JSON.stringify(sec.props, null, 2)}
-  </div>
-</template>`;
+  const sec = sections.value.find((s,i)=>s.type+i===selectedFile.value);
+  if(sec){
+    return JSON.stringify(sec.props,null,2);
   }
 
   return "// fichier";
@@ -248,11 +242,6 @@ const generatedCode = computed(() => {
 </script>
 
 <style>
-.btn-blue { @apply bg-blue-500 text-white px-3 py-1 rounded; }
-.btn-purple { @apply bg-purple-500 text-white px-3 py-1 rounded; }
-.input { @apply border p-2 w-full mb-2 rounded; }
-
-[draggable="true"]:active {
-  opacity: 0.5;
-}
+.input { border:1px solid #ccc; padding:8px; width:100%; margin-bottom:8px; }
+.tool { background:#eee; padding:5px 8px; border-radius:6px; }
 </style>
