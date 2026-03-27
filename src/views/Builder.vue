@@ -59,6 +59,19 @@
           🧱 MainSection (zone éditable)
         </div>
 
+        <!-- 🔥 ZONE DE SAISIE PRINCIPALE -->
+        <textarea
+          v-if="mode === 'edit'"
+          v-model="mainContent"
+          class="w-full border p-4 rounded min-h-[200px] mb-6"
+          placeholder="Écris ton contenu principal ici..."
+        />
+
+        <!-- 👁 PREVIEW -->
+        <div v-else class="mb-6 whitespace-pre-line">
+          {{ mainContent }}
+        </div>
+
         <!-- 🔥 SECTIONS -->
         <div
           v-for="section in sections"
@@ -70,7 +83,7 @@
           @click="selectSection(section)"
         >
 
-          <!-- 🔴 DELETE -->
+          <!-- 🗑 DELETE -->
           <button
             v-if="mode === 'edit'"
             @click.stop="deleteSection(section.id)"
@@ -79,7 +92,7 @@
             🗑
           </button>
 
-          <!-- ✏️ EDIT MODE -->
+          <!-- ✏️ EDIT -->
           <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="p-4">
 
             <!-- TOOLBAR -->
@@ -94,7 +107,7 @@
             <textarea
               v-model="section.props.title"
               class="w-full border p-3 rounded min-h-[120px]"
-              placeholder="Écris ton contenu ici..."
+              placeholder="Contenu section..."
             />
 
           </div>
@@ -168,6 +181,9 @@ const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref(null)
 const pageTitle = ref("Titre par défaut")
+
+/* 🆕 CONTENU GLOBAL */
+const mainContent = ref("Mon site créé avec mon builder")
 
 /* SECTIONS DISPONIBLES */
 const availableSections = [
