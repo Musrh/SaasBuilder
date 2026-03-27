@@ -135,10 +135,10 @@
 import { ref, reactive } from "vue"
 
 /* 🔹 COMPONENTS */
-import HeaderSection from "@/sections/HeaderSection.vue"
-import FooterSection from "@/sections/FooterSection.vue"
-import MainSection from "@/sections/MainSection.vue"
-import LogoSection from "@/sections/LogoSection.vue"
+import HeaderSection from "../sections/HeaderSection.vue"
+import FooterSection from "../sections/FooterSection.vue"
+import MainSection from "../sections/MainSection.vue"
+import LogoSection from "../sections/LogoSection.vue"
 
 /* 🔹 AVAILABLE SECTIONS */
 const availableSections = [
