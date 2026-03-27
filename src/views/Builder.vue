@@ -1,36 +1,49 @@
 <template>
   <div class="h-screen flex bg-gray-100">
 
-    <!-- 🧭 LEFT PANEL (SECTIONS PRO) -->
+    <!-- LEFT PANEL -->
     <div v-if="mode === 'edit'" class="w-64 bg-white border-r p-4 overflow-y-auto">
 
-      <h2 class="font-bold mb-4">🧱 Ajouter une section</h2>
+      <h2 class="font-bold mb-3">📄 Pages</h2>
 
-      <div class="space-y-2">
-
-        <button
-          v-for="name in filteredSections"
-          :key="name"
-          @click="addSection(name)"
-          class="w-full flex items-center justify-between px-3 py-2 rounded-lg border hover:bg-blue-50 transition"
-        >
-          <span>{{ sectionLabels[name] || name }}</span>
-          <span class="text-gray-400">＋</span>
-        </button>
-
+      <div
+        v-for="(p, i) in pages"
+        :key="p.id"
+        @click="currentPageIndex = i"
+        class="p-2 rounded cursor-pointer mb-1"
+        :class="currentPageIndex === i ? 'bg-blue-100 font-bold' : ''"
+      >
+        {{ p.name }}
       </div>
+
+      <button @click="addPage" class="w-full mt-2 bg-green-500 text-white p-2 rounded">
+        + Page
+      </button>
+
+      <hr class="my-4" />
+
+      <h2 class="font-bold mb-3">🧱 Sections</h2>
+
+      <button
+        v-for="(comp, name) in filteredSections"
+        :key="name"
+        @click="addSection(name)"
+        class="w-full text-left px-3 py-2 mb-2 rounded border hover:bg-blue-50"
+      >
+        + {{ name }}
+      </button>
 
     </div>
 
-    <!-- 🖥 CENTER -->
+    <!-- CENTER -->
     <div class="flex-1 flex flex-col">
 
-      <!-- 🔝 TOP BAR -->
+      <!-- TOP BAR -->
       <div v-if="mode === 'edit'" class="bg-white border-b p-3 flex justify-between">
 
         <div class="flex gap-2">
           <button @click="saveData" class="bg-green-500 text-white px-3 py-1 rounded">
-            💾 Sauvegarder
+            💾 Save
           </button>
 
           <button @click="mode='preview'" class="bg-blue-500 text-white px-3 py-1 rounded">
@@ -40,7 +53,7 @@
 
       </div>
 
-      <!-- 🧱 CANVAS -->
+      <!-- CANVAS -->
       <div class="flex-1 overflow-y-auto" :class="mode==='preview' ? 'p-0' : 'p-6'">
 
         <div :class="mode==='preview'
@@ -48,40 +61,48 @@
           : 'max-w-4xl mx-auto bg-white shadow rounded p-6'">
 
           <!-- 🔝 STRUCTURE FIXE -->
+
           <LogoSection />
           <HeaderSection />
           <MenuSection />
 
-          <!-- 🧱 MAIN -->
+          <!-- MAIN -->
           <div class="mt-6">
+
+            <!-- NAV PAGES -->
+            <div class="flex gap-2 mb-4">
+              <button
+                v-for="(p,i) in pages"
+                :key="p.id"
+                @click="currentPageIndex=i"
+                class="px-3 py-1 border rounded"
+                :class="i===currentPageIndex && 'bg-blue-500 text-white'"
+              >
+                {{ p.name }}
+              </button>
+            </div>
 
             <!-- CONTENT -->
             <textarea
               v-if="mode==='edit'"
               v-model="pages[currentPageIndex].content"
-              class="w-full min-h-[50vh] border p-3 mb-4"
-              placeholder="Votre contenu ici..."
+              class="w-full min-h-[40vh] border p-3 mb-4"
             />
 
-            <div
-              v-else
-              v-html="pages[currentPageIndex].content"
-              class="mb-4"
-            ></div>
+            <div v-else v-html="pages[currentPageIndex].content"></div>
 
-            <!-- 🔥 SECTIONS -->
+            <!-- SECTIONS -->
             <div
               v-for="section in pages[currentPageIndex].sections"
               :key="section.id"
-              class="border mb-3 p-3 relative rounded"
+              class="border mb-3 p-3 relative"
               @click="selectSection(section)"
             >
 
-              <!-- DELETE -->
               <button
                 v-if="mode==='edit'"
                 @click.stop="deleteSection(section.id)"
-                class="absolute top-1 right-1 text-red-500 text-xs"
+                class="absolute top-1 right-1 text-red-500"
               >
                 ✕
               </button>
@@ -95,21 +116,17 @@
                   @change="uploadImage($event, section)"
                 />
 
-                <img
-                  v-if="section.props.src"
-                  :src="section.props.src"
-                  class="w-full rounded mt-2"
-                />
+                <img v-if="section.props.src" :src="section.props.src" class="w-full" />
 
               </div>
 
-              <!-- AUTRES -->
+              <!-- TEXT -->
               <div v-else>
 
                 <textarea
                   v-if="mode==='edit'"
                   v-model="section.props.content"
-                  class="w-full border p-2 rounded"
+                  class="w-full border p-2"
                 />
 
                 <component
@@ -129,15 +146,15 @@
         </div>
       </div>
 
-      <!-- 🧾 CODE VIEW -->
+      <!-- CODE VIEW -->
       <div v-if="mode==='edit'" class="h-56 bg-black text-green-400 p-2 text-xs overflow-auto">
         <pre>{{ selectedFile?.content }}</pre>
       </div>
 
     </div>
 
-    <!-- 📁 RIGHT PANEL (ARBORESCENCE) -->
-    <div v-if="mode==='edit'" class="w-72 bg-white border-l p-4 overflow-y-auto">
+    <!-- RIGHT PANEL FILES -->
+    <div v-if="mode==='edit'" class="w-72 bg-white border-l p-4">
 
       <h2 class="font-bold mb-3">📁 Arborescence</h2>
 
@@ -145,18 +162,19 @@
         v-for="file in files"
         :key="file.name"
         @click="selectedFile=file"
-        class="p-2 cursor-pointer hover:bg-gray-100 rounded flex justify-between"
-        :class="selectedFile?.name===file.name && 'bg-blue-100 font-bold'"
+        class="p-2 cursor-pointer hover:bg-gray-100"
+        :class="selectedFile?.name===file.name && 'bg-blue-100'"
       >
-        <span>📄 {{ file.name }}</span>
+        📄 {{ file.name }}
 
         <button
           v-if="file.sectionId"
           @click.stop="deleteSection(file.sectionId)"
-          class="text-red-500 text-xs"
+          class="text-red-500 float-right"
         >
           ✕
         </button>
+
       </div>
 
     </div>
@@ -172,7 +190,7 @@ import HeaderSection from "../components/sections/HeaderSection.vue"
 import MenuSection from "../components/sections/MenuSection.vue"
 import FooterSection from "../components/sections/FooterSection.vue"
 
-/* 🔥 AUTO LOAD */
+/* AUTO LOAD */
 const modules = import.meta.glob("../components/sections/*.vue", { eager: true })
 const sectionRegistry = {}
 
@@ -188,42 +206,41 @@ const currentPageIndex = ref(0)
 const selectedSection = ref(null)
 const selectedFile = ref(null)
 
-/* LABELS */
-const sectionLabels = {
-  HeroSection: "Hero (Accueil)",
-  ImageSection: "Image",
-  TextSection: "Texte",
-  FeatureSection: "Fonctionnalités",
-  ContactSection: "Contact"
-}
-
 /* LOAD */
 onMounted(() => {
   const saved = localStorage.getItem("builderData")
-  pages.value = saved
-    ? JSON.parse(saved)
-    : [{
-        id: 1,
-        name: "Accueil",
-        content: "",
-        sections: []
-      }]
+  pages.value = saved ? JSON.parse(saved) : [{
+    id: 1,
+    name: "Accueil",
+    content: "",
+    sections: []
+  }]
 })
 
 /* SAVE */
 const saveData = () => {
   localStorage.setItem("builderData", JSON.stringify(pages.value))
-  alert("✅ Sauvegardé")
+  alert("Sauvegardé")
 }
 
-/* FILTER */
+/* ADD PAGE */
+const addPage = () => {
+  pages.value.push({
+    id: Date.now(),
+    name: "Nouvelle page",
+    content: "",
+    sections: []
+  })
+}
+
+/* FILTER sections */
 const filteredSections = computed(() => {
   return Object.keys(sectionRegistry).filter(
     s => !["LogoSection","HeaderSection","MenuSection","FooterSection"].includes(s)
   )
 })
 
-/* ADD */
+/* ADD SECTION */
 const addSection = (type) => {
   pages.value[currentPageIndex.value].sections.push({
     id: Date.now(),
@@ -258,23 +275,15 @@ const uploadImage = (e, section) => {
 /* FILE TREE */
 const files = computed(() => {
   return [
-    { name: "LogoSection.vue", content: "<LogoSection />" },
-    { name: "HeaderSection.vue", content: "<HeaderSection />" },
-    { name: "MenuSection.vue", content: "<MenuSection />" },
-
-    ...pages.value[currentPageIndex.value].sections.map((s, i) => ({
-      name: `${s.type}${i + 1}.vue`,
-      content: `<template>\n  <div>${s.props.content || ''}</div>\n</template>`,
+    { name: "LogoSection.vue", content: "<Logo />" },
+    { name: "HeaderSection.vue", content: "<Header />" },
+    { name: "MenuSection.vue", content: "<Menu />" },
+    ...pages.value[currentPageIndex.value].sections.map((s,i)=>({
+      name: `${s.type}${i+1}.vue`,
+      content: `<template>${s.props.content||''}</template>`,
       sectionId: s.id
     })),
-
-    { name: "FooterSection.vue", content: "<FooterSection />" }
+    { name: "FooterSection.vue", content: "<Footer />" }
   ]
 })
 </script>
-
-<style>
-body {
-  font-family: system-ui;
-}
-</style>
