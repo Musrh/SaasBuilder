@@ -15,10 +15,10 @@
     <!-- 🔹 MAIN -->
     <div class="flex flex-col md:flex-row flex-1">
 
-      <!-- 🔹 LEFT (PREVIEW + EDITOR) -->
+      <!-- 🔹 LEFT -->
       <div class="w-full md:w-3/4 p-4 bg-gray-100 flex flex-col">
 
-        <!-- PREVIEW -->
+        <!-- 🔹 PREVIEW -->
         <div class="bg-white shadow p-4 flex-1 overflow-auto rounded">
 
           <div
@@ -35,26 +35,29 @@
             <component
               :is="getComponent(section.type)"
               v-bind="section.props"
+              :key="section.id + JSON.stringify(section.props)"
             />
           </div>
 
         </div>
 
-        <!-- EDITOR -->
+        <!-- 🔹 EDITOR -->
         <div v-if="selectedSection" class="bg-white p-4 mt-4 shadow rounded">
 
           <h3 class="font-bold mb-2">Edition</h3>
 
           <div v-for="(val, key) in selectedSection.props" :key="key">
             <label class="text-sm text-gray-600">{{ key }}</label>
+
             <input
               v-model="selectedSection.props[key]"
               class="border p-2 w-full mb-2 rounded"
               @input="autoSave"
+              @blur="closeEditor"
+              @keyup.enter="closeEditor"
             />
           </div>
 
-          <!-- DELETE -->
           <button
             @click="deleteSection"
             class="w-full bg-red-500 text-white py-2 rounded mt-2"
@@ -66,34 +69,49 @@
 
       </div>
 
-      <!-- 🔹 RIGHT (FILES TREE) -->
+      <!-- 🔹 RIGHT FILE TREE -->
       <div class="w-full md:w-1/4 bg-white p-4 shadow">
 
         <h3 class="font-bold mb-4">Fichiers</h3>
 
         <ul class="text-sm space-y-1">
-          <li>📄 index.html</li>
-          <li>📄 App.vue</li>
-          <li>📄 main.js</li>
-          <li>📄 firebase.js</li>
-          <li>📄 package.json</li>
+
+          <li @click="selectFile('index.html')" class="cursor-pointer hover:text-blue-500">
+            📄 index.html
+          </li>
+
+          <li @click="selectFile('App.vue')" class="cursor-pointer hover:text-blue-500">
+            📄 App.vue
+          </li>
+
+          <li @click="selectFile('main.js')" class="cursor-pointer hover:text-blue-500">
+            📄 main.js
+          </li>
+
+          <li @click="selectFile('firebase.js')" class="cursor-pointer hover:text-blue-500">
+            📄 firebase.js
+          </li>
 
           <li class="mt-2 font-semibold">Sections :</li>
 
-          <li v-for="(sec, i) in sections" :key="sec.id">
+          <li
+            v-for="(sec, i) in sections"
+            :key="sec.id"
+            @click="selectFile(sec.type + i)"
+            class="cursor-pointer hover:text-blue-500"
+          >
             📄 {{ sec.type }}{{ i + 1 }}.vue
           </li>
+
         </ul>
 
       </div>
 
     </div>
 
-    <!-- 🔹 BOTTOM (CODE VIEW) -->
+    <!-- 🔹 BOTTOM CODE -->
     <div class="bg-black text-green-400 p-4 text-xs h-48 overflow-auto font-mono">
-
       <pre>{{ generatedCode }}</pre>
-
     </div>
 
   </div>
@@ -104,16 +122,14 @@ import { ref, onMounted, computed } from "vue";
 import { auth, db } from "../firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
-// 🔹 IMPORT COMPONENTS
 import HeaderSection from "../components/sections/HeaderSection.vue";
 import HeroSection from "../components/sections/HeroSection.vue";
 
 // 🔹 STATE
 const sections = ref([]);
 const selectedSection = ref(null);
+const selectedFile = ref("index.html");
 let userId = null;
-
-// 🔹 DRAG STATE
 let draggedIndex = null;
 
 // 🔹 REGISTRY
@@ -122,7 +138,7 @@ const registry = {
   Hero: HeroSection
 };
 
-// 🔹 LOAD USER DATA
+// 🔹 LOAD
 onMounted(() => {
   auth.onAuthStateChanged(async (user) => {
     if (!user) return;
@@ -134,7 +150,6 @@ onMounted(() => {
     if (snap.exists()) {
       const data = snap.data().sections || [];
 
-      // 🔥 Anti-duplication
       const unique = [];
       const ids = new Set();
 
@@ -150,7 +165,7 @@ onMounted(() => {
   });
 });
 
-// 🔹 ADD SECTION
+// 🔹 ADD
 const addSection = (type) => {
   sections.value.push({
     id: Date.now(),
@@ -169,6 +184,11 @@ const selectSection = (section) => {
   selectedSection.value = section;
 };
 
+// 🔹 CLOSE EDITOR
+const closeEditor = () => {
+  selectedSection.value = null;
+};
+
 // 🔹 DELETE
 const deleteSection = async () => {
   const index = sections.value.findIndex(s => s.id === selectedSection.value.id);
@@ -179,12 +199,11 @@ const deleteSection = async () => {
   }
 };
 
-// 🔹 DRAG START
+// 🔹 DRAG
 const dragStart = (index) => {
   draggedIndex = index;
 };
 
-// 🔹 DROP
 const drop = async (index) => {
   if (draggedIndex === null) return;
 
@@ -192,14 +211,18 @@ const drop = async (index) => {
   sections.value.splice(index, 0, moved);
 
   draggedIndex = null;
-
   await save();
 };
 
-// 🔹 GET COMPONENT
+// 🔹 FILE SELECT
+const selectFile = (file) => {
+  selectedFile.value = file;
+};
+
+// 🔹 COMPONENT
 const getComponent = (type) => registry[type];
 
-// 🔹 SAVE FIRESTORE
+// 🔹 SAVE
 const save = async () => {
   if (!userId) return;
 
@@ -208,31 +231,57 @@ const save = async () => {
   });
 };
 
-// 🔹 AUTO SAVE
+// 🔹 AUTOSAVE
 const autoSave = () => {
   save();
 };
 
-// 🔹 GENERATE HTML
+// 🔹 CODE GENERATOR
 const generatedCode = computed(() => {
-  let html = `<html>\n  <body>\n`;
 
-  sections.value.forEach(sec => {
-    if (sec.type === "Header") {
-      html += `    <h1>${sec.props.title}</h1>\n`;
-    }
+  if (selectedFile.value === "index.html") {
+    let html = `<html>\n  <body>\n`;
 
-    if (sec.type === "Hero") {
-      html += `    <section>\n`;
-      html += `      <h2>${sec.props.title}</h2>\n`;
-      html += `      <p>${sec.props.subtitle}</p>\n`;
-      html += `    </section>\n`;
-    }
-  });
+    sections.value.forEach(sec => {
+      if (sec.type === "Header") {
+        html += `    <h1>${sec.props.title}</h1>\n`;
+      }
 
-  html += `  </body>\n</html>`;
+      if (sec.type === "Hero") {
+        html += `    <section>\n`;
+        html += `      <h2>${sec.props.title}</h2>\n`;
+        html += `      <p>${sec.props.subtitle}</p>\n`;
+        html += `    </section>\n`;
+      }
+    });
 
-  return html;
+    html += `  </body>\n</html>`;
+    return html;
+  }
+
+  if (selectedFile.value === "App.vue") {
+    return `<template>\n  <router-view />\n</template>`;
+  }
+
+  if (selectedFile.value === "main.js") {
+    return `createApp(App).use(router).mount('#app')`;
+  }
+
+  if (selectedFile.value === "firebase.js") {
+    return `// Firebase config`;
+  }
+
+  const sec = sections.value.find((s, i) => s.type + i === selectedFile.value);
+
+  if (sec) {
+    return `<template>
+  <div>
+    ${JSON.stringify(sec.props, null, 2)}
+  </div>
+</template>`;
+  }
+
+  return "";
 });
 </script>
 
@@ -240,7 +289,6 @@ const generatedCode = computed(() => {
 [draggable="true"] {
   transition: all 0.2s ease;
 }
-
 [draggable="true"]:active {
   opacity: 0.5;
 }
