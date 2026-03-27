@@ -1,12 +1,15 @@
 <template>
-  <div class="p-6 bg-gray-100 min-h-screen flex flex-col items-center">
+  <div
+    class="p-6 bg-gray-100 min-h-screen flex flex-col items-center"
+    @click.self="selectedSection = null"
+  >
 
     <!-- 🔥 MODE SWITCH -->
     <div class="mb-4 flex gap-2">
       <button
         v-if="mode === 'edit'"
         @click="saveAndPreview"
-        class="bg-green-500 text-white px-4 py-2 rounded"
+        class="bg-green-500 text-white px-4 py-2 rounded-lg shadow"
       >
         💾 Preview
       </button>
@@ -14,114 +17,116 @@
       <button
         v-else
         @click="mode = 'edit'"
-        class="bg-blue-500 text-white px-4 py-2 rounded"
+        class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow"
       >
         ✏️ Edit
       </button>
     </div>
 
-    <!-- 🔥 SECTIONS DISPONIBLES -->
+    <!-- 🔥 SECTIONS -->
     <div v-if="mode === 'edit'" class="mb-4 flex gap-2 flex-wrap justify-center">
       <button
         v-for="sec in availableSections"
         :key="sec.type"
         @click="addSection(sec)"
-        class="bg-blue-500 text-white px-3 py-1 rounded"
+        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg"
       >
         + {{ sec.name }}
       </button>
     </div>
 
     <!-- ================= PAGE ================= -->
-    <div class="w-full max-w-[900px] bg-white shadow-lg rounded p-6">
+    <div class="w-full max-w-[900px] bg-white shadow-xl rounded-2xl p-6">
 
-      <!-- 🔝 LOGO -->
+      <!-- LOGO -->
       <div class="mb-4 text-center">
         <LogoSection />
       </div>
 
-      <!-- 📝 TITRE -->
+      <!-- TITLE -->
       <div class="mb-6 text-center">
         <input
           v-if="mode === 'edit'"
           v-model="pageTitle"
-          class="text-3xl font-bold border p-2 w-full text-center"
+          class="text-3xl font-bold border p-2 w-full text-center rounded"
         />
         <h1 v-else class="text-3xl font-bold">
           {{ pageTitle }}
         </h1>
       </div>
 
-      <!-- 🧱 MAIN SECTION -->
-      <div class="w-full border-2 border-gray-300 bg-white rounded p-6 min-h-[80vh]">
+      <!-- MAIN -->
+      <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 min-h-[300px]">
 
-        <div class="text-center text-xs text-gray-400 mb-4">
+        <div class="text-center text-gray-400 text-sm mb-4">
           🧱 MainSection (zone éditable)
         </div>
 
-        <!-- 🔥 ZONE DE SAISIE PRINCIPALE -->
+        <!-- CONTENU GLOBAL -->
         <textarea
           v-if="mode === 'edit'"
           v-model="mainContent"
-          class="w-full border p-4 rounded min-h-[200px] mb-6"
-          placeholder="Écris ton contenu principal ici..."
+          class="w-full border p-4 rounded-lg mb-6"
         />
 
-        <!-- 👁 PREVIEW -->
-        <div v-else class="mb-6 whitespace-pre-line">
-          {{ mainContent }}
-        </div>
+        <div
+          v-else
+          class="mb-6"
+          v-html="mainContent"
+        ></div>
 
-        <!-- 🔥 SECTIONS -->
+        <!-- SECTIONS -->
         <div
           v-for="section in sections"
           :key="section.id"
-          class="w-full border mb-4 rounded transition relative"
+          @click.stop="selectSection(section)"
+          class="relative border rounded-lg mb-4 transition"
           :class="selectedSection?.id === section.id
             ? 'border-blue-500 bg-blue-50'
             : 'border-gray-200'"
-          @click="selectSection(section)"
         >
 
-          <!-- 🗑 DELETE -->
+          <!-- DELETE -->
           <button
             v-if="mode === 'edit'"
             @click.stop="deleteSection(section.id)"
-            class="absolute top-2 right-2 text-red-500 text-xs border px-2 py-1 rounded bg-white"
+            class="absolute top-2 right-2 text-red-500 text-xs bg-white border px-2 py-1 rounded"
           >
             🗑
           </button>
 
-          <!-- ✏️ EDIT -->
+          <!-- EDIT -->
           <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="p-4">
 
             <!-- TOOLBAR -->
             <div class="flex gap-2 mb-3 border-b pb-2">
-              <button @click="applyBold(section)" class="px-2 border rounded font-bold">B</button>
-              <button @click="applyUppercase(section)" class="px-2 border rounded">Aa</button>
-              <button @click="applyEmoji(section)" class="px-2 border rounded">😊</button>
+              <button @click="applyBold(section)" class="tool">B</button>
+              <button @click="applyUppercase(section)" class="tool">Aa</button>
+              <button @click="applyEmoji(section)" class="tool">😊</button>
               <input type="color" v-model="section.props.color" />
             </div>
 
-            <!-- TEXTAREA -->
+            <!-- TEXT -->
             <textarea
               v-model="section.props.title"
-              class="w-full border p-3 rounded min-h-[120px]"
-              placeholder="Contenu section..."
+              class="w-full border p-3 rounded-lg min-h-[120px]"
             />
 
           </div>
 
-          <!-- 👁 PREVIEW -->
-          <div v-else class="p-4 whitespace-pre-line" :style="{ color: section.props.color }">
-            {{ section.props.title }}
-          </div>
+          <!-- PREVIEW -->
+          <div
+            v-else
+            class="p-4"
+            :style="{ color: section.props.color }"
+            v-html="section.props.title"
+          />
 
         </div>
 
       </div>
 
-      <!-- 🔻 FOOTER -->
+      <!-- FOOTER -->
       <div class="mt-6 text-center">
         <FooterSection />
       </div>
@@ -129,7 +134,7 @@
     </div>
 
     <!-- ================= FILES ================= -->
-    <div class="w-full max-w-[900px] mt-6 bg-white p-4 border rounded">
+    <div class="w-full max-w-[900px] mt-6 bg-white p-4 border rounded-xl shadow">
 
       <h3 class="font-bold mb-3">📁 Fichiers</h3>
 
@@ -155,8 +160,8 @@
 
       </div>
 
-      <!-- CODE VIEW -->
-      <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded">
+      <!-- CODE -->
+      <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded-lg">
         <div class="text-white mb-2 font-bold">
           {{ selectedFile?.name }}
         </div>
@@ -180,12 +185,11 @@ const mode = ref("edit")
 const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref(null)
-const pageTitle = ref("Titre par défaut")
 
-/* 🆕 CONTENU GLOBAL */
+const pageTitle = ref("Titre par défaut")
 const mainContent = ref("Mon site créé avec mon builder")
 
-/* SECTIONS DISPONIBLES */
+/* SECTIONS */
 const availableSections = [
   { name: "Texte", type: "Text" },
   { name: "Titre", type: "Heading" },
@@ -213,11 +217,15 @@ const selectSection = (section) => {
 /* DELETE */
 const deleteSection = (id) => {
   sections.value = sections.value.filter(s => s.id !== id)
+
+  if (selectedSection.value?.id === id) {
+    selectedSection.value = null
+  }
 }
 
 /* TOOLS */
 const applyBold = (section) => {
-  section.props.title = `**${section.props.title}**`
+  section.props.title = `<b>${section.props.title}</b>`
 }
 
 const applyUppercase = (section) => {
@@ -230,12 +238,17 @@ const applyEmoji = (section) => {
 
 /* MODE */
 const saveAndPreview = () => {
+  selectedSection.value = null
   mode.value = "preview"
 }
 
 /* FILES */
 const computedFiles = computed(() => {
   const base = [
+    {
+      name: "index.html",
+      content: `<body>\n<h1>${pageTitle.value}</h1>\n${mainContent.value}\n</body>`
+    },
     { name: "App.vue", content: "<template>App</template>" },
     { name: "MainSection.vue", content: "<template>Main</template>" }
   ]
@@ -254,3 +267,16 @@ const selectFile = (file) => {
   selectedFile.value = file
 }
 </script>
+
+<style>
+.tool {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tool:hover {
+  background: #eee;
+}
+</style>
