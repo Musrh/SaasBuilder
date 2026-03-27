@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
-import { auth, db } from "@/firebase"
+import { auth, db } from "../firebase"
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
 
 import LogoSection from "../components/sections/LogoSection.vue"
