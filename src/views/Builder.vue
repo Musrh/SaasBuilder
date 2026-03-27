@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 bg-gray-100 min-h-screen">
+  <div class="p-6 bg-gray-100 min-h-screen flex flex-col items-center">
 
     <!-- 🔥 MODE SWITCH -->
     <div class="mb-4 flex gap-2">
@@ -12,7 +12,7 @@
       </button>
 
       <button
-        v-else"
+        v-else
         @click="mode = 'edit'"
         class="bg-blue-500 text-white px-4 py-2 rounded"
       >
@@ -20,134 +20,137 @@
       </button>
     </div>
 
-    <div class="flex gap-6">
+    <!-- 🔥 SECTIONS DISPONIBLES -->
+    <div v-if="mode === 'edit'" class="mb-4 flex gap-2 flex-wrap justify-center">
+      <button
+        v-for="sec in availableSections"
+        :key="sec.type"
+        @click="addSection(sec)"
+        class="bg-blue-500 text-white px-3 py-1 rounded"
+      >
+        + {{ sec.name }}
+      </button>
+    </div>
 
-      <!-- ================= LEFT ================= -->
-      <div class="flex-1">
+    <!-- ================= PAGE ================= -->
+    <div class="w-full max-w-[900px] bg-white shadow-lg rounded p-6">
 
-        <!-- 🔥 SECTIONS -->
-        <div v-if="mode === 'edit'" class="mb-4 flex gap-2 flex-wrap">
-          <button
-            v-for="sec in availableSections"
-            :key="sec.type"
-            @click="addSection(sec)"
-            class="bg-blue-500 text-white px-3 py-1 rounded"
-          >
-            + {{ sec.name }}
-          </button>
+      <!-- 🔝 LOGO -->
+      <div class="mb-4 text-center">
+        <LogoSection />
+      </div>
+
+      <!-- 📝 TITRE MODIFIABLE -->
+      <div class="mb-6 text-center">
+        <input
+          v-if="mode === 'edit'"
+          v-model="pageTitle"
+          class="text-3xl font-bold border p-2 w-full text-center"
+        />
+
+        <h1 v-else class="text-3xl font-bold">
+          {{ pageTitle }}
+        </h1>
+      </div>
+
+      <!-- 🧱 MAIN SECTION -->
+      <div
+        class="mx-auto border-2 border-gray-300 bg-gray-50 rounded p-6"
+        style="width: 700px; min-height: 1000px;"
+      >
+
+        <div class="text-center text-xs text-gray-400 mb-4">
+          🧱 MainSection (zone éditable)
         </div>
 
-        <!-- 🔥 PAGE -->
-        <div class="flex justify-center">
+        <!-- 🔥 SECTIONS -->
+        <div
+          v-for="section in sections"
+          :key="section.id"
+          class="border p-4 mb-3 rounded cursor-pointer"
+          :class="selectedSection?.id === section.id
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-200'"
+          @click="selectSection(section)"
+        >
 
-          <div class="w-full max-w-3xl bg-white shadow-xl rounded-lg overflow-hidden">
+          <!-- ✏️ EDIT MODE -->
+          <div v-if="mode === 'edit' && selectedSection?.id === section.id">
 
-            <!-- HEADER -->
-            <div class="border-b bg-gray-50 p-4">
-              <HeaderSection />
+            <!-- TOOLBAR -->
+            <div class="flex gap-2 mb-2">
+              <button @click="applyBold(section)" class="border px-2 rounded font-bold">B</button>
+              <button @click="applyUppercase(section)" class="border px-2 rounded">Aa</button>
+              <button @click="applyEmoji(section)" class="border px-2 rounded">😊</button>
+              <input type="color" v-model="section.props.color" />
             </div>
 
-            <!-- MAIN -->
-            <div class="border-4 border-dashed border-blue-400 min-h-[400px] p-6">
+            <!-- INPUT -->
+            <input
+              v-model="section.props.title"
+              class="border p-2 w-full rounded"
+            />
 
-              <div class="text-xs text-gray-400 mb-4 text-center">
-                🧱 MainSection (zone éditable)
-              </div>
+            <!-- DELETE -->
+            <button
+              @click.stop="deleteSection(section.id)"
+              class="text-red-500 text-xs mt-2"
+            >
+              🗑 Supprimer
+            </button>
 
-              <div
-                v-for="section in sections"
-                :key="section.id"
-                class="border p-4 mb-3 rounded cursor-pointer"
-                :class="selectedSection?.id === section.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200'"
-                @click="selectSection(section)"
-              >
+          </div>
 
-                <!-- 🔥 EDIT MODE -->
-                <div v-if="mode === 'edit' && selectedSection?.id === section.id">
-
-                  <div class="flex gap-2 mb-2">
-                    <button @click="applyBold(section)" class="border px-2 rounded font-bold">B</button>
-                    <button @click="applyUppercase(section)" class="border px-2 rounded">Aa</button>
-                    <button @click="applyEmoji(section)" class="border px-2 rounded">😊</button>
-                    <input type="color" v-model="section.props.color" />
-                  </div>
-
-                  <input
-                    v-model="section.props.title"
-                    class="border p-2 w-full rounded"
-                  />
-
-                  <button
-                    @click.stop="deleteSection(section.id)"
-                    class="text-red-500 text-xs mt-2"
-                  >
-                    🗑 Supprimer
-                  </button>
-
-                </div>
-
-                <!-- 🔥 PREVIEW -->
-                <div v-else :style="{ color: section.props.color }">
-                  {{ section.props.title }}
-                </div>
-
-              </div>
-
-            </div>
-
-            <!-- FOOTER -->
-            <div class="border-t bg-gray-50 p-4">
-              <FooterSection />
-            </div>
-
+          <!-- 👁 PREVIEW -->
+          <div v-else :style="{ color: section.props.color }">
+            {{ section.props.title }}
           </div>
 
         </div>
 
       </div>
 
-      <!-- ================= RIGHT (FILES) ================= -->
-      <div class="w-80 bg-white border rounded p-3">
+      <!-- 🔻 FOOTER -->
+      <div class="mt-6 text-center">
+        <FooterSection />
+      </div>
 
-        <h3 class="font-bold mb-3">📁 Fichiers</h3>
+    </div>
 
-        <div class="space-y-1 text-sm">
+    <!-- ================= FILES ================= -->
+    <div class="w-full max-w-[900px] mt-6 bg-white p-4 border rounded">
 
-          <div
-            v-for="file in computedFiles"
-            :key="file.name"
-            @click="selectFile(file)"
-            class="p-2 rounded cursor-pointer flex justify-between"
-            :class="selectedFile?.name === file.name ? 'bg-blue-100 font-bold' : ''"
+      <h3 class="font-bold mb-3">📁 Fichiers</h3>
+
+      <div class="space-y-1 text-sm">
+
+        <div
+          v-for="file in computedFiles"
+          :key="file.name"
+          @click="selectFile(file)"
+          class="p-2 rounded cursor-pointer flex justify-between"
+          :class="selectedFile?.name === file.name ? 'bg-blue-100 font-bold' : ''"
+        >
+          <span>📄 {{ file.name }}</span>
+
+          <button
+            v-if="file.deletable"
+            @click.stop="deleteSection(file.sectionId)"
+            class="text-red-500 text-xs"
           >
-
-            <span>📄 {{ file.name }}</span>
-
-            <button
-              v-if="file.deletable"
-              @click.stop="deleteSection(file.sectionId)"
-              class="text-red-500 text-xs"
-            >
-              ✕
-            </button>
-
-          </div>
-
+            ✕
+          </button>
         </div>
 
-        <!-- CODE -->
-        <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded">
+      </div>
 
-          <div class="text-white mb-2 font-bold">
-            {{ selectedFile?.name }}
-          </div>
-
-          <pre>{{ selectedFile?.content }}</pre>
-
+      <!-- CODE -->
+      <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded">
+        <div class="text-white mb-2 font-bold">
+          {{ selectedFile?.name }}
         </div>
 
+        <pre>{{ selectedFile?.content }}</pre>
       </div>
 
     </div>
@@ -156,40 +159,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue"
-import { auth, db } from "../firebase"
-import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { ref, computed } from "vue"
 
-import HeaderSection from "../components/sections/HeaderSection.vue"
+import LogoSection from "../components/sections/LogoSection.vue"
 import FooterSection from "../components/sections/FooterSection.vue"
 
 /* STATE */
+const mode = ref("edit")
 const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref(null)
-const mode = ref("edit")
-
-let userId = null
+const pageTitle = ref("Titre par défaut")
 
 /* SECTIONS DISPONIBLES */
 const availableSections = [
   { name: "Texte", type: "Text" },
-  { name: "Header", type: "Header" }
+  { name: "Titre", type: "Heading" },
+  { name: "Paragraphe", type: "Paragraph" }
 ]
-
-/* LOAD */
-onMounted(() => {
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) return
-
-    userId = user.uid
-    const snap = await getDoc(doc(db, "users", user.uid))
-
-    if (snap.exists()) {
-      sections.value = snap.data().sections || []
-    }
-  })
-})
 
 /* ADD */
 const addSection = (sec) => {
@@ -197,7 +184,7 @@ const addSection = (sec) => {
     id: Date.now(),
     type: sec.type,
     props: {
-      title: "Nouveau texte",
+      title: "Nouveau contenu",
       color: "#000000"
     }
   })
@@ -227,14 +214,8 @@ const applyEmoji = (section) => {
   section.props.title += " 😊"
 }
 
-/* SAVE */
-const saveAndPreview = async () => {
-  if (!userId) return
-
-  await updateDoc(doc(db, "users", userId), {
-    sections: sections.value
-  })
-
+/* MODE */
+const saveAndPreview = () => {
   mode.value = "preview"
 }
 
