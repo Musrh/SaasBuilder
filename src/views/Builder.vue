@@ -7,14 +7,14 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 // STATE
 // =====================
 const mode = ref("edit");
-const pageTitle = ref("Ma page SaaS");
+const pageTitle = ref("Mon site SaaS");
 const sections = ref([]);
-const loading = ref(true);
+const template = ref("blank");
 
 let userRef = null;
 
 // =====================
-// LOAD USER DATA
+// LOAD USER
 // =====================
 onMounted(async () => {
   const user = auth.currentUser;
@@ -26,29 +26,80 @@ onMounted(async () => {
   const data = snap.data();
 
   if (data) {
+    pageTitle.value = data.pageTitle || "Mon site SaaS";
     sections.value = data.sections || [];
-    pageTitle.value = data.pageTitle || "Ma page SaaS";
-  }
+    template.value = data.template || "blank";
 
-  loading.value = false;
+    // si nouveau user → inject template
+    if (sections.value.length === 0) {
+      applyTemplate(template.value);
+    }
+  }
 });
 
 // =====================
-// AUTO SAVE FIRESTORE
+// FIRESTORE AUTO SAVE
 // =====================
 watch(
-  [sections, pageTitle],
+  [sections, pageTitle, template],
   async () => {
     if (!userRef) return;
 
     await updateDoc(userRef, {
       sections: sections.value,
       pageTitle: pageTitle.value,
+      template: template.value,
       updatedAt: Date.now(),
     });
   },
   { deep: true }
 );
+
+// =====================
+// TEMPLATES SYSTEM
+// =====================
+function applyTemplate(type) {
+  template.value = type;
+
+  if (type === "blank") {
+    sections.value = [];
+  }
+
+  if (type === "landing") {
+    sections.value = [
+      {
+        id: Date.now(),
+        type: "hero",
+        content: "🔥 Bienvenue sur mon SaaS",
+      },
+      {
+        id: Date.now() + 1,
+        type: "text",
+        content: "Ceci est une landing page prête à convertir.",
+      },
+      {
+        id: Date.now() + 2,
+        type: "cta",
+        content: "Clique ici pour commencer",
+      },
+    ];
+  }
+
+  if (type === "portfolio") {
+    sections.value = [
+      {
+        id: Date.now(),
+        type: "hero",
+        content: "Portfolio Creator",
+      },
+      {
+        id: Date.now() + 1,
+        type: "text",
+        content: "Mes projets et réalisations",
+      },
+    ];
+  }
+}
 
 // =====================
 // METHODS
@@ -74,70 +125,70 @@ function toggleMode() {
   <div class="w-full min-h-screen bg-[#f6f7fb] flex flex-col">
 
     <!-- TOP BAR -->
-    <div class="w-full flex items-center justify-between p-3 bg-white shadow-sm sticky top-0 z-20">
-      <h1 class="font-bold text-lg">Builder SaaS</h1>
+    <div class="flex items-center justify-between p-3 bg-white shadow-sm sticky top-0 z-20">
+
+      <h1 class="font-bold">SaaS Builder</h1>
 
       <div class="flex gap-2">
-        <button
-          @click="toggleMode"
-          class="px-3 py-1 rounded bg-gray-200 text-sm"
-        >
+        <button @click="toggleMode" class="px-3 py-1 bg-gray-200 rounded text-sm">
           {{ mode === "edit" ? "Preview" : "Edit" }}
-        </button>
-
-        <button
-          class="px-3 py-1 rounded bg-blue-500 text-white text-sm"
-        >
-          Save ✓
         </button>
       </div>
     </div>
 
-    <!-- MAIN CONTAINER -->
-    <div class="w-full flex-1 p-3 md:p-8">
+    <!-- TEMPLATE SELECTOR -->
+    <div v-if="mode === 'edit'" class="p-3 flex gap-2 flex-wrap bg-white border-b">
+
+      <button @click="applyTemplate('blank')" class="px-3 py-2 bg-gray-200 rounded">
+        Blank
+      </button>
+
+      <button @click="applyTemplate('landing')" class="px-3 py-2 bg-blue-500 text-white rounded">
+        Landing
+      </button>
+
+      <button @click="applyTemplate('portfolio')" class="px-3 py-2 bg-green-500 text-white rounded">
+        Portfolio
+      </button>
+
+    </div>
+
+    <!-- CONTENT -->
+    <div class="p-4 md:p-10 w-full flex-1">
 
       <!-- TITLE -->
       <input
         v-if="mode === 'edit'"
         v-model="pageTitle"
-        class="w-full text-3xl md:text-4xl font-bold border-b p-3 bg-transparent outline-none"
-        placeholder="Titre de ta page"
+        class="w-full text-3xl font-bold border-b p-3 bg-transparent outline-none"
       />
 
-      <h1
-        v-else
-        class="w-full text-3xl md:text-4xl font-bold p-3"
-      >
+      <h1 v-else class="text-3xl font-bold p-3">
         {{ pageTitle }}
       </h1>
 
       <!-- ADD SECTION -->
       <div v-if="mode === 'edit'" class="flex gap-2 mt-4 mb-6 flex-wrap">
-        <button
-          class="px-3 py-2 bg-blue-500 text-white rounded"
-          @click="addSection('text')"
-        >
-          + Texte
+
+        <button @click="addSection('text')" class="bg-blue-500 text-white px-3 py-2 rounded">
+          + Text
         </button>
 
-        <button
-          class="px-3 py-2 bg-green-500 text-white rounded"
-          @click="addSection('main')"
-        >
-          + Main
+        <button @click="addSection('cta')" class="bg-green-500 text-white px-3 py-2 rounded">
+          + CTA
         </button>
+
       </div>
 
       <!-- SECTIONS -->
       <div
         v-for="section in sections"
         :key="section.id"
-        class="bg-white rounded-xl shadow-sm border mb-4 p-4"
+        class="bg-white border rounded-xl p-4 mb-4 shadow-sm"
       >
 
-        <!-- HEADER SECTION -->
-        <div class="flex justify-between items-center mb-2">
-          <span class="text-sm text-gray-500">
+        <div class="flex justify-between mb-2">
+          <span class="text-gray-500 text-sm">
             {{ section.type }}
           </span>
 
@@ -150,39 +201,40 @@ function toggleMode() {
           </button>
         </div>
 
-        <!-- TEXT SECTION -->
+        <!-- EDIT MODE -->
         <textarea
           v-if="mode === 'edit'"
           v-model="section.content"
-          class="w-full min-h-[120px] p-3 border rounded outline-none"
-          placeholder="Écris ici..."
+          class="w-full min-h-[120px] border p-3 rounded"
         />
 
-        <div
-          v-else
-          class="w-full min-h-[120px] p-3 text-gray-700"
-        >
-          {{ section.content }}
+        <!-- PREVIEW MODE -->
+        <div v-else class="p-3 text-gray-700">
+          <h3 v-if="section.type === 'hero'" class="text-2xl font-bold">
+            {{ section.content }}
+          </h3>
+
+          <p v-else>
+            {{ section.content }}
+          </p>
         </div>
+
       </div>
 
-      <!-- EMPTY STATE -->
-      <div
-        v-if="sections.length === 0"
-        class="text-center text-gray-400 mt-10"
-      >
-        Aucune section — clique sur “+ Texte”
+      <!-- EMPTY -->
+      <div v-if="sections.length === 0" class="text-center text-gray-400 mt-10">
+        Choisis un template ou ajoute une section
       </div>
+
     </div>
   </div>
 </template>
 
 <style scoped>
 button {
-  transition: 0.2s ease;
+  transition: 0.2s;
 }
-
 button:hover {
-  transform: scale(1.02);
+  transform: scale(1.03);
 }
 </style>
