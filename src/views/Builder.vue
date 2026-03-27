@@ -1,196 +1,188 @@
+<script setup>
+import { ref, onMounted, watch } from "vue";
+import { auth, db } from "@/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+
+// =====================
+// STATE
+// =====================
+const mode = ref("edit");
+const pageTitle = ref("Ma page SaaS");
+const sections = ref([]);
+const loading = ref(true);
+
+let userRef = null;
+
+// =====================
+// LOAD USER DATA
+// =====================
+onMounted(async () => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  userRef = doc(db, "users", user.uid);
+
+  const snap = await getDoc(userRef);
+  const data = snap.data();
+
+  if (data) {
+    sections.value = data.sections || [];
+    pageTitle.value = data.pageTitle || "Ma page SaaS";
+  }
+
+  loading.value = false;
+});
+
+// =====================
+// AUTO SAVE FIRESTORE
+// =====================
+watch(
+  [sections, pageTitle],
+  async () => {
+    if (!userRef) return;
+
+    await updateDoc(userRef, {
+      sections: sections.value,
+      pageTitle: pageTitle.value,
+      updatedAt: Date.now(),
+    });
+  },
+  { deep: true }
+);
+
+// =====================
+// METHODS
+// =====================
+function addSection(type) {
+  sections.value.push({
+    id: Date.now(),
+    type,
+    content: "",
+  });
+}
+
+function removeSection(id) {
+  sections.value = sections.value.filter((s) => s.id !== id);
+}
+
+function toggleMode() {
+  mode.value = mode.value === "edit" ? "preview" : "edit";
+}
+</script>
+
 <template>
-  <div class="h-screen w-full flex bg-[#f6f7fb]">
+  <div class="w-full min-h-screen bg-[#f6f7fb] flex flex-col">
 
-    <!-- ================= LEFT ================= -->
-    <div class="w-64 bg-white border-r p-4">
+    <!-- TOP BAR -->
+    <div class="w-full flex items-center justify-between p-3 bg-white shadow-sm sticky top-0 z-20">
+      <h1 class="font-bold text-lg">Builder SaaS</h1>
 
-      <h2 class="font-bold text-lg mb-4">🧱 Sections</h2>
+      <div class="flex gap-2">
+        <button
+          @click="toggleMode"
+          class="px-3 py-1 rounded bg-gray-200 text-sm"
+        >
+          {{ mode === "edit" ? "Preview" : "Edit" }}
+        </button>
 
-      <button
-        v-for="sec in availableSections"
-        :key="sec.type"
-        @click="addSection(sec)"
-        class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg mb-2"
+        <button
+          class="px-3 py-1 rounded bg-blue-500 text-white text-sm"
+        >
+          Save ✓
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <div class="w-full flex-1 p-3 md:p-8">
+
+      <!-- TITLE -->
+      <input
+        v-if="mode === 'edit'"
+        v-model="pageTitle"
+        class="w-full text-3xl md:text-4xl font-bold border-b p-3 bg-transparent outline-none"
+        placeholder="Titre de ta page"
+      />
+
+      <h1
+        v-else
+        class="w-full text-3xl md:text-4xl font-bold p-3"
       >
-        + {{ sec.name }}
-      </button>
+        {{ pageTitle }}
+      </h1>
 
-    </div>
+      <!-- ADD SECTION -->
+      <div v-if="mode === 'edit'" class="flex gap-2 mt-4 mb-6 flex-wrap">
+        <button
+          class="px-3 py-2 bg-blue-500 text-white rounded"
+          @click="addSection('text')"
+        >
+          + Texte
+        </button>
 
-    <!-- ================= CENTER ================= -->
-    <div class="flex-1 p-4 overflow-auto">
+        <button
+          class="px-3 py-2 bg-green-500 text-white rounded"
+          @click="addSection('main')"
+        >
+          + Main
+        </button>
+      </div>
 
-      <div class="bg-white rounded-xl shadow min-h-full p-4">
+      <!-- SECTIONS -->
+      <div
+        v-for="section in sections"
+        :key="section.id"
+        class="bg-white rounded-xl shadow-sm border mb-4 p-4"
+      >
 
-        <!-- TITLE -->
-        <input
-          v-model="pageTitle"
-          class="w-full text-2xl font-bold border-b p-2 mb-4"
-          placeholder="Titre de la page..."
-          @input="autoSave"
-        />
+        <!-- HEADER SECTION -->
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm text-gray-500">
+            {{ section.type }}
+          </span>
 
-        <!-- 🔥 DRAG ZONE NATIVE -->
-        <div>
-
-          <div
-            v-for="(section, index) in sections"
-            :key="section.id"
-            class="border rounded-lg p-3 mb-3 bg-white shadow-sm cursor-move"
-            draggable="true"
-
-            @dragstart="dragStart(index)"
-            @dragover.prevent
-            @drop="drop(index)"
-            @click="selectSection(section)"
+          <button
+            v-if="mode === 'edit'"
+            @click="removeSection(section.id)"
+            class="text-red-500 text-sm"
           >
-
-            <!-- TEXT EDIT -->
-            <textarea
-              v-model="section.props.title"
-              class="w-full min-h-[100px] border p-2 rounded"
-              @input="autoSave"
-            />
-
-            <!-- ACTIONS -->
-            <div class="flex justify-between mt-2">
-
-              <input
-                type="color"
-                v-model="section.props.color"
-                @input="autoSave"
-              />
-
-              <button
-                @click.stop="deleteSection(section.id)"
-                class="text-red-500 text-sm"
-              >
-                🗑 Delete
-              </button>
-
-            </div>
-
-          </div>
-
+            delete
+          </button>
         </div>
 
-      </div>
-
-    </div>
-
-    <!-- ================= RIGHT ================= -->
-    <div class="w-72 bg-white border-l p-4">
-
-      <h2 class="font-bold mb-4">⚙ Settings</h2>
-
-      <div v-if="selectedSection">
-
-        <p class="text-sm text-gray-500">Section ID</p>
-
-        <div class="text-xs bg-gray-100 p-2 rounded mb-3">
-          {{ selectedSection.id }}
-        </div>
-
-        <p class="text-sm mb-1">Color</p>
-
-        <input
-          type="color"
-          v-model="selectedSection.props.color"
-          @input="autoSave"
-          class="w-full h-10"
+        <!-- TEXT SECTION -->
+        <textarea
+          v-if="mode === 'edit'"
+          v-model="section.content"
+          class="w-full min-h-[120px] p-3 border rounded outline-none"
+          placeholder="Écris ici..."
         />
 
+        <div
+          v-else
+          class="w-full min-h-[120px] p-3 text-gray-700"
+        >
+          {{ section.content }}
+        </div>
       </div>
 
-      <div v-else class="text-gray-400 text-sm">
-        Select a section
+      <!-- EMPTY STATE -->
+      <div
+        v-if="sections.length === 0"
+        class="text-center text-gray-400 mt-10"
+      >
+        Aucune section — clique sur “+ Texte”
       </div>
-
     </div>
-
   </div>
 </template>
 
-<script setup>
-import { ref } from "vue"
-
-/* ================= STATE ================= */
-const sections = ref([])
-const selectedSection = ref(null)
-const pageTitle = ref("My SaaS Builder")
-
-let dragIndex = null
-
-/* ================= AVAILABLE SECTIONS ================= */
-const availableSections = [
-  { name: "Text Block", type: "text" },
-  { name: "Heading", type: "heading" },
-  { name: "Paragraph", type: "paragraph" }
-]
-
-/* ================= ADD ================= */
-const addSection = (sec) => {
-  sections.value.push({
-    id: Date.now(),
-    type: sec.type,
-    props: {
-      title: "New section",
-      color: "#000000"
-    }
-  })
-
-  autoSave()
+<style scoped>
+button {
+  transition: 0.2s ease;
 }
 
-/* ================= SELECT ================= */
-const selectSection = (section) => {
-  selectedSection.value = section
+button:hover {
+  transform: scale(1.02);
 }
-
-/* ================= DELETE ================= */
-const deleteSection = (id) => {
-  sections.value = sections.value.filter(s => s.id !== id)
-
-  if (selectedSection.value?.id === id) {
-    selectedSection.value = null
-  }
-
-  autoSave()
-}
-
-/* ================= DRAG START ================= */
-const dragStart = (index) => {
-  dragIndex = index
-}
-
-/* ================= DROP ================= */
-const drop = (index) => {
-  if (dragIndex === null) return
-
-  const draggedItem = sections.value[dragIndex]
-
-  sections.value.splice(dragIndex, 1)
-  sections.value.splice(index, 0, draggedItem)
-
-  dragIndex = null
-
-  autoSave()
-}
-
-/* ================= AUTOSAVE ================= */
-let timeout = null
-
-const autoSave = () => {
-  clearTimeout(timeout)
-
-  timeout = setTimeout(() => {
-    console.log("💾 Saving SaaS Builder...", {
-      pageTitle: pageTitle.value,
-      sections: sections.value
-    })
-
-    // 👉 Firestore ici plus tard
-
-  }, 500)
-}
-</script>
+</style>
