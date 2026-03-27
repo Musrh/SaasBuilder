@@ -1,133 +1,118 @@
 <template>
-  <div class="flex flex-col min-h-screen">
+  <div class="p-6">
 
-    <!-- 🔹 TOP BAR -->
-    <div class="bg-white shadow p-3 flex gap-2 flex-wrap">
-      <button
-        v-for="sec in availableSections"
-        :key="sec.type"
-        @click="addSection(sec)"
-        class="bg-blue-500 text-white px-3 py-1 rounded"
-      >
-        + {{ sec.name }}
-      </button>
+    <h1 class="text-2xl font-bold mb-4">
+      Builder
+    </h1>
+
+    <!-- 🔥 LOADING -->
+    <div v-if="loading">
+      Chargement...
     </div>
 
-    <div class="flex flex-1">
+    <div v-else class="flex gap-4">
 
-      <!-- 🔹 MAIN AREA -->
-      <div class="flex-1 flex flex-col bg-gray-100 p-4">
+      <!-- ================= LEFT (BUILDER) ================= -->
+      <div class="flex-1">
 
-        <!-- 🔹 PREVIEW -->
-        <div class="bg-white rounded shadow p-4 flex-1 overflow-auto">
+        <!-- ACTIONS -->
+        <div class="mb-4">
+          <button
+            @click="addSection"
+            class="bg-blue-500 text-white px-4 py-2 rounded"
+          >
+            + Ajouter Header
+          </button>
 
-          <HeaderSection />
+          <button
+            @click="saveSections"
+            class="ml-2 bg-green-500 text-white px-4 py-2 rounded"
+          >
+            Sauvegarder
+          </button>
+        </div>
 
-          <!-- 🔥 BUILDER ZONE -->
-          <MainSection class="border-4 border-dashed border-blue-400 bg-white p-4 rounded-xl min-h-[300px]">
+        <!-- 🔥 MAIN SECTION CONTAINER -->
+        <div class="border-4 border-dashed border-blue-400 p-4 rounded-lg min-h-[400px] bg-gray-50">
 
-            <div class="text-xs text-gray-500 mb-3">
-              ✏️ Mode Builder - Clique une section pour l’éditer
+          <div class="text-xs text-gray-500 mb-3">
+            ✏️ Mode Édition actif - clique une section pour modifier
+          </div>
+
+          <!-- LISTE SECTIONS -->
+          <div
+            v-for="section in sections"
+            :key="section.id"
+            @click="selectSection(section)"
+            class="border p-4 mb-3 rounded cursor-pointer transition"
+            :class="selectedSection?.id === section.id
+              ? 'border-blue-500 bg-blue-50 shadow'
+              : 'border-gray-200'"
+          >
+
+            <!-- 🔥 HEADER SECTION ITEM -->
+            <div class="flex justify-between items-center mb-2">
+
+              <strong>{{ section.type }}</strong>
+
+              <!-- DELETE -->
+              <button
+                @click.stop="deleteSection(section.id)"
+                class="text-red-500 text-xs border px-2 py-1 rounded"
+              >
+                🗑
+              </button>
+
             </div>
 
-            <div
-              v-for="section in filteredSections"
-              :key="section.id"
-              draggable="true"
-              @dragstart="dragStart(section.id)"
-              @dragover.prevent
-              @drop="drop(section.id)"
-              @click="selectSection(section)"
-              class="p-3 mb-3 rounded border cursor-move transition relative"
-              :class="selectedSection?.id === section.id
-                ? 'border-blue-500 bg-blue-50 shadow'
-                : 'border-gray-200'"
-            >
+            <!-- 🔥 MODE ÉDITION (TON ANCIEN LOGIC AMÉLIORÉ) -->
+            <div v-if="selectedSection?.id === section.id">
 
-              <!-- 🔥 EDIT MODE -->
-              <div
-                v-if="selectedSection?.id === section.id"
-                class="flex justify-between items-center mb-2 bg-white p-2 border rounded"
-              >
-
-                <div class="flex gap-2">
-                  <button @click="makeBold" class="px-2 border rounded font-bold">B</button>
-                  <button @click="makeUppercase" class="px-2 border rounded">Aa</button>
-                  <button @click="addEmoji" class="px-2 border rounded">😊</button>
-                </div>
-
-                <button
-                  @click="deleteSection(section.id)"
-                  class="text-red-500 text-xs border px-2 py-1 rounded"
-                >
-                  🗑 Delete
-                </button>
-
+              <div class="flex gap-2 mb-2">
+                <button @click="makeBold(section)" class="px-2 border rounded font-bold">B</button>
+                <button @click="makeUppercase(section)" class="px-2 border rounded">Aa</button>
+                <button @click="addEmoji(section)" class="px-2 border rounded">😊</button>
               </div>
 
-              <!-- 🔥 PROPS EDIT -->
-              <div
-                v-if="selectedSection?.id === section.id"
-                class="mb-3 bg-white p-2 border rounded"
-              >
-                <div
-                  v-for="(val, key) in section.props"
-                  :key="key"
-                  class="mb-2"
-                >
-                  <label class="text-xs font-bold">{{ key }}</label>
-                  <input
-                    v-model="section.props[key]"
-                    class="border p-2 w-full rounded"
-                    @input="autoSave"
-                  />
-                </div>
-              </div>
-
-              <!-- 🔹 RENDER SECTION -->
-              <component
-                :is="safeGetComponent(section.type)"
-                v-bind="section.props"
+              <input
+                v-model="section.props.title"
+                class="border p-2 w-full mt-2 rounded"
+                @input="autoSave"
               />
 
+              <div class="text-xs text-gray-500 mt-2">
+                ID: {{ section.id }}
+              </div>
+
             </div>
 
-          </MainSection>
-
-          <FooterSection />
+          </div>
 
         </div>
 
       </div>
 
-      <!-- 🔹 ARBORESCENCE -->
-      <div class="w-80 bg-white border-l p-3">
+      <!-- ================= RIGHT (ARBORESCENCE + CODE) ================= -->
+      <div class="w-80 border-l pl-4">
 
         <h3 class="font-bold mb-2">📁 Arborescence</h3>
 
-        <div class="space-y-1 text-sm">
+        <div class="space-y-2 text-sm">
 
           <div
             v-for="file in files"
             :key="file.name"
             @click="selectFile(file.name)"
-            class="cursor-pointer p-2 rounded flex justify-between"
+            class="p-2 rounded cursor-pointer"
             :class="selectedFile === file.name ? 'bg-blue-100 font-bold' : ''"
           >
-            <span>📄 {{ file.name }}</span>
-
-            <button
-              @click.stop="deleteFile(file.name)"
-              class="text-red-500 text-xs"
-            >
-              ✕
-            </button>
+            📄 {{ file.name }}
           </div>
 
         </div>
 
         <!-- 🔥 CODE VIEW -->
-        <div class="mt-4 bg-black text-green-400 p-2 h-64 overflow-auto text-xs rounded">
+        <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded">
 
           <div class="text-white mb-2 font-bold">
             {{ selectedFile }}
@@ -147,43 +132,20 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from "vue"
+import { ref, onMounted } from "vue"
 
-/* 🔥 IMPORTS */
-import HeaderSection from "../components/sections/HeaderSection.vue"
-import FooterSection from "../components/sections/FooterSection.vue"
-import MainSection from "../components/sections/MainSection.vue"
-import LogoSection from "../components/sections/LogoSection.vue"
-import MenuSection from "../components/sections/MenuSection.vue"
-
+import { auth, db } from "../firebase"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
 
 /* 🔹 STATE */
 const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref("App.vue")
+const loading = ref(true)
 
-/* 🔹 AVAILABLE SECTIONS */
-const availableSections = [
-  { name: "Menu", type: "Menu" },
-  { name: "Logo", type: "Logo" }
-]
+let userId = null
 
-/* 🔹 FILTER */
-const excludedInMain = ["HeaderSearch", "Footer"]
-
-const filteredSections = computed(() =>
-  sections.value.filter(s => !excludedInMain.includes(s.type))
-)
-
-/* 🔹 COMPONENT MAP */
-const componentMap = {
-  Menu: MenuSection,
-  Logo: LogoSection
-}
-
-const safeGetComponent = (type) => componentMap[type] || "div"
-
-/* 🔹 FILES */
+/* 🔹 FILES (ARBORESCENCE) */
 const files = ref([
   {
     name: "App.vue",
@@ -196,95 +158,99 @@ const files = ref([
     content: `<template>
   <section>Main Section</section>
 </template>`
-  },
-  {
-    name: "MenuSection.vue",
-    content: `<template>
-  <nav>Menu</nav>
-</template>`
   }
 ])
 
-const getFileContent = (name) =>
-  files.value.find(f => f.name === name)?.content || "// vide"
+/* 🔥 LOAD FIRESTORE */
+onMounted(() => {
+  auth.onAuthStateChanged(async (user) => {
 
-/* 🔹 ADD SECTION */
-const addSection = (sec) => {
+    if (!user) {
+      alert("Non connecté")
+      return
+    }
+
+    userId = user.uid
+
+    const snap = await getDoc(doc(db, "users", user.uid))
+
+    if (snap.exists()) {
+      sections.value = snap.data().sections || []
+    }
+
+    loading.value = false
+  })
+})
+
+/* ================== SECTION ACTIONS ================== */
+
+// ➕ ADD SECTION
+const addSection = () => {
   sections.value.push({
-    id: Date.now() + Math.random(),
-    type: sec.type,
-    props: reactive({})
+    id: Date.now(),
+    type: "Header",
+    props: {
+      title: "Titre ici"
+    }
   })
 }
 
-/* 🔹 SELECT */
+// 🗑 DELETE SECTION
+const deleteSection = (id) => {
+  sections.value = sections.value.filter(s => s.id !== id)
+
+  if (selectedSection.value?.id === id) {
+    selectedSection.value = null
+  }
+
+  autoSave()
+}
+
+// 🎯 SELECT
 const selectSection = (section) => {
   selectedSection.value = section
 }
 
-/* 🔹 FILE SELECT */
+/* ================== EDIT ACTIONS ================== */
+
+const makeBold = (section) => {
+  section.props.title = `**${section.props.title}**`
+}
+
+const makeUppercase = (section) => {
+  section.props.title = section.props.title.toUpperCase()
+}
+
+const addEmoji = (section) => {
+  section.props.title += " 😊"
+}
+
+/* ================== ARBORESCENCE ================== */
+
 const selectFile = (name) => {
   selectedFile.value = name
 }
 
-/* 🔹 DELETE SECTION */
-const deleteSection = (id) => {
-  sections.value = sections.value.filter(s => s.id !== id)
-  if (selectedSection.value?.id === id) {
-    selectedSection.value = null
+const getFileContent = (name) => {
+  return files.value.find(f => f.name === name)?.content || "// vide"
+}
+
+/* ================== SAVE ================== */
+
+const autoSave = async () => {
+  await saveSections()
+}
+
+const saveSections = async () => {
+  if (!userId) return
+
+  try {
+    await updateDoc(doc(db, "users", userId), {
+      sections: sections.value
+    })
+  } catch (e) {
+    console.error(e)
   }
-}
-
-/* 🔹 DELETE FILE */
-const deleteFile = (name) => {
-  files.value = files.value.filter(f => f.name !== name)
-  if (selectedFile.value === name) {
-    selectedFile.value = "App.vue"
-  }
-}
-
-/* 🔹 DRAG DROP */
-let draggedId = null
-
-const dragStart = (id) => {
-  draggedId = id
-}
-
-const drop = (targetId) => {
-  const from = sections.value.findIndex(s => s.id === draggedId)
-  const to = sections.value.findIndex(s => s.id === targetId)
-
-  if (from < 0 || to < 0) return
-
-  const moved = sections.value.splice(from, 1)[0]
-  sections.value.splice(to, 0, moved)
-}
-
-/* 🔹 EDITOR ACTIONS */
-const makeBold = () => {
-  if (!selectedSection.value) return
-  for (const k in selectedSection.value.props) {
-    selectedSection.value.props[k] = `**${selectedSection.value.props[k]}**`
-  }
-}
-
-const makeUppercase = () => {
-  if (!selectedSection.value) return
-  for (const k in selectedSection.value.props) {
-    selectedSection.value.props[k] =
-      selectedSection.value.props[k].toUpperCase()
-  }
-}
-
-const addEmoji = () => {
-  if (!selectedSection.value) return
-  for (const k in selectedSection.value.props) {
-    selectedSection.value.props[k] += " 😊"
-  }
-}
-
-const autoSave = () => {
-  console.log("autosave:", sections.value)
 }
 </script>
 
