@@ -5,58 +5,65 @@
       Builder
     </h1>
 
-    <!-- 🔥 LOADING -->
+    <!-- 🔥 MODE SWITCH -->
+    <div class="mb-4 flex items-center gap-3">
+
+      <button
+        v-if="mode === 'edit'"
+        @click="saveAndPreview"
+        class="bg-green-500 text-white px-4 py-2 rounded"
+      >
+        💾 Sauvegarder → Preview
+      </button>
+
+      <button
+        v-else
+        @click="mode = 'edit'"
+        class="bg-blue-500 text-white px-4 py-2 rounded"
+      >
+        ✏️ Revenir au mode Édition
+      </button>
+
+      <span class="text-sm text-gray-500">
+        Mode actuel: <b>{{ mode }}</b>
+      </span>
+
+    </div>
+
+    <!-- LOADING -->
     <div v-if="loading">
       Chargement...
     </div>
 
     <div v-else class="flex gap-4">
 
-      <!-- ================= LEFT (BUILDER) ================= -->
+      <!-- ================= LEFT ================= -->
       <div class="flex-1">
 
-        <!-- ACTIONS -->
-        <div class="mb-4">
-          <button
-            @click="addSection"
-            class="bg-blue-500 text-white px-4 py-2 rounded"
-          >
-            + Ajouter Header
-          </button>
-
-          <button
-            @click="saveSections"
-            class="ml-2 bg-green-500 text-white px-4 py-2 rounded"
-          >
-            Sauvegarder
-          </button>
-        </div>
-
-        <!-- 🔥 MAIN SECTION CONTAINER -->
+        <!-- MAIN CONTAINER -->
         <div class="border-4 border-dashed border-blue-400 p-4 rounded-lg min-h-[400px] bg-gray-50">
 
           <div class="text-xs text-gray-500 mb-3">
-            ✏️ Mode Édition actif - clique une section pour modifier
+            ✏️ MainSection Builder Zone
           </div>
 
-          <!-- LISTE SECTIONS -->
           <div
             v-for="section in sections"
             :key="section.id"
-            @click="selectSection(section)"
-            class="border p-4 mb-3 rounded cursor-pointer transition"
+            class="border p-4 mb-3 rounded transition"
             :class="selectedSection?.id === section.id
-              ? 'border-blue-500 bg-blue-50 shadow'
+              ? 'border-blue-500 bg-blue-50'
               : 'border-gray-200'"
+            @click="selectSection(section)"
           >
 
-            <!-- 🔥 HEADER SECTION ITEM -->
+            <!-- 🔥 HEADER -->
             <div class="flex justify-between items-center mb-2">
 
               <strong>{{ section.type }}</strong>
 
-              <!-- DELETE -->
               <button
+                v-if="mode === 'edit'"
                 @click.stop="deleteSection(section.id)"
                 class="text-red-500 text-xs border px-2 py-1 rounded"
               >
@@ -65,25 +72,46 @@
 
             </div>
 
-            <!-- 🔥 MODE ÉDITION (TON ANCIEN LOGIC AMÉLIORÉ) -->
-            <div v-if="selectedSection?.id === section.id">
+            <!-- ================= EDIT MODE ================= -->
+            <div v-if="mode === 'edit' && selectedSection?.id === section.id">
 
-              <div class="flex gap-2 mb-2">
-                <button @click="makeBold(section)" class="px-2 border rounded font-bold">B</button>
-                <button @click="makeUppercase(section)" class="px-2 border rounded">Aa</button>
-                <button @click="addEmoji(section)" class="px-2 border rounded">😊</button>
+              <!-- 🔥 TOOLBAR FIXÉE -->
+              <div class="flex gap-2 mb-3 border-b pb-2">
+
+                <button @click="applyBold(section)" class="px-2 border rounded font-bold">
+                  B
+                </button>
+
+                <button @click="applyUppercase(section)" class="px-2 border rounded">
+                  Aa
+                </button>
+
+                <button @click="applyEmoji(section)" class="px-2 border rounded">
+                  😊
+                </button>
+
+                <!-- 🎨 COLOR -->
+                <input
+                  type="color"
+                  v-model="section.props.color"
+                  class="w-8 h-8"
+                />
+
               </div>
 
+              <!-- INPUT -->
               <input
                 v-model="section.props.title"
-                class="border p-2 w-full mt-2 rounded"
-                @input="autoSave"
+                class="border p-2 w-full rounded"
               />
 
-              <div class="text-xs text-gray-500 mt-2">
-                ID: {{ section.id }}
-              </div>
+            </div>
 
+            <!-- ================= PREVIEW MODE ================= -->
+            <div v-else>
+              <div :style="{ color: section.props.color }">
+                {{ section.props.title }}
+              </div>
             </div>
 
           </div>
@@ -92,7 +120,7 @@
 
       </div>
 
-      <!-- ================= RIGHT (ARBORESCENCE + CODE) ================= -->
+      <!-- ================= RIGHT ================= -->
       <div class="w-80 border-l pl-4">
 
         <h3 class="font-bold mb-2">📁 Arborescence</h3>
@@ -111,7 +139,6 @@
 
         </div>
 
-        <!-- 🔥 CODE VIEW -->
         <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded">
 
           <div class="text-white mb-2 font-bold">
@@ -133,7 +160,6 @@
 
 <script setup>
 import { ref, onMounted } from "vue"
-
 import { auth, db } from "../firebase"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 
@@ -142,10 +168,11 @@ const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref("App.vue")
 const loading = ref(true)
+const mode = ref("edit")
 
 let userId = null
 
-/* 🔹 FILES (ARBORESCENCE) */
+/* 🔹 FILES */
 const files = ref([
   {
     name: "App.vue",
@@ -161,17 +188,12 @@ const files = ref([
   }
 ])
 
-/* 🔥 LOAD FIRESTORE */
+/* 🔥 LOAD */
 onMounted(() => {
   auth.onAuthStateChanged(async (user) => {
-
-    if (!user) {
-      alert("Non connecté")
-      return
-    }
+    if (!user) return
 
     userId = user.uid
-
     const snap = await getDoc(doc(db, "users", user.uid))
 
     if (snap.exists()) {
@@ -182,50 +204,39 @@ onMounted(() => {
   })
 })
 
-/* ================== SECTION ACTIONS ================== */
+/* ================== MODE ================== */
 
-// ➕ ADD SECTION
-const addSection = () => {
-  sections.value.push({
-    id: Date.now(),
-    type: "Header",
-    props: {
-      title: "Titre ici"
-    }
-  })
+const saveAndPreview = async () => {
+  await saveSections()
+  mode.value = "preview"
 }
 
-// 🗑 DELETE SECTION
-const deleteSection = (id) => {
-  sections.value = sections.value.filter(s => s.id !== id)
+/* ================== SECTION ================== */
 
-  if (selectedSection.value?.id === id) {
-    selectedSection.value = null
-  }
-
-  autoSave()
-}
-
-// 🎯 SELECT
 const selectSection = (section) => {
+  if (mode.value === "preview") return
   selectedSection.value = section
 }
 
-/* ================== EDIT ACTIONS ================== */
+const deleteSection = (id) => {
+  sections.value = sections.value.filter(s => s.id !== id)
+}
 
-const makeBold = (section) => {
+/* ================== TOOLS ================== */
+
+const applyBold = (section) => {
   section.props.title = `**${section.props.title}**`
 }
 
-const makeUppercase = (section) => {
+const applyUppercase = (section) => {
   section.props.title = section.props.title.toUpperCase()
 }
 
-const addEmoji = (section) => {
+const applyEmoji = (section) => {
   section.props.title += " 😊"
 }
 
-/* ================== ARBORESCENCE ================== */
+/* ================== FILES ================== */
 
 const selectFile = (name) => {
   selectedFile.value = name
@@ -237,20 +248,12 @@ const getFileContent = (name) => {
 
 /* ================== SAVE ================== */
 
-const autoSave = async () => {
-  await saveSections()
-}
-
 const saveSections = async () => {
   if (!userId) return
 
-  try {
-    await updateDoc(doc(db, "users", userId), {
-      sections: sections.value
-    })
-  } catch (e) {
-    console.error(e)
-  }
+  await updateDoc(doc(db, "users", userId), {
+    sections: sections.value
+  })
 }
 </script>
 
