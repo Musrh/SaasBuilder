@@ -15,7 +15,7 @@
 
     <div class="flex flex-1">
 
-      <!-- 🔹 MAIN AREA -->
+      <!-- 🔹 MAIN -->
       <div class="flex-1 flex flex-col bg-gray-100 p-4">
 
         <!-- 🔹 PREVIEW -->
@@ -26,8 +26,8 @@
             <LogoSection />
           </HeaderSection>
 
-          <!-- MAIN -->
-          <MainSection>
+          <!-- 🔥 MAIN SECTION (ENCADRÉE) -->
+          <MainSection class="border-2 border-dashed border-blue-400 p-3 rounded-lg">
 
             <div
               v-for="section in sections"
@@ -38,42 +38,47 @@
               @drop="drop(section.id)"
               @click="selectSection(section)"
               class="border mb-3 p-3 rounded cursor-move hover:bg-gray-50 transition"
-              :class="selectedSection?.id === section.id ? 'border-blue-500' : ''"
+              :class="selectedSection?.id === section.id ? 'border-blue-500 bg-blue-50' : ''"
             >
+
+              <!-- 🔹 MODE ÉDITION -->
+              <div v-if="selectedSection?.id === section.id" class="mb-2">
+                
+                <!-- TOOLBAR -->
+                <div class="flex gap-2 mb-2 border-b pb-2 bg-gray-100 p-2 rounded">
+                  <button @click="makeBold" class="px-2 py-1 border rounded">B</button>
+                  <button @click="makeUppercase" class="px-2 py-1 border rounded">Aa</button>
+                  <button @click="addEmoji" class="px-2 py-1 border rounded">😊</button>
+                </div>
+
+                <!-- INPUTS -->
+                <div
+                  v-for="(val, key) in section.props"
+                  :key="key"
+                  class="mb-2"
+                >
+                  <label class="text-xs font-bold">{{ key }}</label>
+                  <input
+                    v-model="section.props[key]"
+                    class="border p-2 w-full rounded"
+                    @input="autoSave"
+                  />
+                </div>
+
+              </div>
+
+              <!-- 🔹 RENDER SECTION -->
               <component
                 :is="safeGetComponent(section.type)"
                 v-bind="section.props"
               />
+
             </div>
 
           </MainSection>
 
           <!-- FOOTER -->
           <FooterSection />
-
-        </div>
-
-        <!-- 🔹 EDITOR -->
-        <div v-if="selectedSection" class="bg-white p-4 mt-4 rounded shadow">
-
-          <!-- TOOLBAR -->
-          <div class="flex gap-2 mb-3 border-b pb-2">
-            <button @click="makeBold" class="tool">B</button>
-            <button @click="makeUppercase" class="tool">Aa</button>
-            <button @click="addEmoji" class="tool">😊</button>
-          </div>
-
-          <!-- INPUTS -->
-          <div v-for="(val, key) in selectedSection.props" :key="key" class="mb-2">
-            <label class="text-sm font-medium block">{{ key }}</label>
-            <input
-              v-model="selectedSection.props[key]"
-              class="border p-2 w-full rounded"
-              @input="autoSave"
-              @blur="closeEditor"
-              @keyup.enter="closeEditor"
-            />
-          </div>
 
         </div>
 
@@ -111,21 +116,20 @@
 
         </ul>
 
-        <button
-          v-if="selectedSectionFromFile"
-          @click="deleteFromTree"
-          class="w-full bg-red-500 text-white mt-4 py-2 rounded hover:bg-red-600"
-        >
-          Supprimer section
-        </button>
-
       </div>
 
     </div>
 
-    <!-- 🔹 CODE VIEW -->
-    <div class="bg-black text-green-400 p-4 h-52 overflow-auto text-xs">
+    <!-- 🔥 CODE VIEW EN BAS -->
+    <div class="bg-black text-green-400 p-4 h-64 overflow-auto text-xs">
+
+      <div class="flex justify-between mb-2 text-white">
+        <span>📄 Arborescence & Code</span>
+        <span>{{ selectedFile }}</span>
+      </div>
+
       <pre>{{ generatedCode }}</pre>
+
     </div>
 
   </div>
@@ -135,34 +139,31 @@
 import { ref, reactive } from "vue"
 
 /* 🔹 COMPONENTS */
-import HeaderSection from "../components/sections/HeaderSection.vue"
-import FooterSection from "../components/sections/FooterSection.vue"
-import MainSection from "../components/sections/MainSection.vue"
-import LogoSection from "../components/sections/LogoSection.vue"
+import HeaderSection from "@/sections/HeaderSection.vue"
+import FooterSection from "@/sections/FooterSection.vue"
+import MainSection from "@/sections/MainSection.vue"
+import LogoSection from "@/sections/LogoSection.vue"
 
-/* 🔹 AVAILABLE SECTIONS */
+/* 🔹 DATA */
 const availableSections = [
   { name: "Header", type: "Header" },
   { name: "Footer", type: "Footer" },
   { name: "Logo", type: "Logo" }
 ]
 
-/* 🔹 STATE */
 const sections = ref([])
 const selectedSection = ref(null)
-const selectedSectionFromFile = ref(null)
+const selectedFile = ref("App.vue")
 const generatedCode = ref("")
 
-/* 🔹 COMPONENT MAP SAFE */
+/* 🔹 COMPONENT MAP */
 const componentMap = {
   Header: HeaderSection,
   Footer: FooterSection,
   Logo: LogoSection
 }
 
-const safeGetComponent = (type) => {
-  return componentMap[type] || null
-}
+const safeGetComponent = (type) => componentMap[type] || null
 
 /* 🔹 ADD SECTION */
 const addSection = (sec) => {
@@ -178,7 +179,7 @@ const selectSection = (section) => {
   selectedSection.value = section
 }
 
-/* 🔹 DRAG & DROP (BY ID SAFE) */
+/* 🔹 DRAG & DROP */
 let draggedId = null
 
 const dragStart = (id) => {
@@ -186,45 +187,32 @@ const dragStart = (id) => {
 }
 
 const drop = (targetId) => {
-  const fromIndex = sections.value.findIndex(s => s.id === draggedId)
-  const toIndex = sections.value.findIndex(s => s.id === targetId)
+  const from = sections.value.findIndex(s => s.id === draggedId)
+  const to = sections.value.findIndex(s => s.id === targetId)
 
-  if (fromIndex === -1 || toIndex === -1) return
+  if (from < 0 || to < 0) return
 
-  const moved = sections.value.splice(fromIndex, 1)[0]
-  sections.value.splice(toIndex, 0, moved)
+  const moved = sections.value.splice(from, 1)[0]
+  sections.value.splice(to, 0, moved)
 }
 
 /* 🔹 FILE TREE */
 const selectFile = (id) => {
-  selectedSectionFromFile.value = id
+  selectedFile.value = id
 }
 
 const fileClass = (id) => {
-  return selectedSectionFromFile.value === id
+  return selectedFile.value === id
     ? "text-blue-500 font-bold cursor-pointer"
     : "cursor-pointer"
-}
-
-/* 🔹 DELETE */
-const deleteFromTree = () => {
-  sections.value = sections.value.filter(s => s.id !== selectedSectionFromFile.value)
-  selectedSectionFromFile.value = null
 }
 
 /* 🔹 EDITOR ACTIONS */
 const makeBold = () => {}
 const makeUppercase = () => {}
 const addEmoji = () => {}
-
 const autoSave = () => {}
-const closeEditor = () => {}
 </script>
 
 <style scoped>
-.tool {
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
 </style>
