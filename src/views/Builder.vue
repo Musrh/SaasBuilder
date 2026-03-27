@@ -1,118 +1,135 @@
 <template>
   <div class="h-screen flex bg-gray-100">
 
-    <!-- 🧭 LEFT PANEL (SECTIONS) -->
-    <div
-      v-if="mode === 'edit'"
-      class="w-64 bg-white border-r p-4 overflow-y-auto"
-    >
-      <h2 class="text-lg font-bold mb-4">🧱 Sections</h2>
+    <!-- 🧭 LEFT PANEL -->
+    <div v-if="mode === 'edit'" class="w-64 bg-white border-r p-4 overflow-y-auto">
+
+      <h2 class="font-bold mb-3">📄 Pages</h2>
+
+      <div
+        v-for="(p, i) in pages"
+        :key="p.id"
+        @click="currentPageIndex = i"
+        class="p-2 rounded cursor-pointer mb-1"
+        :class="currentPageIndex === i ? 'bg-blue-100 font-bold' : 'hover:bg-gray-100'"
+      >
+        {{ p.name }}
+      </div>
+
+      <button
+        @click="addPage"
+        class="w-full mt-2 bg-green-500 text-white p-2 rounded"
+      >
+        + Nouvelle page
+      </button>
+
+      <hr class="my-4" />
+
+      <h2 class="font-bold mb-3">🧱 Sections</h2>
 
       <button
         v-for="(comp, name) in sectionRegistry"
         :key="name"
         @click="addSection(name)"
-        class="w-full text-left px-3 py-2 mb-2 rounded-lg border hover:bg-blue-50 hover:border-blue-400 transition"
+        class="w-full text-left px-3 py-2 mb-2 rounded border hover:bg-blue-50"
       >
         + {{ name }}
       </button>
+
     </div>
 
     <!-- 🖥 CENTER -->
     <div class="flex-1 flex flex-col">
 
       <!-- TOP BAR -->
-      <div
-        v-if="mode === 'edit'"
-        class="bg-white border-b p-3 flex justify-between items-center shadow-sm"
-      >
+      <div v-if="mode === 'edit'" class="bg-white border-b p-3 flex justify-between">
+
         <div class="flex gap-2">
-          <button @click="mode = 'edit'" :class="modeBtn('edit')">
-            ✏️ Edit
-          </button>
-          <button @click="mode = 'preview'" :class="modeBtn('preview')">
-            👁 Preview
-          </button>
+          <button @click="mode = 'edit'" :class="modeBtn('edit')">Edit</button>
+          <button @click="mode = 'preview'" :class="modeBtn('preview')">Preview</button>
         </div>
 
-        <div class="font-semibold text-gray-600">
-          Builder SaaS
-        </div>
+        <div class="font-bold">Builder</div>
+
       </div>
 
       <!-- CANVAS -->
-      <div
-        class="flex-1 overflow-y-auto"
-        :class="mode === 'preview' ? 'p-0' : 'p-6'"
-      >
-        <div
-          :class="mode === 'preview'
-            ? 'w-full min-h-screen bg-white'
-            : 'max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6'"
-        >
+      <div class="flex-1 overflow-y-auto" :class="mode === 'preview' ? 'p-0' : 'p-6'">
 
-          <!-- TITLE -->
-          <input
-            v-if="mode === 'edit'"
-            v-model="pageTitle"
-            class="text-3xl font-bold w-full border-b mb-6 outline-none"
-          />
+        <div :class="mode === 'preview'
+          ? 'w-full min-h-screen bg-white'
+          : 'max-w-4xl mx-auto bg-white rounded-xl shadow p-6'">
 
-          <h1 v-else class="text-3xl font-bold mb-6">
-            {{ pageTitle }}
-          </h1>
+          <!-- 🔝 HEADER -->
+          <div class="flex items-center justify-center gap-3 mb-6">
 
-          <!-- MAIN CONTENT -->
+            <LogoSection />
+
+            <input
+              v-if="mode === 'edit'"
+              v-model="pages[currentPageIndex].title"
+              class="text-2xl font-bold border-b outline-none"
+            />
+
+            <h1 v-else class="text-2xl font-bold">
+              {{ pages[currentPageIndex].title }}
+            </h1>
+
+          </div>
+
+          <!-- 🧭 MENU PAGES -->
+          <div class="flex gap-3 justify-center mb-6">
+            <button
+              v-for="(p, i) in pages"
+              :key="p.id"
+              @click="currentPageIndex = i"
+              class="px-3 py-1 rounded border"
+              :class="i === currentPageIndex ? 'bg-blue-500 text-white' : ''"
+            >
+              {{ p.name }}
+            </button>
+          </div>
+
+          <!-- 🧱 MAIN CONTENT -->
           <textarea
             v-if="mode === 'edit'"
-            v-model="mainContent"
-            class="w-full min-h-[60vh] border p-4 rounded-lg mb-6 resize-none"
+            v-model="pages[currentPageIndex].content"
+            class="w-full min-h-[50vh] border p-3 rounded mb-4"
           />
 
           <div
             v-else
-            v-html="mainContent"
-            class="w-full min-h-[60vh]"
+            v-html="pages[currentPageIndex].content"
+            class="mb-4"
           ></div>
 
-          <!-- SECTIONS -->
+          <!-- 🔥 SECTIONS PAR PAGE -->
           <div
-            v-for="section in sections"
+            v-for="section in pages[currentPageIndex].sections"
             :key="section.id"
-            class="relative group border rounded-xl mb-4 overflow-hidden"
+            class="relative border rounded mb-3"
             @click="selectSection(section)"
           >
 
-            <!-- DELETE -->
-            <div
+            <button
               v-if="mode === 'edit'"
-              class="absolute top-2 right-2 hidden group-hover:flex gap-2"
+              @click.stop="deleteSection(section.id)"
+              class="absolute top-1 right-1 text-red-500 text-xs"
             >
-              <button
-                @click.stop="deleteSection(section.id)"
-                class="bg-white shadow px-2 py-1 text-xs rounded text-red-500"
-              >
-                🗑
-              </button>
-            </div>
+              ✕
+            </button>
 
             <!-- EDIT -->
-            <div
-              v-if="mode === 'edit' && selectedSection?.id === section.id"
-              class="p-4 bg-blue-50"
-            >
-              <!-- TOOLBAR -->
-              <div class="flex gap-2 mb-3">
-                <button @click="bold(section)" class="tool">B</button>
-                <button @click="upper(section)" class="tool">Aa</button>
-                <button @click="emoji(section)" class="tool">😊</button>
+            <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="p-3 bg-blue-50">
+
+              <div class="flex gap-2 mb-2">
+                <button @click="bold(section)">B</button>
+                <button @click="emoji(section)">😊</button>
                 <input type="color" v-model="section.props.color" />
               </div>
 
-              <textarea
-                v-model="section.props.content"
-                class="w-full border p-3 rounded-lg"
-              />
+              <textarea v-model="section.props.content" class="w-full border p-2" />
+
             </div>
 
             <!-- PREVIEW -->
@@ -124,39 +141,37 @@
 
           </div>
 
+          <!-- 🔻 FOOTER -->
+          <FooterSection />
+
         </div>
       </div>
 
-      <!-- CODE (EDIT ONLY) -->
-      <div
-        v-if="mode === 'edit'"
-        class="h-56 bg-black text-green-400 text-xs p-3 overflow-auto"
-      >
+      <!-- CODE -->
+      <div v-if="mode === 'edit'" class="h-56 bg-black text-green-400 p-2 text-xs overflow-auto">
         <pre>{{ generatedCode }}</pre>
       </div>
 
     </div>
 
-    <!-- 📁 RIGHT PANEL (FILES) -->
-    <div
-      v-if="mode === 'edit'"
-      class="w-72 bg-white border-l p-4 overflow-y-auto"
-    >
-      <h2 class="text-lg font-bold mb-4">📁 Fichiers</h2>
+    <!-- 📁 FILES -->
+    <div v-if="mode === 'edit'" class="w-72 bg-white border-l p-4">
+
+      <h2 class="font-bold mb-3">📁 Fichiers</h2>
 
       <div
         v-for="file in files"
         :key="file.name"
         @click="selectedFile = file"
-        class="p-2 rounded cursor-pointer hover:bg-gray-100"
-        :class="selectedFile?.name === file.name && 'bg-blue-100 font-bold'"
+        class="p-2 cursor-pointer hover:bg-gray-100"
       >
-        📄 {{ file.name }}
+        {{ file.name }}
       </div>
 
-      <div class="mt-4 bg-gray-900 text-green-400 p-3 text-xs h-40 overflow-auto rounded">
-        <pre>{{ selectedFile?.content }}</pre>
-      </div>
+      <pre class="mt-3 bg-gray-900 text-green-400 p-2 text-xs h-40 overflow-auto">
+{{ selectedFile?.content }}
+      </pre>
+
     </div>
 
   </div>
@@ -164,10 +179,11 @@
 
 <script setup>
 import { ref, computed } from "vue"
+import LogoSection from "../components/sections/LogoSection.vue"
+import FooterSection from "../components/sections/FooterSection.vue"
 
-/* 🔥 AUTO LOAD SECTIONS */
+/* 🔥 AUTO IMPORT */
 const modules = import.meta.glob("../components/sections/*.vue", { eager: true })
-
 const sectionRegistry = {}
 
 for (const path in modules) {
@@ -177,23 +193,49 @@ for (const path in modules) {
 
 /* STATE */
 const mode = ref("edit")
-const sections = ref([])
 const selectedSection = ref(null)
 const selectedFile = ref(null)
 
-const pageTitle = ref("Mon site")
-const mainContent = ref("<p>Bienvenue sur mon site</p>")
+const currentPageIndex = ref(0)
 
-/* ADD */
+/* 🆕 PAGES */
+const pages = ref([
+  {
+    id: 1,
+    name: "Accueil",
+    title: "Mon site",
+    content: "<p>Bienvenue</p>",
+    sections: []
+  }
+])
+
+/* ADD PAGE */
+const addPage = () => {
+  pages.value.push({
+    id: Date.now(),
+    name: "Nouvelle page",
+    title: "Titre",
+    content: "",
+    sections: []
+  })
+}
+
+/* ADD SECTION */
 const addSection = (type) => {
-  sections.value.push({
+  pages.value[currentPageIndex.value].sections.push({
     id: Date.now(),
     type,
     props: {
       content: "Nouveau contenu",
-      color: "#000000"
+      color: "#000"
     }
   })
+}
+
+/* DELETE */
+const deleteSection = (id) => {
+  const page = pages.value[currentPageIndex.value]
+  page.sections = page.sections.filter(s => s.id !== id)
 }
 
 /* SELECT */
@@ -202,15 +244,8 @@ const selectSection = (s) => {
   selectedSection.value = s
 }
 
-/* DELETE */
-const deleteSection = (id) => {
-  sections.value = sections.value.filter(s => s.id !== id)
-  if (selectedSection.value?.id === id) selectedSection.value = null
-}
-
 /* TOOLS */
 const bold = (s) => s.props.content = `<b>${s.props.content}</b>`
-const upper = (s) => s.props.content = s.props.content.toUpperCase()
 const emoji = (s) => s.props.content += " 🚀"
 
 /* UI */
@@ -219,37 +254,18 @@ const modeBtn = (m) =>
 
 /* FILES */
 const files = computed(() => {
-  return [
-    { name: "index.html", content: generatedCode.value },
-    ...sections.value.map((s, i) => ({
-      name: `${s.type}${i + 1}.vue`,
-      content: `<template><div>${s.props.content}</div></template>`
-    }))
-  ]
+  return pages.value.map(p => ({
+    name: `${p.name}.html`,
+    content: `<h1>${p.title}</h1>${p.content}`
+  }))
 })
 
-/* GENERATED CODE */
+/* CODE */
 const generatedCode = computed(() => {
-  return `
-<html>
-  <body>
-    <h1>${pageTitle.value}</h1>
-    ${mainContent.value}
-    ${sections.value.map(s => `<div>${s.props.content}</div>`).join("")}
-  </body>
-</html>
-  `
+  return pages.value.map(p => `
+<h1>${p.title}</h1>
+${p.content}
+${p.sections.map(s => `<div>${s.props.content}</div>`).join("")}
+`).join("\n")
 })
 </script>
-
-<style>
-.tool {
-  padding: 6px 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background: white;
-}
-.tool:hover {
-  background: #eee;
-}
-</style>
