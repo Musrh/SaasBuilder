@@ -22,15 +22,28 @@
 
       <hr class="my-4" />
 
-      <h2 class="font-bold mb-3">🧱 Sections</h2>
+      <!-- 🔥 SELECT SECTIONS -->
+      <h2 class="font-bold mb-2">🧱 Ajouter section</h2>
+
+      <select
+        v-model="selectedSectionType"
+        class="w-full border p-2 mb-2 rounded"
+      >
+        <option disabled value="">Choisir une section</option>
+        <option
+          v-for="name in filteredSections"
+          :key="name"
+          :value="name"
+        >
+          {{ name }}
+        </option>
+      </select>
 
       <button
-        v-for="(comp, name) in filteredSections"
-        :key="name"
-        @click="addSection(name)"
-        class="w-full text-left px-3 py-2 mb-2 rounded border hover:bg-blue-50"
+        @click="addSelectedSection"
+        class="w-full bg-blue-500 text-white p-2 rounded"
       >
-        + {{ name }}
+        Ajouter
       </button>
 
     </div>
@@ -39,103 +52,83 @@
     <div class="flex-1 flex flex-col">
 
       <!-- TOP BAR -->
-      <div v-if="mode === 'edit'" class="bg-white border-b p-3 flex justify-between">
+      <div v-if="mode === 'edit'" class="bg-white border-b p-3 flex gap-2">
 
-        <div class="flex gap-2">
-          <button @click="saveData" class="bg-green-500 text-white px-3 py-1 rounded">
-            💾 Save
-          </button>
+        <button @click="saveData" class="bg-green-500 text-white px-3 py-1 rounded">
+          💾 Save
+        </button>
 
-          <button @click="mode='preview'" class="bg-blue-500 text-white px-3 py-1 rounded">
-            👁 Preview
-          </button>
-        </div>
+        <button @click="mode='preview'" class="bg-blue-500 text-white px-3 py-1 rounded">
+          👁 Preview
+        </button>
 
       </div>
 
       <!-- CANVAS -->
-      <div class="flex-1 overflow-y-auto" :class="mode==='preview' ? 'p-0' : 'p-6'">
+      <div class="flex-1 overflow-y-auto p-6">
 
-        <div :class="mode==='preview'
-          ? 'w-full min-h-screen bg-white'
-          : 'max-w-4xl mx-auto bg-white shadow rounded p-6'">
+        <div class="max-w-4xl mx-auto bg-white shadow rounded p-6">
 
-          <!-- 🔝 STRUCTURE FIXE -->
-
+          <!-- STRUCTURE -->
           <LogoSection />
           <HeaderSection />
           <MenuSection />
 
           <!-- MAIN -->
-          <div class="mt-6">
+          <textarea
+            v-if="mode==='edit'"
+            v-model="pages[currentPageIndex].content"
+            class="w-full min-h-[40vh] border p-3 mb-4"
+            placeholder="Votre contenu ici..."
+          />
 
-            <!-- NAV PAGES -->
-            <div class="flex gap-2 mb-4">
-              <button
-                v-for="(p,i) in pages"
-                :key="p.id"
-                @click="currentPageIndex=i"
-                class="px-3 py-1 border rounded"
-                :class="i===currentPageIndex && 'bg-blue-500 text-white'"
-              >
-                {{ p.name }}
-              </button>
+          <div v-else v-html="pages[currentPageIndex].content"></div>
+
+          <!-- SECTIONS -->
+          <div
+            v-for="section in pages[currentPageIndex].sections"
+            :key="section.id"
+            class="border mb-3 p-3 relative rounded"
+          >
+
+            <!-- DELETE -->
+            <button
+              v-if="mode==='edit'"
+              @click.stop="deleteSection(section.id)"
+              class="absolute top-1 right-1 text-red-500"
+            >
+              ✕
+            </button>
+
+            <!-- IMAGE SECTION -->
+            <div v-if="section.type==='ImageSection'">
+
+              <div v-if="mode==='edit'" class="mb-2">
+                <input type="file" @change="uploadImage($event, section)" />
+              </div>
+
+              <img
+                v-if="section.props.src"
+                :src="section.props.src"
+                class="w-full rounded"
+              />
+
             </div>
 
-            <!-- CONTENT -->
-            <textarea
-              v-if="mode==='edit'"
-              v-model="pages[currentPageIndex].content"
-              class="w-full min-h-[40vh] border p-3 mb-4"
-            />
+            <!-- OTHER SECTIONS -->
+            <div v-else>
 
-            <div v-else v-html="pages[currentPageIndex].content"></div>
-
-            <!-- SECTIONS -->
-            <div
-              v-for="section in pages[currentPageIndex].sections"
-              :key="section.id"
-              class="border mb-3 p-3 relative"
-              @click="selectSection(section)"
-            >
-
-              <button
+              <textarea
                 v-if="mode==='edit'"
-                @click.stop="deleteSection(section.id)"
-                class="absolute top-1 right-1 text-red-500"
-              >
-                ✕
-              </button>
+                v-model="section.props.content"
+                class="w-full border p-2"
+              />
 
-              <!-- IMAGE -->
-              <div v-if="section.type==='ImageSection'">
-
-                <input
-                  v-if="mode==='edit'"
-                  type="file"
-                  @change="uploadImage($event, section)"
-                />
-
-                <img v-if="section.props.src" :src="section.props.src" class="w-full" />
-
-              </div>
-
-              <!-- TEXT -->
-              <div v-else>
-
-                <textarea
-                  v-if="mode==='edit'"
-                  v-model="section.props.content"
-                  class="w-full border p-2"
-                />
-
-                <component
-                  v-else
-                  :is="sectionRegistry[section.type]"
-                  v-bind="section.props"
-                />
-
-              </div>
+              <component
+                v-else
+                :is="sectionRegistry[section.type]"
+                v-bind="section.props"
+              />
 
             </div>
 
@@ -147,13 +140,13 @@
       </div>
 
       <!-- CODE VIEW -->
-      <div v-if="mode==='edit'" class="h-56 bg-black text-green-400 p-2 text-xs overflow-auto">
+      <div v-if="mode==='edit'" class="h-48 bg-black text-green-400 p-2 text-xs overflow-auto">
         <pre>{{ selectedFile?.content }}</pre>
       </div>
 
     </div>
 
-    <!-- RIGHT PANEL FILES -->
+    <!-- RIGHT PANEL -->
     <div v-if="mode==='edit'" class="w-72 bg-white border-l p-4">
 
       <h2 class="font-bold mb-3">📁 Arborescence</h2>
@@ -203,8 +196,8 @@ for (const path in modules) {
 const mode = ref("edit")
 const pages = ref([])
 const currentPageIndex = ref(0)
-const selectedSection = ref(null)
 const selectedFile = ref(null)
+const selectedSectionType = ref("")
 
 /* LOAD */
 onMounted(() => {
@@ -220,7 +213,7 @@ onMounted(() => {
 /* SAVE */
 const saveData = () => {
   localStorage.setItem("builderData", JSON.stringify(pages.value))
-  alert("Sauvegardé")
+  alert("✅ Sauvegardé")
 }
 
 /* ADD PAGE */
@@ -233,31 +226,30 @@ const addPage = () => {
   })
 }
 
-/* FILTER sections */
+/* FILTER */
 const filteredSections = computed(() => {
   return Object.keys(sectionRegistry).filter(
     s => !["LogoSection","HeaderSection","MenuSection","FooterSection"].includes(s)
   )
 })
 
-/* ADD SECTION */
-const addSection = (type) => {
+/* ADD SELECTED */
+const addSelectedSection = () => {
+  if (!selectedSectionType.value) return
+
   pages.value[currentPageIndex.value].sections.push({
     id: Date.now(),
-    type,
+    type: selectedSectionType.value,
     props: {}
   })
+
+  selectedSectionType.value = ""
 }
 
 /* DELETE */
 const deleteSection = (id) => {
   const page = pages.value[currentPageIndex.value]
   page.sections = page.sections.filter(s => s.id !== id)
-}
-
-/* SELECT */
-const selectSection = (s) => {
-  selectedSection.value = s
 }
 
 /* IMAGE */
