@@ -1,5 +1,3 @@
-
-
 <template>
   <div
     class="p-6 bg-gray-100 min-h-screen flex flex-col items-center"
@@ -25,7 +23,7 @@
       </button>
     </div>
 
-    <!-- 🔥 SECTIONS -->
+    <!-- 🔥 ADD SECTIONS -->
     <div v-if="mode === 'edit'" class="mb-4 flex gap-2 flex-wrap justify-center">
       <button
         v-for="sec in availableSections"
@@ -40,12 +38,12 @@
     <!-- ================= PAGE ================= -->
     <div class="w-full max-w-[900px] bg-white shadow-xl rounded-2xl p-6">
 
-      <!-- LOGO -->
+      <!-- 🔥 LOGO FIXE -->
       <div class="mb-4 text-center">
         <LogoSection />
       </div>
 
-      <!-- TITLE -->
+      <!-- 🔥 TITLE -->
       <div class="mb-6 text-center">
         <input
           v-if="mode === 'edit'"
@@ -57,18 +55,18 @@
         </h1>
       </div>
 
-      <!-- MAIN -->
+      <!-- ================= MAIN SECTION ================= -->
       <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 min-h-[300px]">
 
         <div class="text-center text-gray-400 text-sm mb-4">
-          🧱 MainSection (zone éditable)
+          🧱 MainSection (zone principale du site)
         </div>
 
-        <!-- CONTENU GLOBAL -->
+        <!-- CONTENT GLOBAL -->
         <textarea
           v-if="mode === 'edit'"
           v-model="mainContent"
-          class="w-full border p-4 rounded-lg mb-6"
+          class="w-full border p-4 rounded-lg mb-6 min-h-[120px]"
         />
 
         <div
@@ -77,7 +75,7 @@
           v-html="mainContent"
         ></div>
 
-        <!-- SECTIONS -->
+        <!-- ================= DYNAMIC SECTIONS ================= -->
         <div
           v-for="section in sections"
           :key="section.id"
@@ -97,10 +95,9 @@
             🗑
           </button>
 
-          <!-- EDIT -->
+          <!-- EDIT MODE -->
           <div v-if="mode === 'edit' && selectedSection?.id === section.id" class="p-4">
 
-            <!-- TOOLBAR -->
             <div class="flex gap-2 mb-3 border-b pb-2">
               <button @click="applyBold(section)" class="tool">B</button>
               <button @click="applyUppercase(section)" class="tool">Aa</button>
@@ -108,12 +105,10 @@
               <input type="color" v-model="section.props.color" />
             </div>
 
-            <!-- TEXT -->
             <textarea
               v-model="section.props.title"
               class="w-full border p-3 rounded-lg min-h-[120px]"
             />
-
           </div>
 
           <!-- PREVIEW -->
@@ -128,20 +123,19 @@
 
       </div>
 
-      <!-- FOOTER -->
+      <!-- ================= FOOTER ================= -->
       <div class="mt-6 text-center">
         <FooterSection />
       </div>
 
     </div>
 
-    <!-- ================= FILES ================= -->
+    <!-- ================= FILES PANEL ================= -->
     <div class="w-full max-w-[900px] mt-6 bg-white p-4 border rounded-xl shadow">
 
-      <h3 class="font-bold mb-3">📁 Fichiers</h3>
+      <h3 class="font-bold mb-3">📁 Fichiers générés</h3>
 
       <div class="space-y-1 text-sm">
-
         <div
           v-for="file in computedFiles"
           :key="file.name"
@@ -159,10 +153,8 @@
             ✕
           </button>
         </div>
-
       </div>
 
-      <!-- CODE -->
       <div class="mt-4 bg-black text-green-400 p-3 h-64 overflow-auto text-xs rounded-lg">
         <div class="text-white mb-2 font-bold">
           {{ selectedFile?.name }}
@@ -182,7 +174,7 @@ import { ref, computed } from "vue"
 import LogoSection from "../components/sections/LogoSection.vue"
 import FooterSection from "../components/sections/FooterSection.vue"
 
-/* STATE */
+/* ================= STATE ================= */
 const mode = ref("edit")
 const sections = ref([])
 const selectedSection = ref(null)
@@ -191,14 +183,14 @@ const selectedFile = ref(null)
 const pageTitle = ref("Titre par défaut")
 const mainContent = ref("Mon site créé avec mon builder")
 
-/* SECTIONS */
+/* ================= AVAILABLE SECTIONS ================= */
 const availableSections = [
   { name: "Texte", type: "Text" },
   { name: "Titre", type: "Heading" },
   { name: "Paragraphe", type: "Paragraph" }
 ]
 
-/* ADD */
+/* ================= ADD SECTION ================= */
 const addSection = (sec) => {
   sections.value.push({
     id: Date.now(),
@@ -210,22 +202,19 @@ const addSection = (sec) => {
   })
 }
 
-/* SELECT */
+/* ================= SELECT ================= */
 const selectSection = (section) => {
   if (mode.value === "preview") return
   selectedSection.value = section
 }
 
-/* DELETE */
+/* ================= DELETE ================= */
 const deleteSection = (id) => {
   sections.value = sections.value.filter(s => s.id !== id)
-
-  if (selectedSection.value?.id === id) {
-    selectedSection.value = null
-  }
+  if (selectedSection.value?.id === id) selectedSection.value = null
 }
 
-/* TOOLS */
+/* ================= EDIT TOOLS ================= */
 const applyBold = (section) => {
   section.props.title = `<b>${section.props.title}</b>`
 }
@@ -238,13 +227,13 @@ const applyEmoji = (section) => {
   section.props.title += " 😊"
 }
 
-/* MODE */
+/* ================= MODE ================= */
 const saveAndPreview = () => {
   selectedSection.value = null
   mode.value = "preview"
 }
 
-/* FILES */
+/* ================= FILES ================= */
 const computedFiles = computed(() => {
   const base = [
     {
@@ -252,7 +241,7 @@ const computedFiles = computed(() => {
       content: `<body>\n<h1>${pageTitle.value}</h1>\n${mainContent.value}\n</body>`
     },
     { name: "App.vue", content: "<template>App</template>" },
-    { name: "MainSection.vue", content: "<template>Main</template>" }
+    { name: "MainSection.vue", content: "<template>MainSection</template>" }
   ]
 
   const dynamic = sections.value.map((s, i) => ({
