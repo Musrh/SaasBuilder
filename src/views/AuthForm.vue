@@ -1,54 +1,69 @@
 <template>
-  <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center px-4">
 
-    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
+    <!-- CARD -->
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
 
-      <!-- 🔥 TITRE -->
-      <h1 class="text-2xl font-bold text-center mb-6">
-        {{ isLogin ? "Connexion" : "Créer un compte" }}
-      </h1>
+      <!-- LOGO / TITLE -->
+      <div class="text-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">
+          {{ isLogin ? "Connexion" : "Créer un compte" }}
+        </h1>
+        <p class="text-gray-500 text-sm mt-2">
+          Accédez à votre espace en toute sécurité
+        </p>
+      </div>
 
-      <!-- 🔥 FORM -->
+      <!-- FORM -->
       <div class="space-y-4">
 
         <!-- EMAIL -->
-        <input
-          v-model="email"
-          type="email"
-          placeholder="Email"
-          class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
+        <div>
+          <label class="text-sm text-gray-600">Email</label>
+          <input
+            v-model="email"
+            type="email"
+            placeholder="exemple@email.com"
+            class="w-full mt-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+          />
+        </div>
 
         <!-- PASSWORD -->
-        <input
-          v-model="password"
-          type="password"
-          placeholder="Mot de passe"
-          class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
+        <div>
+          <label class="text-sm text-gray-600">Mot de passe</label>
+          <input
+            v-model="password"
+            type="password"
+            placeholder="••••••••"
+            class="w-full mt-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+          />
+        </div>
 
-        <!-- 🔥 BUTTON -->
+        <!-- BUTTON -->
         <button
           @click="handleSubmit"
-          class="w-full py-3 rounded-lg text-white font-semibold transition"
-          :class="isLogin 
-            ? 'bg-blue-500 hover:bg-blue-600' 
-            : 'bg-green-500 hover:bg-green-600'"
+          class="w-full py-3 rounded-xl font-semibold text-white transition duration-300 shadow-md"
+          :class="isLogin
+            ? 'bg-blue-500 hover:bg-blue-600 active:scale-95'
+            : 'bg-green-500 hover:bg-green-600 active:scale-95'"
         >
           {{ isLogin ? "Se connecter" : "S'inscrire" }}
         </button>
 
       </div>
 
-      <!-- 🔥 SWITCH MODE -->
-      <div class="mt-6 text-center text-sm text-gray-600">
+      <!-- DIVIDER -->
+      <div class="my-6 border-t"></div>
+
+      <!-- SWITCH -->
+      <div class="text-center text-sm text-gray-600">
         <span>
-          {{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}
+          {{ isLogin ? "Pas encore de compte ?" : "Déjà inscrit ?" }}
         </span>
 
         <button
           @click="isLogin = !isLogin"
-          class="text-blue-500 font-semibold ml-1 hover:underline"
+          class="ml-1 text-blue-500 font-semibold hover:underline"
         >
           {{ isLogin ? "Créer un compte" : "Se connecter" }}
         </button>
@@ -84,10 +99,8 @@ const handleSubmit = async () => {
     }
 
     if (isLogin.value) {
-      // 🔐 LOGIN
       await signInWithEmailAndPassword(auth, email.value, password.value);
     } else {
-      // 🆕 REGISTER
       const cred = await createUserWithEmailAndPassword(
         auth,
         email.value,
