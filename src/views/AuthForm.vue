@@ -1,95 +1,114 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center px-4">
+  <div class="min-h-screen flex items-center justify-center bg-gray-100">
 
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
 
-      <h1 class="text-3xl font-bold text-center mb-6">
-        {{ isLogin ? "Connexion" : "Créer un compte" }}
-      </h1>
+      <h2 class="text-2xl font-bold text-center mb-6">
+        {{ isLogin ? "Connexion" : "Inscription" }}
+      </h2>
 
-      <div class="space-y-4">
+      <!-- EMAIL -->
+      <input
+        v-model="email"
+        type="email"
+        placeholder="Email"
+        class="input"
+      />
 
-        <input
-          v-model="email"
-          type="email"
-          placeholder="Email"
-          class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400"
-        />
+      <!-- PASSWORD -->
+      <input
+        v-model="password"
+        type="password"
+        placeholder="Mot de passe"
+        class="input"
+      />
 
-        <input
-          v-model="password"
-          type="password"
-          placeholder="Mot de passe"
-          class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400"
-        />
+      <!-- BUTTON -->
+      <button
+        @click="handleAuth"
+        class="w-full bg-blue-500 text-white py-2 rounded-lg mt-4 hover:bg-blue-600"
+      >
+        {{ isLogin ? "Se connecter" : "Créer un compte" }}
+      </button>
 
-        <button
-          @click="handleSubmit"
-          class="w-full py-3 rounded-xl text-white font-semibold transition"
-          :class="isLogin ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'"
-        >
-          {{ isLogin ? "Se connecter" : "S'inscrire" }}
-        </button>
+      <!-- SWITCH -->
+      <p class="text-center mt-4 text-sm">
+        <span v-if="isLogin">
+          Pas de compte ?
+          <span @click="isLogin = false" class="text-blue-500 cursor-pointer">
+            S'inscrire
+          </span>
+        </span>
 
-      </div>
+        <span v-else>
+          Déjà un compte ?
+          <span @click="isLogin = true" class="text-blue-500 cursor-pointer">
+            Se connecter
+          </span>
+        </span>
+      </p>
 
-      <div class="mt-6 text-center text-sm">
-        <span>{{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}</span>
-        <button @click="isLogin = !isLogin" class="text-blue-500 ml-1">
-          {{ isLogin ? "Créer un compte" : "Se connecter" }}
-        </button>
-      </div>
+      <!-- ERROR -->
+      <p v-if="error" class="text-red-500 text-sm mt-3 text-center">
+        {{ error }}
+      </p>
 
     </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { auth, db } from "../firebase";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { ref, onMounted } from "vue"
+import { useRoute } from "vue-router"
 
-const email = ref("");
-const password = ref("");
-const isLogin = ref(true);
-const router = useRouter();
+/* STATE */
+const email = ref("")
+const password = ref("")
+const isLogin = ref(true)
+const error = ref("")
 
-const handleSubmit = async () => {
-  try {
-    if (!email.value || !password.value) {
-      alert("Remplis les champs");
-      return;
-    }
+/* ROUTE PARAMS */
+const route = useRoute()
+const plan = ref(null)
+const price = ref(null)
 
-    const selectedPlan = localStorage.getItem("planChoisi") || "free";
+/* INIT */
+onMounted(() => {
+  plan.value = route.query.plan || null
+  price.value = route.query.price || null
+})
 
-    if (isLogin.value) {
-      await signInWithEmailAndPassword(auth, email.value, password.value);
-    } else {
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        email.value,
-        password.value
-      );
-
-      await setDoc(doc(db, "users", cred.user.uid), {
-        email: email.value,
-        plan: selectedPlan,
-        createdAt: Date.now(),
-        expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        sections: []
-      });
-    }
-
-    router.push("/dashboard");
-
-  } catch (e) {
-    alert(e.message);
+/* FAKE AUTH (simple pour test SaaS) */
+const handleAuth = () => {
+  if (!email.value || !password.value) {
+    error.value = "Veuillez remplir tous les champs"
+    return
   }
-};
+
+  // 🔥 USER SIMULÉ (tu peux remplacer par Firebase après)
+  const user = {
+    email: email.value,
+    uid: Date.now().toString()
+  }
+
+  localStorage.setItem("user", JSON.stringify(user))
+
+  // 🔥 REDIRECTION INTELLIGENTE
+  if (plan.value) {
+    window.location.href = `/#/panier?plan=${plan.value}&price=${price.value}`
+  } else {
+    window.location.href = "/#/dashboard"
+  }
+}
 </script>
+
+<style scoped>
+.input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+</style>
