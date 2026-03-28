@@ -4,16 +4,13 @@
     <!-- 🔥 HERO -->
     <section class="relative h-[80vh] flex items-center justify-center text-center">
 
-      <!-- IMAGE BACKGROUND -->
       <img
         src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f"
         class="absolute inset-0 w-full h-full object-cover"
       />
 
-      <!-- OVERLAY -->
       <div class="absolute inset-0 bg-white/70"></div>
 
-      <!-- CONTENT -->
       <div class="relative z-10 px-6">
 
         <h1 class="text-4xl md:text-5xl font-bold text-blue-500 mb-4">
@@ -32,7 +29,7 @@
           @click="scrollToPlans"
           class="bg-blue-500 text-white px-6 py-3 rounded-lg text-lg shadow hover:bg-blue-600 transition"
         >
-          Commencer →
+          Voir les offres
         </button>
 
       </div>
@@ -57,13 +54,12 @@
           </h3>
 
           <p class="text-3xl font-bold mb-4">
-            1€
-            <span class="text-sm text-gray-500">/mois</span>
+            Gratuit
           </p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ 1 page</li>
-            <li>✔ Design simple</li>
+            <li>✔ 1 seule page</li>
+            <li>✔ Builder simple</li>
             <li>✔ Hébergement inclus</li>
           </ul>
 
@@ -90,8 +86,8 @@
 
           <ul class="text-gray-600 mb-6 space-y-2">
             <li>✔ Multi pages</li>
-            <li>✔ Design avancé</li>
-            <li>✔ Support premium</li>
+            <li>✔ Builder avancé</li>
+            <li>✔ Design pro</li>
           </ul>
 
           <button
@@ -118,7 +114,7 @@
           <ul class="text-gray-600 mb-6 space-y-2">
             <li>✔ E-commerce</li>
             <li>✔ Paiement intégré</li>
-            <li>✔ Analytics</li>
+            <li>✔ Boutique complète</li>
           </ul>
 
           <button
@@ -144,11 +140,24 @@ import { ref } from "vue"
 const router = useRouter()
 const plansRef = ref(null)
 
+/* 🔥 MAPPING PLAN → BUILDER */
+const builderMap = {
+  free: "/builder1",
+  pro: "/builder",
+  premium: "/builder3"
+}
+
+/* 🔥 SELECT PLAN */
 const selectPlan = (plan) => {
   localStorage.setItem("planChoisi", plan)
+
+  // 🔥 on stocke aussi le builder associé
+  localStorage.setItem("builderRoute", builderMap[plan])
+
   router.push("/auth")
 }
 
+/* SCROLL */
 const scrollToPlans = () => {
   plansRef.value.scrollIntoView({ behavior: "smooth" })
 }
