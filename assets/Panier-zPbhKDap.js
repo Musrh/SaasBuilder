@@ -1,0 +1,1 @@
+import{a as e,n as t,s as n,t as r}from"./index-CEqPdtJq.js";var i={__name:`Panier`,setup(i){let a=n(null);return n(``),n(``),n(``),n(``),n(``),e(()=>{t(r,e=>{a.value=e})}),()=>{}}};export{i as default};
