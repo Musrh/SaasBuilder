@@ -1,155 +1,85 @@
 <template>
   <div class="w-full">
 
-    <!-- 🔥 HERO -->
-    <section class="relative h-[80vh] flex items-center justify-center text-center">
+    <!-- 🔥 HERO (image réduite) -->
+    <div class="relative h-[45vh] flex items-center justify-center text-center">
 
-      <!-- IMAGE BACKGROUND -->
+      <!-- IMAGE -->
       <img
-        src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f"
-        class="absolute inset-0 w-full h-full object-cover"
+        src="https://images.unsplash.com/photo-1498050108023-c5249f4df085"
+        class="absolute inset-0 w-full h-full object-cover opacity-30"
       />
 
-      <!-- OVERLAY -->
-      <div class="absolute inset-0 bg-white/70"></div>
-
-      <!-- CONTENT -->
-      <div class="relative z-10 px-6">
-
-        <h1 class="text-4xl md:text-5xl font-bold text-blue-500 mb-4">
+      <!-- CONTENU -->
+      <div class="relative z-10 px-4">
+        <h1 class="text-2xl md:text-4xl font-bold text-blue-600 mb-3">
           Créez votre site sur mesure
         </h1>
 
-        <p class="text-lg text-gray-700 mb-2">
+        <p class="text-gray-700 text-sm md:text-lg mb-2">
           Obtenez un résultat professionnel en quelques clics
         </p>
 
-        <p class="text-xl text-gray-800 mb-6">
-          À partir de <span class="text-blue-500 font-bold">1 € HT/mois</span>
+        <p class="text-blue-500 text-base md:text-xl font-semibold">
+          À partir de 1 € HT/mois
         </p>
-
-        <button
-          @click="scrollToPlans"
-          class="bg-blue-500 text-white px-6 py-3 rounded-lg text-lg shadow hover:bg-blue-600 transition"
-        >
-          Commencer →
-        </button>
-
       </div>
-    </section>
+
+    </div>
 
     <!-- 🔥 OFFRES -->
-    <section ref="plansRef" class="py-16 bg-gray-100 text-center">
+    <div class="py-10 bg-gray-50 text-center">
 
-      <h2 class="text-3xl font-bold text-blue-500 mb-4">
+      <h2 class="text-2xl md:text-3xl font-bold text-blue-600 mb-2">
         Nos offres
       </h2>
 
-      <div class="w-16 h-1 bg-blue-400 mx-auto mb-10 rounded"></div>
+      <div class="w-16 h-1 bg-blue-400 mx-auto mb-8 rounded"></div>
 
-      <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto px-4">
+      <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto px-4">
 
-        <!-- PLAN FREE -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-
-          <h3 class="text-xl font-bold text-blue-400 mb-2">
-            Vitrine
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">
-            1€
-            <span class="text-sm text-gray-500">/mois</span>
-          </p>
-
-          <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ 1 page</li>
-            <li>✔ Design simple</li>
-            <li>✔ Hébergement inclus</li>
-          </ul>
+        <!-- GRATUIT -->
+        <div class="bg-white shadow rounded-xl p-6 border-t-4 border-gray-400">
+          <h3 class="text-xl font-bold mb-2">Gratuit</h3>
+          <p class="text-gray-500 mb-4">Idéal pour tester</p>
+          <p class="text-2xl font-bold mb-4">0€</p>
 
           <button
             @click="selectPlan('free')"
-            class="w-full bg-blue-400 text-white py-2 rounded hover:bg-blue-500"
+            class="border px-4 py-2 rounded hover:bg-gray-100"
           >
             Choisir
           </button>
-
         </div>
 
-        <!-- PLAN PRO -->
-        <div class="bg-white rounded-xl shadow-lg border-2 border-blue-500 p-6 scale-105">
-
-          <h3 class="text-xl font-bold text-blue-500 mb-2">
-            Pro
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">
-            5€
-            <span class="text-sm text-gray-500">/mois</span>
-          </p>
-
-          <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ Multi pages</li>
-            <li>✔ Design avancé</li>
-            <li>✔ Support premium</li>
-          </ul>
+        <!-- PAYANT -->
+        <div class="bg-white shadow-xl rounded-xl p-6 border-t-4 border-blue-500">
+          <h3 class="text-xl font-bold mb-2 text-blue-600">Pro</h3>
+          <p class="text-gray-500 mb-4">Pour projets sérieux</p>
+          <p class="text-2xl font-bold mb-4">5€ / mois</p>
 
           <button
-            @click="selectPlan('pro')"
-            class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+            @click="selectPlan('paid')"
+            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
           >
             Choisir
           </button>
-
-        </div>
-
-        <!-- PLAN PREMIUM -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-
-          <h3 class="text-xl font-bold text-purple-500 mb-2">
-            Premium
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">
-            10€
-            <span class="text-sm text-gray-500">/mois</span>
-          </p>
-
-          <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ E-commerce</li>
-            <li>✔ Paiement intégré</li>
-            <li>✔ Analytics</li>
-          </ul>
-
-          <button
-            @click="selectPlan('premium')"
-            class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600"
-          >
-            Choisir
-          </button>
-
         </div>
 
       </div>
 
-    </section>
+    </div>
 
   </div>
 </template>
 
 <script setup>
 import { useRouter } from "vue-router"
-import { ref } from "vue"
 
 const router = useRouter()
-const plansRef = ref(null)
 
 const selectPlan = (plan) => {
   localStorage.setItem("planChoisi", plan)
   router.push("/auth")
-}
-
-const scrollToPlans = () => {
-  plansRef.value.scrollIntoView({ behavior: "smooth" })
 }
 </script>
