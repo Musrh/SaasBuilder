@@ -1,22 +1,60 @@
 <template>
-  <div class="p-6">
+  <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
 
-    <h1 class="text-2xl font-bold mb-4">
-      {{ isLogin ? "Connexion" : "Inscription" }}
-    </h1>
+    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
 
-    <input v-model="email" placeholder="Email" class="border p-2 mb-2 w-full" />
-    <input v-model="password" type="password" placeholder="Password" class="border p-2 mb-2 w-full" />
+      <!-- 🔥 TITRE -->
+      <h1 class="text-2xl font-bold text-center mb-6">
+        {{ isLogin ? "Connexion" : "Créer un compte" }}
+      </h1>
 
-    <button @click="handleSubmit" class="bg-blue-500 text-white px-4 py-2">
-      OK
-    </button>
+      <!-- 🔥 FORM -->
+      <div class="space-y-4">
 
-    <br /><br />
+        <!-- EMAIL -->
+        <input
+          v-model="email"
+          type="email"
+          placeholder="Email"
+          class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
 
-    <button @click="isLogin = !isLogin">
-      Switch mode
-    </button>
+        <!-- PASSWORD -->
+        <input
+          v-model="password"
+          type="password"
+          placeholder="Mot de passe"
+          class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+
+        <!-- 🔥 BUTTON -->
+        <button
+          @click="handleSubmit"
+          class="w-full py-3 rounded-lg text-white font-semibold transition"
+          :class="isLogin 
+            ? 'bg-blue-500 hover:bg-blue-600' 
+            : 'bg-green-500 hover:bg-green-600'"
+        >
+          {{ isLogin ? "Se connecter" : "S'inscrire" }}
+        </button>
+
+      </div>
+
+      <!-- 🔥 SWITCH MODE -->
+      <div class="mt-6 text-center text-sm text-gray-600">
+        <span>
+          {{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}
+        </span>
+
+        <button
+          @click="isLogin = !isLogin"
+          class="text-blue-500 font-semibold ml-1 hover:underline"
+        >
+          {{ isLogin ? "Créer un compte" : "Se connecter" }}
+        </button>
+      </div>
+
+    </div>
 
   </div>
 </template>
@@ -46,8 +84,10 @@ const handleSubmit = async () => {
     }
 
     if (isLogin.value) {
+      // 🔐 LOGIN
       await signInWithEmailAndPassword(auth, email.value, password.value);
     } else {
+      // 🆕 REGISTER
       const cred = await createUserWithEmailAndPassword(
         auth,
         email.value,
