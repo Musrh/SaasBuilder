@@ -14,7 +14,17 @@ const routes = [
       path: "/panier",
       component: () => import("./views/Panier.vue")
 },
+
+{
+      path: "/success",
+      component: () => import("./views/Success.vue")
+},
   
+{
+      path: "/panier",
+      component: () => import("./views/Cancel.vue")
+},
+ 
 {
   path: "/builder1",
   component: () => import("./views/Builder1.vue")
