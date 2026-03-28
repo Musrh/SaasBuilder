@@ -5,20 +5,21 @@
       {{ titles.cart }}
     </h1>
 
-    <!-- USER NOT LOGGED -->
+    <!-- USER -->
     <div v-if="!user">
       <p class="text-red-600 font-semibold">
         {{ titles.mustLogin }}
       </p>
+
       <button
-        @click="$router.push('/login')"
+        @click="$router.push('/auth')"
         class="bg-black text-white px-4 py-2 mt-3 rounded"
       >
         {{ titles.login }}
       </button>
     </div>
 
-    <!-- ================= PLANS SAAS ================= -->
+    <!-- ================= PLANS ================= -->
     <div v-else class="mb-6">
 
       <h2 class="font-bold mb-2">Plans SaaS</h2>
@@ -56,23 +57,9 @@
       </div>
     </div>
 
-    <!-- ================= CART ITEMS ================= -->
-    <div v-if="cart.length">
+    <!-- ================= ADDRESS ================= -->
+    <div v-if="user">
 
-      <h2 class="font-bold mb-2">Produits</h2>
-
-      <ul class="mb-6">
-        <li
-          v-for="item in cart"
-          :key="item.id"
-          class="flex justify-between"
-        >
-          <span>{{ item.nom }} x {{ item.quantity }}</span>
-          <span>{{ (item.prix * item.quantity).toFixed(2) }} €</span>
-        </li>
-      </ul>
-
-      <!-- ADDRESS -->
       <h2 class="font-semibold mb-2">{{ titles.address }}</h2>
 
       <input v-model="adresse1" :placeholder="titles.address1" class="input" />
@@ -81,157 +68,78 @@
       <input v-model="ville" :placeholder="titles.city" class="input" />
       <input v-model="pays" :placeholder="titles.country" class="input" />
 
-      <!-- PAY BUTTONS -->
-      <div class="flex gap-4 mt-4">
-
-        <button
-          @click="checkoutStripe"
-          class="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Stripe
-        </button>
-
-        <button
-          @click="checkoutPaypal"
-          class="bg-yellow-500 text-black px-4 py-2 rounded"
-        >
-          PayPal
-        </button>
-
-      </div>
     </div>
-
-    <p v-else>{{ titles.cartEmpty }}</p>
 
   </div>
 </template>
 
-<script>
-import { mapState } from "vuex";
-import axios from "axios";
+<script setup>
+import { ref, onMounted } from "vue"
+import axios from "axios"
+import { auth } from "../firebase"
+import { onAuthStateChanged } from "firebase/auth"
 
-export default {
-  data() {
-    return {
-      adresse1: "",
-      adresse2: "",
-      codePostal: "",
-      ville: "",
-      pays: "",
-    };
-  },
+/* ================= STATE ================= */
+const user = ref(null)
 
-  computed: {
-    ...mapState(["cart", "user"]),
+const adresse1 = ref("")
+const adresse2 = ref("")
+const codePostal = ref("")
+const ville = ref("")
+const pays = ref("")
 
-    currentLang() {
-      return this.$store.getters["language/currentLanguage"] || "fr";
-    },
+/* ================= AUTH ================= */
+onMounted(() => {
+  onAuthStateChanged(auth, (u) => {
+    user.value = u
+  })
+})
 
-    titles() {
-      return {
-        fr: {
-          cart: "Votre Panier",
-          mustLogin: "Vous devez être connecté pour payer.",
-          login: "Se connecter",
-          address: "Adresse",
-          address1: "Adresse 1",
-          address2: "Adresse 2",
-          postalCode: "Code postal",
-          city: "Ville",
-          country: "Pays",
-          cartEmpty: "Votre panier est vide."
-        },
-        en: {
-          cart: "Your Cart",
-          mustLogin: "You must be logged in.",
-          login: "Login",
-          address: "Address",
-          address1: "Address 1",
-          address2: "Address 2",
-          postalCode: "Postal Code",
-          city: "City",
-          country: "Country",
-          cartEmpty: "Cart is empty."
-        }
-      }[this.currentLang];
-    }
-  },
+/* ================= TEXT ================= */
+const titles = {
+  cart: "Votre Panier",
+  mustLogin: "Vous devez être connecté pour payer.",
+  login: "Se connecter",
+  address: "Adresse",
+  address1: "Adresse 1",
+  address2: "Adresse 2",
+  postalCode: "Code postal",
+  city: "Ville",
+  country: "Pays",
+}
 
-  methods: {
+/* ================= HELP ================= */
+const getAdresse = () => {
+  return `${adresse1.value} ${adresse2.value}, ${codePostal.value} ${ville.value}, ${pays.value}`
+}
 
-    getAdresse() {
-      return `${this.adresse1} ${this.adresse2}, ${this.codePostal} ${this.ville}, ${this.pays}`;
-    },
-
-    // ================= SAAS PLAN BUY =================
-    async buyPlan(plan, price) {
-      try {
-        const response = await axios.post(
-          "https://backend-master-production-cf50.up.railway.app/create-stripe-session",
+/* ================= BUY PLAN ================= */
+const buyPlan = async (plan, price) => {
+  try {
+    const response = await axios.post(
+      "https://backend-master-production-cf50.up.railway.app/create-stripe-session",
+      {
+        items: [
           {
-            items: [
-              {
-                nom: "Plan " + plan,
-                prix: price,
-                quantity: 1
-              }
-            ],
-            email: this.user.email,
-            adresseLivraison: this.getAdresse(),
-            plan: plan,
-            clientId: this.user.uid
+            nom: "Plan " + plan,
+            prix: price,
+            quantity: 1
           }
-        );
-
-        window.location.href = response.data.url;
-
-      } catch (err) {
-        console.error(err);
-        alert("Erreur paiement plan");
+        ],
+        email: user.value.email,
+        adresseLivraison: getAdresse(),
+        plan: plan,
+        clientId: user.value.uid
       }
-    },
+    )
 
-    // ================= STRIPE CART =================
-    async checkoutStripe() {
-      try {
-        const response = await axios.post(
-          "https://backend-master-production-cf50.up.railway.app/create-stripe-session",
-          {
-            items: this.cart,
-            email: this.user.email,
-            adresseLivraison: this.getAdresse(),
-            clientId: this.user.uid
-          }
-        );
+    window.location.href = response.data.url
 
-        window.location.href = response.data.url;
-
-      } catch (err) {
-        console.error("Stripe error:", err);
-      }
-    },
-
-    // ================= PAYPAL =================
-    async checkoutPaypal() {
-      try {
-        const order = await axios.post(
-          "https://paypalbackend-production.up.railway.app/create-paypal-order",
-          {
-            items: this.cart,
-            email: this.user.email,
-            adresseLivraison: this.getAdresse()
-          }
-        );
-
-        window.location.href = order.data.approveUrl || order.data.url;
-
-      } catch (err) {
-        console.error("PayPal error:", err);
-      }
-    }
+  } catch (err) {
+    console.error(err)
+    alert("Erreur paiement")
   }
-};
+}
 </script>
 
 <style scoped>
@@ -239,8 +147,8 @@ export default {
   display: block;
   width: 100%;
   margin-bottom: 10px;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 </style>
