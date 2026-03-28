@@ -1,0 +1,1 @@
+import{_ as e,s as t}from"./runtime-core.esm-bundler-Cb6mg53V.js";import{t as n}from"./index-Di7BqDZi.js";var r={};function i(n,r){return e(),t(`h1`,null,`This plan Under Construction`)}var a=n(r,[[`render`,i]]);export{a as default};
