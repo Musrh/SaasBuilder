@@ -1,1 +1,0 @@
-import{D as e,g as t}from"./runtime-core.esm-bundler-pN0j22zX.js";import{i as n,n as r,r as i,t as a}from"./index-DfLbYXZk.js";var o={__name:`Panier`,setup(o){let s=i();n();let c=e(null),l=e(null),u=e(0);return e(``),e(``),e(``),e(``),e(``),t(()=>{r(a,e=>{c.value=e}),s.query.plan&&(l.value=s.query.plan,u.value=Number(s.query.price||0))}),()=>{}}};export{o as default};
