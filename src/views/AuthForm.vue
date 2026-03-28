@@ -1,83 +1,52 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center px-4">
 
-    <!-- CARD -->
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
 
-      <!-- LOGO / TITLE -->
-      <div class="text-center mb-6">
-        <h1 class="text-3xl font-bold text-gray-800">
-          {{ isLogin ? "Connexion" : "Créer un compte" }}
-        </h1>
-        <p class="text-gray-500 text-sm mt-2">
-          Accédez à votre espace en toute sécurité
-        </p>
-      </div>
+      <h1 class="text-3xl font-bold text-center mb-6">
+        {{ isLogin ? "Connexion" : "Créer un compte" }}
+      </h1>
 
-      <!-- FORM -->
       <div class="space-y-4">
 
-        <!-- EMAIL -->
-        <div>
-          <label class="text-sm text-gray-600">Email</label>
-          <input
-            v-model="email"
-            type="email"
-            placeholder="exemple@email.com"
-            class="w-full mt-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-          />
-        </div>
+        <input
+          v-model="email"
+          type="email"
+          placeholder="Email"
+          class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400"
+        />
 
-        <!-- PASSWORD -->
-        <div>
-          <label class="text-sm text-gray-600">Mot de passe</label>
-          <input
-            v-model="password"
-            type="password"
-            placeholder="••••••••"
-            class="w-full mt-1 px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-          />
-        </div>
+        <input
+          v-model="password"
+          type="password"
+          placeholder="Mot de passe"
+          class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400"
+        />
 
-        <!-- BUTTON -->
         <button
           @click="handleSubmit"
-          class="w-full py-3 rounded-xl font-semibold text-white transition duration-300 shadow-md"
-          :class="isLogin
-            ? 'bg-blue-500 hover:bg-blue-600 active:scale-95'
-            : 'bg-green-500 hover:bg-green-600 active:scale-95'"
+          class="w-full py-3 rounded-xl text-white font-semibold transition"
+          :class="isLogin ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'"
         >
           {{ isLogin ? "Se connecter" : "S'inscrire" }}
         </button>
 
       </div>
 
-      <!-- DIVIDER -->
-      <div class="my-6 border-t"></div>
-
-      <!-- SWITCH -->
-      <div class="text-center text-sm text-gray-600">
-        <span>
-          {{ isLogin ? "Pas encore de compte ?" : "Déjà inscrit ?" }}
-        </span>
-
-        <button
-          @click="isLogin = !isLogin"
-          class="ml-1 text-blue-500 font-semibold hover:underline"
-        >
+      <div class="mt-6 text-center text-sm">
+        <span>{{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}</span>
+        <button @click="isLogin = !isLogin" class="text-blue-500 ml-1">
           {{ isLogin ? "Créer un compte" : "Se connecter" }}
         </button>
       </div>
 
     </div>
-
   </div>
 </template>
 
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-
 import { auth, db } from "../firebase";
 import {
   createUserWithEmailAndPassword,
@@ -88,7 +57,6 @@ import { doc, setDoc } from "firebase/firestore";
 const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
-
 const router = useRouter();
 
 const handleSubmit = async () => {
@@ -97,6 +65,8 @@ const handleSubmit = async () => {
       alert("Remplis les champs");
       return;
     }
+
+    const selectedPlan = localStorage.getItem("planChoisi") || "free";
 
     if (isLogin.value) {
       await signInWithEmailAndPassword(auth, email.value, password.value);
@@ -109,8 +79,9 @@ const handleSubmit = async () => {
 
       await setDoc(doc(db, "users", cred.user.uid), {
         email: email.value,
-        plan: "free",
-        createdAt: new Date(),
+        plan: selectedPlan,
+        createdAt: Date.now(),
+        expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
         sections: []
       });
     }
@@ -118,7 +89,6 @@ const handleSubmit = async () => {
     router.push("/dashboard");
 
   } catch (e) {
-    console.error(e);
     alert(e.message);
   }
 };
