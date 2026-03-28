@@ -9,6 +9,11 @@ const routes = [
   { path: "/", component: PlanSelection },
   { path: "/auth", component: AuthForm },
   { path: "/dashboard", component: Dashboard },
+
+{
+      path: "/panier",
+      component: () => import("./views/Panier.vue")
+},
   
 {
   path: "/builder1",
