@@ -1,183 +1,80 @@
 <template>
-  <div class="w-full">
+  <div class="p-4 max-w-3xl mx-auto">
 
-    <!-- 🔥 HERO -->
-    <section class="relative h-[80vh] flex items-center justify-center text-center">
+    <h1 class="text-2xl font-bold mb-4">Panier SaaS</h1>
 
-      <img
-        src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f"
-        class="absolute inset-0 w-full h-full object-cover"
-      />
+    <!-- PLAN -->
+    <div v-if="plan" class="border p-4 rounded-xl mb-6">
+      <h2 class="font-bold text-lg">Plan choisi : {{ plan }}</h2>
+      <p class="text-gray-600">Prix : {{ price }} €</p>
+    </div>
 
-      <div class="absolute inset-0 bg-white/70"></div>
+    <!-- LOGIN -->
+    <div v-if="!user">
+      <p class="text-red-600">Connectez-vous pour continuer</p>
+      <button @click="goAuth" class="bg-black text-white px-4 py-2 mt-3 rounded">
+        Se connecter
+      </button>
+    </div>
 
-      <div class="relative z-10 px-6">
-
-        <h1 class="text-4xl md:text-5xl font-bold text-blue-500 mb-4">
-          Créez votre site sur mesure
-        </h1>
-
-        <p class="text-lg text-gray-700 mb-2">
-          Obtenez un résultat professionnel en quelques clics
-        </p>
-
-        <p class="text-xl text-gray-800 mb-6">
-          À partir de <span class="text-blue-500 font-bold">1 € HT/mois</span>
-        </p>
-
-        <button
-          @click="scrollToPlans"
-          class="bg-blue-500 text-white px-6 py-3 rounded-lg text-lg shadow hover:bg-blue-600 transition"
-        >
-          Voir les offres
-        </button>
-
-      </div>
-    </section>
-
-    <!-- 🔥 OFFRES -->
-    <section ref="plansRef" class="py-16 bg-gray-100 text-center">
-
-      <h2 class="text-3xl font-bold text-blue-500 mb-4">
-        Nos offres
-      </h2>
-
-      <div class="w-16 h-1 bg-blue-400 mx-auto mb-10 rounded"></div>
-
-      <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto px-4">
-
-        <!-- PLAN FREE -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-
-          <h3 class="text-xl font-bold text-blue-400 mb-2">
-            Vitrine
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">Gratuit</p>
-
-          <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ 1 seule page</li>
-            <li>✔ Builder simple</li>
-            <li>✔ Hébergement inclus</li>
-          </ul>
-
-          <button
-            @click="selectPlan('free')"
-            class="w-full bg-blue-400 text-white py-2 rounded hover:bg-blue-500"
-          >
-            Choisir
-          </button>
-
-        </div>
-
-        <!-- PLAN PRO -->
-        <div class="bg-white rounded-xl shadow-lg border-2 border-blue-500 p-6 scale-105">
-
-          <h3 class="text-xl font-bold text-blue-500 mb-2">
-            Pro
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">
-            5€
-            <span class="text-sm text-gray-500">/mois</span>
-          </p>
-
-          <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ Multi pages</li>
-            <li>✔ Builder avancé</li>
-            <li>✔ Design pro</li>
-          </ul>
-
-          <button
-            @click="selectPlan('pro')"
-            class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
-          >
-            Choisir Pro
-          </button>
-
-        </div>
-
-        <!-- PLAN PREMIUM -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-
-          <h3 class="text-xl font-bold text-purple-500 mb-2">
-            Premium
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">
-            10€
-            <span class="text-sm text-gray-500">/mois</span>
-          </p>
-
-          <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ E-commerce</li>
-            <li>✔ Paiement intégré</li>
-            <li>✔ Boutique complète</li>
-          </ul>
-
-          <button
-            @click="selectPlan('premium')"
-            class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600"
-          >
-            Choisir Premium
-          </button>
-
-        </div>
-
-      </div>
-
-    </section>
+    <!-- PAY -->
+    <div v-else>
+      <button
+        @click="pay"
+        class="bg-blue-600 text-white px-4 py-2 rounded w-full"
+      >
+        Payer avec Stripe
+      </button>
+    </div>
 
   </div>
 </template>
 
 <script setup>
-import { useRouter } from "vue-router"
-import { ref } from "vue"
+import { ref, onMounted } from "vue"
+import { useRoute, useRouter } from "vue-router"
 
+const route = useRoute()
 const router = useRouter()
-const plansRef = ref(null)
 
-/* 🔥 PLAN → BUILDER */
-const builderMap = {
-  free: "/auth",
-  pro: "/builder",
-  premium: "/builder3"
+const plan = ref("")
+const price = ref(0)
+const user = ref(null)
+
+onMounted(() => {
+  plan.value = route.query.plan
+  price.value = route.query.price
+
+  const savedUser = localStorage.getItem("user")
+  if (savedUser) user.value = JSON.parse(savedUser)
+})
+
+const goAuth = () => {
+  router.push(`/auth?plan=${plan.value}&price=${price.value}`)
 }
 
-/* 💎 PRIX PLANS */
-const planPrices = {
-  pro: 5,
-  premium: 10
-}
+const pay = async () => {
+  const res = await fetch(
+    "https://backend-master-production-cf50.up.railway.app/create-stripe-session",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: [
+          {
+            nom: "Plan " + plan.value,
+            prix: price.value,
+            quantity: 1
+          }
+        ],
+        email: user.value.email,
+        plan: plan.value,
+        clientId: user.value.uid
+      })
+    }
+  )
 
-/* 🚀 SELECT PLAN SAAS */
-const selectPlan = (plan) => {
-
-  localStorage.setItem("planChoisi", plan)
-  localStorage.setItem("builderRoute", builderMap[plan])
-
-  // ================= FREE =================
-  if (plan === "free") {
-    router.push("/auth")
-    return
-  }
-
-  // ================= PRO / PREMIUM → PANIER =================
-  if (plan === "pro" || plan === "premium") {
-    router.push({
-      path: "/panier",
-      query: {
-        plan: plan,
-        price: planPrices[plan]
-      }
-    })
-    return
-  }
-}
-
-/* SCROLL */
-const scrollToPlans = () => {
-  plansRef.value.scrollIntoView({ behavior: "smooth" })
+  const data = await res.json()
+  window.location.href = data.url
 }
 </script>
