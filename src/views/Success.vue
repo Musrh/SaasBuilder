@@ -1,80 +1,74 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-    <div class="bg-white shadow-xl rounded-2xl p-8 max-w-md w-full text-center">
+  <div class="min-h-screen flex flex-col items-center justify-center bg-gray-100 text-center p-6">
 
-      <!-- ICON SUCCESS -->
-      <div class="text-green-500 text-6xl mb-4">✅</div>
+    <!-- SUCCESS -->
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
 
-      <h1 class="text-2xl font-bold mb-2">
-        Paiement réussi
+      <h1 class="text-2xl font-bold text-green-600 mb-4">
+        ✅ Paiement réussi !
       </h1>
 
-      <p class="text-gray-500 mb-6">
-        Merci pour votre commande 🎉
+      <p class="text-gray-700 mb-6">
+        Votre abonnement a été activé avec succès.
       </p>
 
       <!-- LOADING -->
-      <div v-if="loading" class="text-gray-500">
-        Chargement des détails...
+      <div class="flex flex-col items-center">
+        <div class="loader mb-3"></div>
+        <p class="text-sm text-gray-500">
+          Redirection vers votre espace...
+        </p>
       </div>
-
-      <!-- ORDER INFO -->
-      <div v-else-if="order" class="text-left bg-gray-50 p-4 rounded-xl">
-        <p><strong>Email :</strong> {{ order.email }}</p>
-        <p><strong>Montant :</strong> {{ order.montant }} €</p>
-        <p><strong>Statut :</strong> {{ order.status }}</p>
-        <p><strong>Plan :</strong> {{ order.plan || 'Basic' }}</p>
-      </div>
-
-      <!-- ERROR -->
-      <div v-else class="text-red-500">
-        Impossible de récupérer la commande
-      </div>
-
-      <button
-        class="mt-6 bg-black text-white px-6 py-2 rounded-xl hover:bg-gray-800"
-        @click="$router.push('/')"
-      >
-        Retour au site
-      </button>
 
     </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { useRoute } from "vue-router";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { onMounted } from "vue"
+import { useRoute } from "vue-router"
 
-const route = useRoute();
+const route = useRoute()
 
-const loading = ref(true);
-const order = ref(null);
+onMounted(() => {
 
-onMounted(async () => {
-  try {
-    const sessionId = route.query.session_id;
+  // 🔥 récupérer session Stripe (optionnel)
+  const sessionId = route.query.session_id
+  console.log("Stripe session:", sessionId)
 
-    if (!sessionId) {
-      loading.value = false;
-      return;
-    }
+  // 🔥 récupérer plan choisi
+  const plan = localStorage.getItem("planChoisi") || "free"
 
-    // 🔥 On cherche dans Firestore (orders SaaS master)
-    const snapshot = await getDoc(
-      doc(db, "orders", sessionId)
-    );
-
-    if (snapshot.exists()) {
-      order.value = snapshot.data();
-    }
-
-  } catch (e) {
-    console.error(e);
-  } finally {
-    loading.value = false;
+  // 🔥 mapping plan → builder
+  const routes = {
+    free: "/builder1",
+    pro: "/builder2",
+    premium: "/builder3"
   }
-});
+
+  // 🔥 redirection après 2 secondes
+  setTimeout(() => {
+    window.location.href = "/#" + (routes[plan] || "/builder1")
+  }, 2000)
+
+})
 </script>
+
+<style scoped>
+/* Loader simple */
+.loader {
+  border: 4px solid #eee;
+  border-top: 4px solid #22c55e;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>
