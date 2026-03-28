@@ -15,7 +15,7 @@ const routes = [
   component: () => import("./views/Builder1.vue")
 },
 {
-  path: "/builder",
+  path: "/builder2",
   component: () => import("./views/Builder.vue")
 },
 {
