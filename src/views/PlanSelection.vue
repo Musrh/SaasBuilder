@@ -53,9 +53,7 @@
             Vitrine
           </h3>
 
-          <p class="text-3xl font-bold mb-4">
-            Gratuit
-          </p>
+          <p class="text-3xl font-bold mb-4">Gratuit</p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
             <li>✔ 1 seule page</li>
@@ -94,7 +92,7 @@
             @click="selectPlan('pro')"
             class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
           >
-            Choisir
+            Choisir Pro
           </button>
 
         </div>
@@ -121,7 +119,7 @@
             @click="selectPlan('premium')"
             class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600"
           >
-            Choisir
+            Choisir Premium
           </button>
 
         </div>
@@ -140,21 +138,42 @@ import { ref } from "vue"
 const router = useRouter()
 const plansRef = ref(null)
 
-/* 🔥 MAPPING PLAN → BUILDER */
+/* 🔥 PLAN → BUILDER */
 const builderMap = {
-  free: "/builder1",
+  free: "/auth",
   pro: "/builder",
   premium: "/builder3"
 }
 
-/* 🔥 SELECT PLAN */
-const selectPlan = (plan) => {
-  localStorage.setItem("planChoisi", plan)
+/* 💎 PRIX PLANS */
+const planPrices = {
+  pro: 5,
+  premium: 10
+}
 
-  // 🔥 on stocke aussi le builder associé
+/* 🚀 SELECT PLAN SAAS */
+const selectPlan = (plan) => {
+
+  localStorage.setItem("planChoisi", plan)
   localStorage.setItem("builderRoute", builderMap[plan])
 
-  router.push("/auth")
+  // ================= FREE =================
+  if (plan === "free") {
+    router.push("/auth")
+    return
+  }
+
+  // ================= PRO / PREMIUM → PANIER =================
+  if (plan === "pro" || plan === "premium") {
+    router.push({
+      path: "/panier",
+      query: {
+        plan: plan,
+        price: planPrices[plan]
+      }
+    })
+    return
+  }
 }
 
 /* SCROLL */
