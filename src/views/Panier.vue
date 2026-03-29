@@ -1,3 +1,59 @@
+<template>
+  <div class="p-6 max-w-2xl mx-auto">
+
+    <h1 class="text-2xl font-bold mb-6 text-center">
+      🛒 Panier SaaS
+    </h1>
+
+    <!-- PLAN -->
+    <div v-if="selectedPlan" class="bg-gray-50 p-4 rounded-xl mb-6 shadow">
+      <h2 class="text-lg font-semibold">
+        Plan : {{ selectedPlan }}
+      </h2>
+      <p class="text-gray-600">
+        Prix : {{ selectedPrice }} €
+      </p>
+    </div>
+
+    <!-- NOT LOGGED -->
+    <div v-if="!user" class="text-center">
+
+      <p class="text-red-500 mb-4">
+        Vous devez être connecté
+      </p>
+
+      <button
+        @click="goAuth"
+        class="bg-black text-white px-4 py-2 rounded"
+      >
+        Se connecter
+      </button>
+
+    </div>
+
+    <!-- FORM -->
+    <div v-else>
+
+      <div class="space-y-2 mb-4">
+        <input v-model="adresse1" placeholder="Adresse 1" class="input" />
+        <input v-model="adresse2" placeholder="Adresse 2" class="input" />
+        <input v-model="codePostal" placeholder="Code postal" class="input" />
+        <input v-model="ville" placeholder="Ville" class="input" />
+        <input v-model="pays" placeholder="Pays" class="input" />
+      </div>
+
+      <button
+        @click="buyPlan"
+        class="w-full bg-blue-600 text-white py-3 rounded-lg"
+      >
+        💳 Payer avec Stripe
+      </button>
+
+    </div>
+
+  </div>
+</template>
+
 <script setup>
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
@@ -24,7 +80,7 @@ onMounted(() => {
     user.value = u
   })
 
-  // PLAN URL
+  // 🔥 PLAN URL
   if (route.query.plan) {
     selectedPlan.value = route.query.plan
     selectedPrice.value = Number(route.query.price || 0)
@@ -32,7 +88,7 @@ onMounted(() => {
     localStorage.setItem("planChoisi", selectedPlan.value)
   }
 
-  // RESTORE AFTER LOGIN
+  // 🔥 RESTORE
   const pendingPlan = localStorage.getItem("pendingPlan")
   const pendingPrice = localStorage.getItem("pendingPrice")
 
@@ -48,8 +104,7 @@ onMounted(() => {
 const goAuth = () => {
   localStorage.setItem("pendingPlan", selectedPlan.value)
   localStorage.setItem("pendingPrice", selectedPrice.value)
-
-  router.push(`/auth`)
+  router.push("/auth")
 }
 
 const getAdresse = () => {
@@ -100,3 +155,12 @@ const buyPlan = async () => {
   }
 }
 </script>
+
+<style scoped>
+.input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+</style>
