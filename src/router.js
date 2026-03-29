@@ -44,7 +44,12 @@ const routes = [
   {
     path: "/builder3",
     component: () => import("./views/Builder3.vue")
+  },
+  {
+  path: "/site/:userId",
+  component: () => import("./views/SiteClient.vue")
   }
+  
 ];
 
 export default createRouter({
