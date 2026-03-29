@@ -1,46 +1,53 @@
-import { createRouter, createWebHashHistory("/SaasBuilder/") } from "vue-router";
+import { createRouter, createWebHashHistory } from "vue-router";
 
 import PlanSelection from "./views/PlanSelection.vue";
 import AuthForm from "./views/AuthForm.vue";
 import Dashboard from "./views/Dashboard.vue";
 
-
 const routes = [
-  { path: "/", component: PlanSelection },
-  { path: "/auth", component: AuthForm },
-  { path: "/dashboard", component: Dashboard },
+  {
+    path: "/",
+    component: PlanSelection
+  },
+  {
+    path: "/auth",
+    component: AuthForm
+  },
+  {
+    path: "/dashboard",
+    component: Dashboard
+  },
 
-{
-      path: "/panier",
-      component: () => import("./views/Panier.vue")
-},
+  {
+    path: "/panier",
+    component: () => import("./views/Panier.vue")
+  },
 
-{
-      path: "/success",
-      component: () => import("./views/Success.vue")
-},
-  
-{
-      path: "/cancel",
-      component: () => import("./views/Cancel.vue")
-},
- 
-{
-  path: "/builder1",
-  component: () => import("./views/Builder1.vue")
-},
-{
-  path: "/builder2",
-  component: () => import("./views/Builder.vue")
-},
-{
-  path: "/builder3",
-  component: () => import("./views/Builder3.vue")
-}
-  
+  {
+    path: "/success",
+    component: () => import("./views/Success.vue")
+  },
+
+  {
+    path: "/cancel",
+    component: () => import("./views/Cancel.vue")
+  },
+
+  {
+    path: "/builder1",
+    component: () => import("./views/Builder1.vue")
+  },
+  {
+    path: "/builder2",
+    component: () => import("./views/Builder.vue")
+  },
+  {
+    path: "/builder3",
+    component: () => import("./views/Builder3.vue")
+  }
 ];
 
 export default createRouter({
-  history: createWebHashHistory(),
+  history: createWebHashHistory("/SaasBuilder/"),
   routes,
 });
