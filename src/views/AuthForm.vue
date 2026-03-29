@@ -74,6 +74,7 @@ import {
   getDoc
 } from "firebase/firestore";
 
+/* STATE */
 const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
@@ -81,11 +82,7 @@ const isLogin = ref(true);
 const router = useRouter();
 const route = useRoute();
 
-/* 🔥 ALWAYS GO DASHBOARD */
-const goDashboard = () => {
-  router.push("/dashboard");
-};
-
+/* 🔥 AUTH LOGIC */
 const handleSubmit = async () => {
   try {
 
@@ -94,6 +91,7 @@ const handleSubmit = async () => {
       return;
     }
 
+    // 🔥 Plan sélectionné
     const selectedPlan =
       route.query.plan ||
       localStorage.getItem("planChoisi") ||
@@ -101,7 +99,7 @@ const handleSubmit = async () => {
 
     let userCredential;
 
-    /* ================= LOGIN ================= */
+    // ================= LOGIN =================
     if (isLogin.value) {
 
       userCredential = await signInWithEmailAndPassword(
@@ -119,15 +117,58 @@ const handleSubmit = async () => {
         return;
       }
 
-      const data = snap.data();
+      const userData = snap.data();
 
-      localStorage.setItem("planChoisi", data.plan || "free");
+      const plan = userData.plan || "free";
+      const paye = userData.paye || false;
 
-      goDashboard();
-      return;
+      localStorage.setItem("planChoisi", plan);
+
+      // ================= FREE =================
+      if (plan === "free") {
+        router.push("/dashboard");
+        return;
+      }
+
+      // ================= PRO =================
+      if (plan === "pro") {
+
+        if (paye) {
+          // ✅ payé → Dashboard → Builder2
+          router.push("/dashboard");
+        } else {
+          // ❌ pas payé → Panier
+          router.push({
+            path: "/panier",
+            query: { plan: "pro", price: 5 }
+          });
+        }
+
+        return;
+      }
+
+      // ================= PREMIUM =================
+      if (plan === "premium") {
+
+        if (paye) {
+          // ✅ payé → Dashboard → Builder Premium
+          router.push("/dashboard");
+        } else {
+          // ❌ pas payé → Panier
+          router.push({
+            path: "/panier",
+            query: { plan: "premium", price: 10 }
+          });
+        }
+
+        return;
+      }
+
+      // fallback
+      router.push("/dashboard");
     }
 
-    /* ================= REGISTER ================= */
+    // ================= REGISTER =================
     else {
 
       userCredential = await createUserWithEmailAndPassword(
@@ -138,18 +179,41 @@ const handleSubmit = async () => {
 
       const user = userCredential.user;
 
+      // 🔥 création Firestore
       await setDoc(doc(db, "users", user.uid), {
         email: email.value,
         plan: selectedPlan,
-        paid: selectedPlan === "free",
+        paye: selectedPlan === "free", // ✅ FREE actif direct
         createdAt: Date.now(),
+        expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
         sections: []
       });
 
       localStorage.setItem("planChoisi", selectedPlan);
 
-      goDashboard();
-      return;
+      // ================= FREE =================
+      if (selectedPlan === "free") {
+        router.push("/dashboard");
+        return;
+      }
+
+      // ================= PRO =================
+      if (selectedPlan === "pro") {
+        router.push({
+          path: "/panier",
+          query: { plan: "pro", price: 5 }
+        });
+        return;
+      }
+
+      // ================= PREMIUM =================
+      if (selectedPlan === "premium") {
+        router.push({
+          path: "/panier",
+          query: { plan: "premium", price: 10 }
+        });
+        return;
+      }
     }
 
   } catch (error) {
