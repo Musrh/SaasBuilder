@@ -3,10 +3,12 @@
 
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
 
+      <!-- TITLE -->
       <h1 class="text-3xl font-bold text-center mb-6">
         {{ isLogin ? "Connexion" : "Créer un compte" }}
       </h1>
 
+      <!-- FORM -->
       <div class="space-y-4">
 
         <!-- EMAIL -->
@@ -38,6 +40,7 @@
 
       </div>
 
+      <!-- SWITCH -->
       <div class="mt-6 text-center text-sm text-gray-600">
         <span>
           {{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}
@@ -71,6 +74,7 @@ import {
   getDoc
 } from "firebase/firestore";
 
+/* STATE */
 const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
@@ -78,37 +82,12 @@ const isLogin = ref(true);
 const router = useRouter();
 const route = useRoute();
 
-/* 🔥 ROUTING CENTRALISÉ */
-const goDashboard = (plan) => {
-  localStorage.setItem("planChoisi", plan);
-
-  if (plan === "free") {
-    router.push("/dashboard");
-    return;
-  }
-
-  if (plan === "pro") {
-    router.push("/dashboard?builder=2");
-    return;
-  }
-
-  if (plan === "premium") {
-    // Builder externe premium
-    window.location.href = "https://musrh.github.io/SaaasGenerator/#/?";
-  }
+/* 🔥 REDIRECTION UNIQUE */
+const goDashboard = () => {
+  router.push("/dashboard");
 };
 
-/* 🔥 CHECK PAY */
-const goPayment = (plan) => {
-  const price = plan === "pro" ? 5 : 10;
-
-  router.push({
-    path: "/panier",
-    query: { plan, price }
-  });
-};
-
-/* 🔥 MAIN */
+/* 🔥 SUBMIT */
 const handleSubmit = async () => {
   try {
 
@@ -134,6 +113,7 @@ const handleSubmit = async () => {
       );
 
       const user = userCredential.user;
+
       const snap = await getDoc(doc(db, "users", user.uid));
 
       if (!snap.exists()) {
@@ -143,28 +123,12 @@ const handleSubmit = async () => {
 
       const data = snap.data();
 
-      const plan = data.plan || "free";
-      const paid = data.paid || false;
+      // 🔥 sauvegarde plan local
+      localStorage.setItem("planChoisi", data.plan || "free");
 
-      // FREE
-      if (plan === "free") {
-        goDashboard("free");
-        return;
-      }
-
-      // PRO / PREMIUM
-      if (plan === "pro" || plan === "premium") {
-
-        if (paid) {
-          goDashboard(plan);
-        } else {
-          goPayment(plan);
-        }
-
-        return;
-      }
-
-      goDashboard("free");
+      // 🔥 TOUJOURS DASHBOARD
+      goDashboard();
+      return;
     }
 
     /* ================= REGISTER ================= */
@@ -186,15 +150,11 @@ const handleSubmit = async () => {
         sections: []
       });
 
-      if (selectedPlan === "free") {
-        goDashboard("free");
-        return;
-      }
+      localStorage.setItem("planChoisi", selectedPlan);
 
-      if (selectedPlan === "pro" || selectedPlan === "premium") {
-        goPayment(selectedPlan);
-        return;
-      }
+      // 🔥 TOUJOURS DASHBOARD
+      goDashboard();
+      return;
     }
 
   } catch (error) {
