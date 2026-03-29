@@ -46,12 +46,10 @@
 
       <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto px-4">
 
-        <!-- PLAN FREE -->
+        <!-- FREE -->
         <div class="bg-white rounded-xl shadow p-6">
 
-          <h3 class="text-xl font-bold text-blue-400 mb-2">
-            Vitrine
-          </h3>
+          <h3 class="text-xl font-bold text-blue-400 mb-2">Vitrine</h3>
 
           <p class="text-3xl font-bold mb-4">Gratuit</p>
 
@@ -70,12 +68,10 @@
 
         </div>
 
-        <!-- PLAN PRO -->
+        <!-- PRO -->
         <div class="bg-white rounded-xl shadow-lg border-2 border-blue-500 p-6 scale-105">
 
-          <h3 class="text-xl font-bold text-blue-500 mb-2">
-            Pro
-          </h3>
+          <h3 class="text-xl font-bold text-blue-500 mb-2">Pro</h3>
 
           <p class="text-3xl font-bold mb-4">
             5€ <span class="text-sm text-gray-500">/mois</span>
@@ -96,12 +92,10 @@
 
         </div>
 
-        <!-- PLAN PREMIUM -->
+        <!-- PREMIUM -->
         <div class="bg-white rounded-xl shadow p-6">
 
-          <h3 class="text-xl font-bold text-purple-500 mb-2">
-            Premium
-          </h3>
+          <h3 class="text-xl font-bold text-purple-500 mb-2">Premium</h3>
 
           <p class="text-3xl font-bold mb-4">
             10€ <span class="text-sm text-gray-500">/mois</span>
@@ -142,21 +136,27 @@ const planPrices = {
   premium: 10
 }
 
-/* 🔥 AUTO REDIRECT SI FREE DÉJÀ ACTIF */
+/* 🔥 AUTO REDIRECT SI CLIENT EXISTE DÉJÀ */
 onMounted(() => {
   const userPlan = localStorage.getItem("userPlan")
 
-  if (userPlan === "free") {
-    router.push("/dashboard?plan=free")
+  if (userPlan) {
+    router.push(`/dashboard?plan=${userPlan}`)
   }
 })
 
 /* 🚀 SELECT PLAN */
 const selectPlan = (plan) => {
 
-  localStorage.setItem("planChoisi", plan)
+  const userPlan = localStorage.getItem("userPlan")
 
-  // ================= FREE → DASHBOARD DIRECT =================
+  // ================= CLIENT EXISTANT → DASHBOARD =================
+  if (userPlan) {
+    router.push(`/dashboard?plan=${userPlan}`)
+    return
+  }
+
+  // ================= FREE =================
   if (plan === "free") {
 
     localStorage.setItem("userPlan", "free")
