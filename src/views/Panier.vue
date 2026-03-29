@@ -1,53 +1,59 @@
 <template>
-  <div class="p-6 max-w-2xl mx-auto">
+  <div class="min-h-screen bg-gray-100 flex justify-center items-center p-4">
 
-    <h1 class="text-2xl font-bold mb-6 text-center">
-      🛒 Panier SaaS
-    </h1>
+    <div class="w-full max-w-xl bg-white shadow-xl rounded-2xl p-6">
 
-    <!-- PLAN -->
-    <div v-if="selectedPlan" class="bg-gray-50 p-4 rounded-xl mb-6 shadow">
-      <h2 class="text-lg font-semibold">
-        Plan : {{ selectedPlan }}
-      </h2>
-      <p class="text-gray-600">
-        Prix : {{ selectedPrice }} €
-      </p>
-    </div>
+      <h1 class="text-2xl font-bold mb-6 text-center">
+        🛒 Panier SaaS
+      </h1>
 
-    <!-- NOT LOGGED -->
-    <div v-if="!user" class="text-center">
-
-      <p class="text-red-500 mb-4">
-        Vous devez être connecté
-      </p>
-
-      <button
-        @click="goAuth"
-        class="bg-black text-white px-4 py-2 rounded"
-      >
-        Se connecter
-      </button>
-
-    </div>
-
-    <!-- FORM -->
-    <div v-else>
-
-      <div class="space-y-2 mb-4">
-        <input v-model="adresse1" placeholder="Adresse 1" class="input" />
-        <input v-model="adresse2" placeholder="Adresse 2" class="input" />
-        <input v-model="codePostal" placeholder="Code postal" class="input" />
-        <input v-model="ville" placeholder="Ville" class="input" />
-        <input v-model="pays" placeholder="Pays" class="input" />
+      <!-- PLAN -->
+      <div v-if="selectedPlan" class="bg-gray-50 p-4 rounded-xl mb-6">
+        <h2 class="text-lg font-semibold">
+          Plan : {{ selectedPlan.toUpperCase() }}
+        </h2>
+        <p class="text-gray-600">
+          Prix : {{ selectedPrice }} €
+        </p>
       </div>
 
-      <button
-        @click="buyPlan"
-        class="w-full bg-blue-600 text-white py-3 rounded-lg"
-      >
-        💳 Payer avec Stripe
-      </button>
+      <!-- NOT LOGGED -->
+      <div v-if="!user" class="text-center">
+
+        <p class="text-red-500 font-semibold mb-4">
+          Vous devez être connecté pour continuer
+        </p>
+
+        <button
+          @click="goAuth"
+          class="bg-black text-white px-4 py-2 rounded-lg"
+        >
+          Se connecter
+        </button>
+
+      </div>
+
+      <!-- FORM -->
+      <div v-else>
+
+        <div class="space-y-3 mb-6">
+
+          <input v-model="adresse1" placeholder="Adresse 1" class="input" />
+          <input v-model="adresse2" placeholder="Adresse 2" class="input" />
+          <input v-model="codePostal" placeholder="Code postal" class="input" />
+          <input v-model="ville" placeholder="Ville" class="input" />
+          <input v-model="pays" placeholder="Pays" class="input" />
+
+        </div>
+
+        <button
+          @click="buyPlan"
+          class="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
+        >
+          💳 Payer avec Stripe
+        </button>
+
+      </div>
 
     </div>
 
@@ -74,13 +80,15 @@ const codePostal = ref("")
 const ville = ref("")
 const pays = ref("")
 
+// ================= INIT =================
 onMounted(() => {
 
+  // 🔥 AUTH
   onAuthStateChanged(auth, (u) => {
     user.value = u
   })
 
-  // 🔥 PLAN URL
+  // 🔥 PLAN depuis URL
   if (route.query.plan) {
     selectedPlan.value = route.query.plan
     selectedPrice.value = Number(route.query.price || 0)
@@ -88,7 +96,7 @@ onMounted(() => {
     localStorage.setItem("planChoisi", selectedPlan.value)
   }
 
-  // 🔥 RESTORE
+  // 🔥 RESTORE après login
   const pendingPlan = localStorage.getItem("pendingPlan")
   const pendingPrice = localStorage.getItem("pendingPrice")
 
@@ -101,16 +109,20 @@ onMounted(() => {
   }
 })
 
+// ================= AUTH REDIRECT =================
 const goAuth = () => {
   localStorage.setItem("pendingPlan", selectedPlan.value)
   localStorage.setItem("pendingPrice", selectedPrice.value)
-  router.push("/auth")
+
+  router.push(`/auth`)
 }
 
+// ================= ADDRESS =================
 const getAdresse = () => {
   return `${adresse1.value} ${adresse2.value}, ${codePostal.value} ${ville.value}, ${pays.value}`
 }
 
+// ================= STRIPE =================
 const buyPlan = async () => {
 
   if (!selectedPlan.value || !selectedPrice.value) {
@@ -123,6 +135,7 @@ const buyPlan = async () => {
   }
 
   try {
+
     const res = await fetch(
       "https://backend-master-production-cf50.up.railway.app/create-stripe-session",
       {
@@ -131,26 +144,35 @@ const buyPlan = async () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          plan: selectedPlan.value,
-          prix: selectedPrice.value,
+          items: [
+            {
+              nom: "Plan " + selectedPlan.value,
+              prix: selectedPrice.value,
+              quantity: 1
+            }
+          ],
           email: user.value.email,
           clientId: user.value.uid,
-          adresse: getAdresse()
+          plan: selectedPlan.value,
+          adresseLivraison: getAdresse()
         })
       }
     )
 
     const data = await res.json()
 
+    console.log("STRIPE RESPONSE:", data)
+
     if (!data.url) {
-      alert("Erreur Stripe")
+      alert("Erreur Stripe (pas d'URL)")
       return
     }
 
+    // 🔥 REDIRECT STRIPE
     window.location.href = data.url
 
-  } catch (e) {
-    console.error(e)
+  } catch (err) {
+    console.error(err)
     alert("Erreur paiement")
   }
 }
@@ -159,8 +181,13 @@ const buyPlan = async () => {
 <style scoped>
 .input {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #ddd;
-  border-radius: 8px;
+  border-radius: 10px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #3b82f6;
 }
 </style>
