@@ -1,4 +1,3 @@
-//PlanSection.vue
 <template>
   <div class="w-full">
 
@@ -47,82 +46,58 @@
 
       <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto px-4">
 
-        <!-- PLAN FREE -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-
-          <h3 class="text-xl font-bold text-blue-400 mb-2">
-            Vitrine
-          </h3>
-
+        <!-- FREE -->
+        <div class="bg-white rounded-xl shadow p-6">
+          <h3 class="text-xl font-bold text-gray-500 mb-2">Free</h3>
           <p class="text-3xl font-bold mb-4">Gratuit</p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ 1 seule page</li>
+            <li>✔ 1 page</li>
             <li>✔ Builder simple</li>
-            <li>✔ Hébergement inclus</li>
           </ul>
 
           <button
             @click="selectPlan('free')"
-            class="w-full bg-blue-400 text-white py-2 rounded hover:bg-blue-500"
+            class="w-full bg-gray-500 text-white py-2 rounded"
           >
             Choisir
           </button>
-
         </div>
 
-        <!-- PLAN PRO -->
+        <!-- PRO -->
         <div class="bg-white rounded-xl shadow-lg border-2 border-blue-500 p-6 scale-105">
-
-          <h3 class="text-xl font-bold text-blue-500 mb-2">
-            Pro
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">
-            5€
-            <span class="text-sm text-gray-500">/mois</span>
-          </p>
+          <h3 class="text-xl font-bold text-blue-500 mb-2">Pro</h3>
+          <p class="text-3xl font-bold mb-4">5€ / mois</p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
             <li>✔ Multi pages</li>
-            <li>✔ Builder avancé</li>
             <li>✔ Design pro</li>
           </ul>
 
           <button
             @click="selectPlan('pro')"
-            class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+            class="w-full bg-blue-500 text-white py-2 rounded"
           >
             Choisir Pro
           </button>
-
         </div>
 
-        <!-- PLAN PREMIUM -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-
-          <h3 class="text-xl font-bold text-purple-500 mb-2">
-            Premium
-          </h3>
-
-          <p class="text-3xl font-bold mb-4">
-            10€
-            <span class="text-sm text-gray-500">/mois</span>
-          </p>
+        <!-- PREMIUM -->
+        <div class="bg-white rounded-xl shadow p-6">
+          <h3 class="text-xl font-bold text-purple-500 mb-2">Premium</h3>
+          <p class="text-3xl font-bold mb-4">10€ / mois</p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
             <li>✔ E-commerce</li>
             <li>✔ Paiement intégré</li>
-            <li>✔ Boutique complète</li>
           </ul>
 
           <button
             @click="selectPlan('premium')"
-            class="w-full bg-purple-500 text-white py-2 rounded hover:bg-purple-600"
+            class="w-full bg-purple-500 text-white py-2 rounded"
           >
             Choisir Premium
           </button>
-
         </div>
 
       </div>
@@ -139,45 +114,14 @@ import { ref } from "vue"
 const router = useRouter()
 const plansRef = ref(null)
 
-/* 🔥 PLAN → BUILDER */
-const builderMap = {
-  free: "/auth",
-  pro: "/builder",
-  premium: "/builder3"
-}
-
-/* 💎 PRIX PLANS */
-const planPrices = {
-  pro: 5,
-  premium: 10
-}
-
-/* 🚀 SELECT PLAN SAAS */
+/* 🔥 SELECT PLAN → AUTH */
 const selectPlan = (plan) => {
-
   localStorage.setItem("planChoisi", plan)
-  localStorage.setItem("builderRoute", builderMap[plan])
 
-  // ================= FREE =================
-  if (plan === "free") {
-    router.push("/auth")
-    return
-  }
-
-  // ================= PRO / PREMIUM → PANIER =================
-  if (plan === "pro" || plan === "premium") {
-    router.push({
-      path: "/panier",
-      query: {
-        plan: plan,
-        price: planPrices[plan]
-      }
-    })
-    return
-  }
+  // 👉 TOUJOURS AUTH
+  router.push(`/auth?plan=${plan}`)
 }
 
-/* SCROLL */
 const scrollToPlans = () => {
   plansRef.value.scrollIntoView({ behavior: "smooth" })
 }
