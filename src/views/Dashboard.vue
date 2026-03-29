@@ -7,26 +7,32 @@
 
       <button
         @click="logout"
-        class="bg-red-500 text-white px-4 py-2 rounded-lg"
+        class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
       >
         Déconnexion
       </button>
     </div>
 
-    <div v-if="!user">Chargement...</div>
+    <!-- LOADING -->
+    <div v-if="!user" class="text-center mt-10">
+      Chargement...
+    </div>
 
+    <!-- CONTENT -->
     <div v-else class="max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
 
       <!-- INFOS -->
       <div class="bg-white p-6 rounded-xl shadow">
-        <h2 class="font-bold mb-4">Informations</h2>
+        <h2 class="font-bold mb-4 text-lg">Informations</h2>
 
         <p><b>Email :</b> {{ user.email }}</p>
 
         <p class="mt-2">
           <b>Plan :</b>
-          <span class="px-2 py-1 rounded text-white text-sm"
-            :class="planColor">
+          <span
+            class="px-2 py-1 rounded text-white text-sm"
+            :class="planColor"
+          >
             {{ user.plan }}
           </span>
         </p>
@@ -48,7 +54,7 @@
 
         <button
           @click="goBuilder"
-          class="w-full mb-3 bg-blue-500 text-white py-3 rounded-lg"
+          class="w-full mb-3 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition"
         >
           🚀 Accéder au Builder
         </button>
@@ -56,12 +62,11 @@
         <button
           v-if="user.plan !== 'premium'"
           @click="upgrade"
-          class="w-full bg-yellow-500 text-white py-3 rounded-lg"
+          class="w-full bg-yellow-500 text-white py-3 rounded-lg hover:bg-yellow-600 transition"
         >
           ⭐ Upgrade
         </button>
 
-        <!-- INFO PLAN -->
         <p class="mt-4 text-sm text-gray-500">
           {{ planDescription }}
         </p>
@@ -77,29 +82,40 @@
 import { ref, computed, onMounted } from "vue";
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { signOut } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "vue-router";
+
+const router = useRouter();
 
 const user = ref(null);
 const expiry = ref(null);
 
 /* LOAD USER */
 onMounted(() => {
-  auth.onAuthStateChanged(async (u) => {
-    if (!u) return;
+  onAuthStateChanged(auth, async (u) => {
+
+    // 🔥 SI PAS CONNECTÉ → ACCUEIL
+    if (!u) {
+      router.push("/");
+      return;
+    }
 
     const snap = await getDoc(doc(db, "users", u.uid));
-    user.value = snap.data();
-    expiry.value = user.value?.expiry;
+
+    if (snap.exists()) {
+      user.value = snap.data();
+      expiry.value = user.value?.expiry;
+    }
   });
 });
 
-/* DATE */
+/* DATE FORMAT */
 const expiryDate = computed(() => {
   if (!expiry.value) return null;
   return new Date(expiry.value).toLocaleDateString();
 });
 
-/* DAYS */
+/* DAYS LEFT */
 const daysLeft = computed(() => {
   if (!expiry.value) return null;
   return Math.ceil((expiry.value - Date.now()) / (1000 * 60 * 60 * 24));
@@ -107,14 +123,16 @@ const daysLeft = computed(() => {
 
 /* PLAN COLOR */
 const planColor = computed(() => {
-  return user.value?.plan === "free"
+  if (!user.value) return "";
+
+  return user.value.plan === "free"
     ? "bg-gray-500"
-    : user.value?.plan === "pro"
+    : user.value.plan === "pro"
     ? "bg-blue-500"
     : "bg-purple-600";
 });
 
-/* PLAN DESC */
+/* PLAN DESCRIPTION */
 const planDescription = computed(() => {
   if (!user.value) return "";
 
@@ -127,23 +145,36 @@ const planDescription = computed(() => {
 
 /* BUILDER REDIRECTION */
 const goBuilder = () => {
+  if (!user.value) return;
+
   if (user.value.plan === "free") {
-    window.location.href = "#/builder1";
+    router.push("/builder1");
   } else if (user.value.plan === "pro") {
-    window.location.href = "#/builder";
+    router.push("/builder");
   } else if (user.value.plan === "premium") {
-    window.location.href = "#/builder3";
+    router.push("/builder3");
   }
 };
 
 /* UPGRADE */
 const upgrade = () => {
-  alert("Paiement Stripe/PayPal à implémenter");
+  router.push("/panier?plan=pro&price=5");
 };
 
 /* LOGOUT */
 const logout = async () => {
-  await signOut(auth);
-  window.location.href = "#/auth";
+  try {
+    await signOut(auth);
+
+    // 🔥 CLEAN STORAGE
+    localStorage.clear();
+
+    // 🔥 REDIRECT HOME
+    router.push("/");
+
+  } catch (error) {
+    console.error(error);
+    alert("Erreur lors de la déconnexion");
+  }
 };
 </script>
