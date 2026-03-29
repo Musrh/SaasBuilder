@@ -11,9 +11,15 @@ const loading = ref(true)
 const error = ref("")
 const user = ref(null)
 
+let redirected = false // 🔥 évite double redirect
+
 onMounted(() => {
   onAuthStateChanged(auth, async (u) => {
+
+    if (redirected) return
+
     if (!u) {
+      redirected = true
       router.push("/auth")
       return
     }
@@ -26,7 +32,6 @@ onMounted(() => {
 
       if (!snap.exists()) {
         error.value = "Utilisateur introuvable"
-        loading.value = false
         return
       }
 
@@ -38,24 +43,24 @@ onMounted(() => {
       // 🚀 REDIRECTION SAAS LOGIC
       // =========================
 
+      redirected = true
+
       if (plan === "free") {
-        router.push("/builder1")
-        return
+        router.replace("/builder1")
       }
 
-      if (plan === "pro") {
-        router.push("/builder2")
-        return
+      else if (plan === "pro") {
+        router.replace("/builder2")
       }
 
-      if (plan === "premium") {
+      else if (plan === "premium") {
         window.location.href =
           `https://musrh.github.io/SaaasGenerator/#/?uid=${uid}`
-        return
       }
 
-      // fallback
-      router.push("/builder1")
+      else {
+        router.replace("/builder1")
+      }
 
     } catch (err) {
       console.error(err)
