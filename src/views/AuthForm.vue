@@ -1,110 +1,122 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center px-4">
+  <div class="min-h-screen flex items-center justify-center bg-gray-100 px-4">
 
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+    <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
 
-      <h1 class="text-3xl font-bold text-center mb-6">
-        {{ isLogin ? "Connexion" : "Créer un compte" }}
-      </h1>
+      <h2 class="text-2xl font-bold text-center text-blue-500 mb-6">
+        Connexion
+      </h2>
 
-      <div class="space-y-4">
+      <!-- EMAIL -->
+      <input
+        v-model="email"
+        type="email"
+        placeholder="Email"
+        class="w-full border p-3 rounded mb-3"
+      />
 
-        <input
-          v-model="email"
-          type="email"
-          placeholder="Email"
-          class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400"
-        />
+      <!-- PASSWORD -->
+      <input
+        v-model="password"
+        type="password"
+        placeholder="Mot de passe"
+        class="w-full border p-3 rounded mb-4"
+      />
 
-        <input
-          v-model="password"
-          type="password"
-          placeholder="Mot de passe"
-          class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400"
-        />
+      <!-- BUTTON -->
+      <button
+        @click="login"
+        class="w-full bg-blue-500 text-white py-3 rounded hover:bg-blue-600"
+      >
+        Se connecter
+      </button>
 
-        <button
-          @click="handleSubmit"
-          class="w-full py-3 rounded-xl text-white font-semibold transition"
-          :class="isLogin ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'"
-        >
-          {{ isLogin ? "Se connecter" : "S'inscrire" }}
-        </button>
-
-      </div>
-
-      <div class="mt-6 text-center text-sm">
-        <span>{{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}</span>
-        <button @click="isLogin = !isLogin" class="text-blue-500 ml-1">
-          {{ isLogin ? "Créer un compte" : "Se connecter" }}
-        </button>
-      </div>
+      <p class="text-center text-sm mt-4 text-gray-500">
+        Pas de compte ? Créer un compte
+      </p>
 
     </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter, useRoute } from "vue-router";
-import { auth, db } from "../firebase";
+import { ref } from "vue"
+import { useRouter } from "vue-router"
+import { auth, db } from "../firebase"
+
 import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+  signInWithEmailAndPassword
+} from "firebase/auth"
 
-const email = ref("");
-const password = ref("");
-const isLogin = ref(true);
+import {
+  doc,
+  getDoc
+} from "firebase/firestore"
 
-const router = useRouter();
-const route = useRoute();
+const router = useRouter()
 
-const handleSubmit = async () => {
+const email = ref("")
+const password = ref("")
+
+/* 🔥 LOGIN SAAS CORRIGÉ */
+const login = async () => {
   try {
-    if (!email.value || !password.value) {
-      alert("Remplis les champs");
-      return;
+
+    // ================= AUTH FIREBASE =================
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email.value,
+      password.value
+    )
+
+    const user = userCredential.user
+
+    // ================= FIRESTORE USER =================
+    const userRef = doc(db, "users", user.uid)
+    const userSnap = await getDoc(userRef)
+
+    let userData = {
+      plan: "free"
     }
 
-    const selectedPlan = localStorage.getItem("planChoisi") || "free";
-
-    let userCred;
-
-    if (isLogin.value) {
-      userCred = await signInWithEmailAndPassword(auth, email.value, password.value);
-    } else {
-      userCred = await createUserWithEmailAndPassword(auth, email.value, password.value);
-
-      await setDoc(doc(db, "users", userCred.user.uid), {
-        email: email.value,
-        plan: selectedPlan,
-        createdAt: Date.now(),
-        expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        sections: []
-      });
+    if (userSnap.exists()) {
+      userData = userSnap.data()
     }
 
-    // 🔥 SI PAIEMENT EN ATTENTE → PANIER
-    const pendingPlan = localStorage.getItem("pendingPlan");
+    // ================= PLAN RÉEL =================
+    const plan = userData.plan || "free"
 
-    if (pendingPlan) {
-      router.push({
-        path: "/panier",
-        query: {
-          plan: pendingPlan,
-          price: localStorage.getItem("pendingPrice")
-        }
-      });
-      return;
+    // ================= SAVE LOCAL =================
+    localStorage.setItem("userPlan", plan)
+    localStorage.setItem("userEmail", user.email)
+    localStorage.setItem("userId", user.uid)
+
+    // ================= 🔥 IMPORTANT FIX BUG PANIER =================
+    // ❌ NE PLUS JAMAIS REDIRIGER ICI VERS /panier
+
+    // ================= REDIRECTION SAAS =================
+    if (plan === "free") {
+      router.push("/dashboard?plan=free")
+      return
     }
 
-    // 🔥 SINON → DASHBOARD
-    router.push("/dashboard");
+    if (plan === "pro") {
+      router.push("/dashboard?plan=pro")
+      return
+    }
 
-  } catch (e) {
-    alert(e.message);
+    if (plan === "premium") {
+      router.push("/dashboard?plan=premium")
+      return
+    }
+
+    // fallback
+    router.push("/dashboard")
+
+  } catch (error) {
+    console.error(error)
+    alert("Erreur de connexion")
   }
-};
+}
 </script>
