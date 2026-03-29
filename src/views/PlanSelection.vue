@@ -65,7 +65,7 @@
             @click="selectPlan('free')"
             class="w-full bg-blue-400 text-white py-2 rounded hover:bg-blue-500"
           >
-            Choisir
+            Commencer gratuitement
           </button>
 
         </div>
@@ -138,46 +138,39 @@ import { ref } from "vue"
 const router = useRouter()
 const plansRef = ref(null)
 
-/* 🔥 PLAN → BUILDER */
-const builderMap = {
-  free: "/auth",
-  pro: "/builder",
-  premium: "/builder3"
-}
-
-/* 💎 PRIX PLANS */
+/* 💰 PRIX */
 const planPrices = {
   pro: 5,
   premium: 10
 }
 
-/* 🚀 SELECT PLAN SAAS */
+/* 🚀 SELECT PLAN */
 const selectPlan = (plan) => {
 
+  // sauvegarde local
   localStorage.setItem("planChoisi", plan)
-  localStorage.setItem("builderRoute", builderMap[plan])
 
-  // ================= FREE =================
+  // ================= FREE → DASHBOARD DIRECT =================
   if (plan === "free") {
-    router.push("/auth")
+    router.push({
+      path: "/dashboard",
+      query: { plan: "free" }
+    })
     return
   }
 
   // ================= PRO / PREMIUM → PANIER =================
-  if (plan === "pro" || plan === "premium") {
-    router.push({
-      path: "/panier",
-      query: {
-        plan: plan,
-        price: planPrices[plan]
-      }
-    })
-    return
-  }
+  router.push({
+    path: "/panier",
+    query: {
+      plan,
+      price: planPrices[plan]
+    }
+  })
 }
 
 /* SCROLL */
 const scrollToPlans = () => {
-  plansRef.value.scrollIntoView({ behavior: "smooth" })
+  plansRef.value?.scrollIntoView({ behavior: "smooth" })
 }
 </script>
