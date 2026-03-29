@@ -46,18 +46,20 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { auth, db } from "../firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
 const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
+
 const router = useRouter();
+const route = useRoute();
 
 const handleSubmit = async () => {
   try {
@@ -68,16 +70,14 @@ const handleSubmit = async () => {
 
     const selectedPlan = localStorage.getItem("planChoisi") || "free";
 
-    if (isLogin.value) {
-      await signInWithEmailAndPassword(auth, email.value, password.value);
-    } else {
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        email.value,
-        password.value
-      );
+    let userCred;
 
-      await setDoc(doc(db, "users", cred.user.uid), {
+    if (isLogin.value) {
+      userCred = await signInWithEmailAndPassword(auth, email.value, password.value);
+    } else {
+      userCred = await createUserWithEmailAndPassword(auth, email.value, password.value);
+
+      await setDoc(doc(db, "users", userCred.user.uid), {
         email: email.value,
         plan: selectedPlan,
         createdAt: Date.now(),
@@ -86,6 +86,21 @@ const handleSubmit = async () => {
       });
     }
 
+    // 🔥 SI PAIEMENT EN ATTENTE → PANIER
+    const pendingPlan = localStorage.getItem("pendingPlan");
+
+    if (pendingPlan) {
+      router.push({
+        path: "/panier",
+        query: {
+          plan: pendingPlan,
+          price: localStorage.getItem("pendingPrice")
+        }
+      });
+      return;
+    }
+
+    // 🔥 SINON → DASHBOARD
     router.push("/dashboard");
 
   } catch (e) {
