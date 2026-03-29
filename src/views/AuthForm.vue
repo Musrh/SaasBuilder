@@ -74,7 +74,6 @@ import {
   getDoc
 } from "firebase/firestore";
 
-/* STATE */
 const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
@@ -82,12 +81,11 @@ const isLogin = ref(true);
 const router = useRouter();
 const route = useRoute();
 
-/* 🔥 REDIRECTION UNIQUE */
+/* 🔥 ALWAYS GO DASHBOARD */
 const goDashboard = () => {
   router.push("/dashboard");
 };
 
-/* 🔥 SUBMIT */
 const handleSubmit = async () => {
   try {
 
@@ -123,10 +121,8 @@ const handleSubmit = async () => {
 
       const data = snap.data();
 
-      // 🔥 sauvegarde plan local
       localStorage.setItem("planChoisi", data.plan || "free");
 
-      // 🔥 TOUJOURS DASHBOARD
       goDashboard();
       return;
     }
@@ -152,7 +148,6 @@ const handleSubmit = async () => {
 
       localStorage.setItem("planChoisi", selectedPlan);
 
-      // 🔥 TOUJOURS DASHBOARD
       goDashboard();
       return;
     }
