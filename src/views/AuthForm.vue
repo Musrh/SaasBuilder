@@ -3,12 +3,10 @@
 
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
 
-      <!-- TITLE -->
       <h1 class="text-3xl font-bold text-center mb-6">
         {{ isLogin ? "Connexion" : "Créer un compte" }}
       </h1>
 
-      <!-- FORM -->
       <div class="space-y-4">
 
         <!-- EMAIL -->
@@ -40,7 +38,6 @@
 
       </div>
 
-      <!-- SWITCH -->
       <div class="mt-6 text-center text-sm text-gray-600">
         <span>
           {{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}
@@ -74,7 +71,6 @@ import {
   getDoc
 } from "firebase/firestore";
 
-/* STATE */
 const email = ref("");
 const password = ref("");
 const isLogin = ref(true);
@@ -82,7 +78,37 @@ const isLogin = ref(true);
 const router = useRouter();
 const route = useRoute();
 
-/* 🔥 AUTH LOGIC */
+/* 🔥 ROUTING CENTRALISÉ */
+const goDashboard = (plan) => {
+  localStorage.setItem("planChoisi", plan);
+
+  if (plan === "free") {
+    router.push("/dashboard");
+    return;
+  }
+
+  if (plan === "pro") {
+    router.push("/dashboard?builder=2");
+    return;
+  }
+
+  if (plan === "premium") {
+    // Builder externe premium
+    window.location.href = "https://musrh.github.io/SaaasGenerator/#/?";
+  }
+};
+
+/* 🔥 CHECK PAY */
+const goPayment = (plan) => {
+  const price = plan === "pro" ? 5 : 10;
+
+  router.push({
+    path: "/panier",
+    query: { plan, price }
+  });
+};
+
+/* 🔥 MAIN */
 const handleSubmit = async () => {
   try {
 
@@ -91,7 +117,6 @@ const handleSubmit = async () => {
       return;
     }
 
-    // 🔥 Plan sélectionné
     const selectedPlan =
       route.query.plan ||
       localStorage.getItem("planChoisi") ||
@@ -99,7 +124,7 @@ const handleSubmit = async () => {
 
     let userCredential;
 
-    // ================= LOGIN =================
+    /* ================= LOGIN ================= */
     if (isLogin.value) {
 
       userCredential = await signInWithEmailAndPassword(
@@ -109,7 +134,6 @@ const handleSubmit = async () => {
       );
 
       const user = userCredential.user;
-
       const snap = await getDoc(doc(db, "users", user.uid));
 
       if (!snap.exists()) {
@@ -117,16 +141,14 @@ const handleSubmit = async () => {
         return;
       }
 
-      const userData = snap.data();
+      const data = snap.data();
 
-      const plan = userData.plan || "free";
-      const paid = userData.paid || false;
-
-      localStorage.setItem("planChoisi", plan);
+      const plan = data.plan || "free";
+      const paid = data.paid || false;
 
       // FREE
       if (plan === "free") {
-        router.push("/dashboard");
+        goDashboard("free");
         return;
       }
 
@@ -134,26 +156,18 @@ const handleSubmit = async () => {
       if (plan === "pro" || plan === "premium") {
 
         if (paid) {
-          // ✅ déjà payé
-          router.push("/dashboard");
+          goDashboard(plan);
         } else {
-          // ❌ pas payé → panier
-          const price = plan === "pro" ? 5 : 10;
-
-          router.push({
-            path: "/panier",
-            query: { plan, price }
-          });
+          goPayment(plan);
         }
 
         return;
       }
 
-      // fallback
-      router.push("/dashboard");
+      goDashboard("free");
     }
 
-    // ================= REGISTER =================
+    /* ================= REGISTER ================= */
     else {
 
       userCredential = await createUserWithEmailAndPassword(
@@ -164,37 +178,21 @@ const handleSubmit = async () => {
 
       const user = userCredential.user;
 
-      // 🔥 création user Firestore
       await setDoc(doc(db, "users", user.uid), {
         email: email.value,
         plan: selectedPlan,
-        paid: selectedPlan === "free", // 🔥 FREE actif direct
+        paid: selectedPlan === "free",
         createdAt: Date.now(),
-        expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
         sections: []
       });
 
-      localStorage.setItem("planChoisi", selectedPlan);
-
-      // FREE
       if (selectedPlan === "free") {
-        router.push("/dashboard");
+        goDashboard("free");
         return;
       }
 
-      // PRO / PREMIUM → PANIER
       if (selectedPlan === "pro" || selectedPlan === "premium") {
-
-        const price = selectedPlan === "pro" ? 5 : 10;
-
-        router.push({
-          path: "/panier",
-          query: {
-            plan: selectedPlan,
-            price
-          }
-        });
-
+        goPayment(selectedPlan);
         return;
       }
     }
