@@ -82,7 +82,7 @@ const isLogin = ref(true);
 const router = useRouter();
 const route = useRoute();
 
-/* 🔥 HANDLE AUTH */
+/* 🔥 AUTH LOGIC */
 const handleSubmit = async () => {
   try {
 
@@ -91,7 +91,7 @@ const handleSubmit = async () => {
       return;
     }
 
-    // 🔥 PLAN PRIORITAIRE
+    // 🔥 Plan sélectionné
     const selectedPlan =
       route.query.plan ||
       localStorage.getItem("planChoisi") ||
@@ -110,21 +110,47 @@ const handleSubmit = async () => {
 
       const user = userCredential.user;
 
-      // 🔥 récupérer plan réel depuis Firestore
       const snap = await getDoc(doc(db, "users", user.uid));
 
-      if (snap.exists()) {
-        const userData = snap.data();
+      if (!snap.exists()) {
+        alert("Utilisateur introuvable");
+        return;
+      }
 
-        localStorage.setItem("planChoisi", userData.plan || "free");
+      const userData = snap.data();
 
+      const plan = userData.plan || "free";
+      const paid = userData.paid || false;
+
+      localStorage.setItem("planChoisi", plan);
+
+      // FREE
+      if (plan === "free") {
         router.push("/dashboard");
+        return;
+      }
+
+      // PRO / PREMIUM
+      if (plan === "pro" || plan === "premium") {
+
+        if (paid) {
+          // ✅ déjà payé
+          router.push("/dashboard");
+        } else {
+          // ❌ pas payé → panier
+          const price = plan === "pro" ? 5 : 10;
+
+          router.push({
+            path: "/panier",
+            query: { plan, price }
+          });
+        }
+
         return;
       }
 
       // fallback
       router.push("/dashboard");
-      return;
     }
 
     // ================= REGISTER =================
@@ -138,10 +164,11 @@ const handleSubmit = async () => {
 
       const user = userCredential.user;
 
-      // 🔥 créer user Firestore
+      // 🔥 création user Firestore
       await setDoc(doc(db, "users", user.uid), {
         email: email.value,
         plan: selectedPlan,
+        paid: selectedPlan === "free", // 🔥 FREE actif direct
         createdAt: Date.now(),
         expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
         sections: []
@@ -149,13 +176,13 @@ const handleSubmit = async () => {
 
       localStorage.setItem("planChoisi", selectedPlan);
 
-      // ================= FREE =================
+      // FREE
       if (selectedPlan === "free") {
         router.push("/dashboard");
         return;
       }
 
-      // ================= PRO / PREMIUM =================
+      // PRO / PREMIUM → PANIER
       if (selectedPlan === "pro" || selectedPlan === "premium") {
 
         const price = selectedPlan === "pro" ? 5 : 10;
