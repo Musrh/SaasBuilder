@@ -1,0 +1,1 @@
+import{_ as e,s as t}from"./runtime-core.esm-bundler-pN0j22zX.js";import{c as n}from"./index-DHtOxTwn.js";var r={};function i(n,r){return e(),t(`h1`,null,`This plan for single page`)}var a=n(r,[[`render`,i]]);export{a as default};
