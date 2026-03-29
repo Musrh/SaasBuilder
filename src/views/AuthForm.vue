@@ -3,8 +3,9 @@
 
     <div class="w-full max-w-md bg-white shadow-lg rounded-xl p-6">
 
+      <!-- TITLE -->
       <h2 class="text-2xl font-bold text-center text-blue-500 mb-6">
-        Connexion
+        {{ isLogin ? "Connexion" : "Créer un compte" }}
       </h2>
 
       <!-- EMAIL -->
@@ -25,14 +26,23 @@
 
       <!-- BUTTON -->
       <button
-        @click="login"
-        class="w-full bg-blue-500 text-white py-3 rounded hover:bg-blue-600"
+        @click="handleSubmit"
+        class="w-full text-white py-3 rounded font-semibold transition"
+        :class="isLogin ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'"
       >
-        Se connecter
+        {{ isLogin ? "Se connecter" : "Créer un compte" }}
       </button>
 
+      <!-- SWITCH -->
       <p class="text-center text-sm mt-4 text-gray-500">
-        Pas de compte ? Créer un compte
+        {{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}
+
+        <span
+          @click="toggleMode"
+          class="text-blue-500 cursor-pointer font-semibold ml-1"
+        >
+          {{ isLogin ? "Créer un compte" : "Se connecter" }}
+        </span>
       </p>
 
     </div>
@@ -46,77 +56,91 @@ import { useRouter } from "vue-router"
 import { auth, db } from "../firebase"
 
 import {
-  signInWithEmailAndPassword
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
 } from "firebase/auth"
 
 import {
   doc,
-  getDoc
+  getDoc,
+  setDoc
 } from "firebase/firestore"
 
 const router = useRouter()
 
 const email = ref("")
 const password = ref("")
+const isLogin = ref(true)
 
-/* 🔥 LOGIN SAAS CORRIGÉ */
-const login = async () => {
+/* SWITCH */
+const toggleMode = () => {
+  isLogin.value = !isLogin.value
+}
+
+/* SUBMIT */
+const handleSubmit = async () => {
   try {
 
-    // ================= AUTH FIREBASE =================
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email.value,
-      password.value
-    )
-
-    const user = userCredential.user
-
-    // ================= FIRESTORE USER =================
-    const userRef = doc(db, "users", user.uid)
-    const userSnap = await getDoc(userRef)
-
-    let userData = {
-      plan: "free"
-    }
-
-    if (userSnap.exists()) {
-      userData = userSnap.data()
-    }
-
-    // ================= PLAN RÉEL =================
-    const plan = userData.plan || "free"
-
-    // ================= SAVE LOCAL =================
-    localStorage.setItem("userPlan", plan)
-    localStorage.setItem("userEmail", user.email)
-    localStorage.setItem("userId", user.uid)
-
-    // ================= 🔥 IMPORTANT FIX BUG PANIER =================
-    // ❌ NE PLUS JAMAIS REDIRIGER ICI VERS /panier
-
-    // ================= REDIRECTION SAAS =================
-    if (plan === "free") {
-      router.push("/dashboard?plan=free")
+    if (!email.value || !password.value) {
+      alert("Remplis les champs")
       return
     }
 
-    if (plan === "pro") {
-      router.push("/dashboard?plan=pro")
-      return
+    const selectedPlan = localStorage.getItem("planChoisi") || "free"
+
+    // ================= LOGIN =================
+    if (isLogin.value) {
+
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email.value,
+        password.value
+      )
+
+      const user = userCredential.user
+
+      const snap = await getDoc(doc(db, "users", user.uid))
+
+      let userData = { plan: "free" }
+
+      if (snap.exists()) {
+        userData = snap.data()
+      }
+
+      const plan = userData.plan || "free"
+
+      localStorage.setItem("userPlan", plan)
+      localStorage.setItem("userEmail", user.email)
+      localStorage.setItem("userId", user.uid)
+
+      router.push("/dashboard")
     }
 
-    if (plan === "premium") {
-      router.push("/dashboard?plan=premium")
-      return
-    }
+    // ================= REGISTER =================
+    else {
 
-    // fallback
-    router.push("/dashboard")
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        email.value,
+        password.value
+      )
+
+      await setDoc(doc(db, "users", cred.user.uid), {
+        email: email.value,
+        plan: selectedPlan,
+        createdAt: Date.now(),
+        expiry: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        sections: []
+      })
+
+      localStorage.setItem("userPlan", selectedPlan)
+
+      router.push("/dashboard")
+    }
 
   } catch (error) {
     console.error(error)
-    alert("Erreur de connexion")
+    alert(error.message)
   }
 }
 </script>
