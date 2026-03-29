@@ -7,9 +7,9 @@ import { doc, getDoc } from "firebase/firestore"
 
 const router = useRouter()
 
-const user = ref(null)
 const loading = ref(true)
 const error = ref("")
+const user = ref(null)
 
 onMounted(() => {
   onAuthStateChanged(auth, async (u) => {
@@ -26,6 +26,7 @@ onMounted(() => {
 
       if (!snap.exists()) {
         error.value = "Utilisateur introuvable"
+        loading.value = false
         return
       }
 
@@ -33,18 +34,28 @@ onMounted(() => {
       const plan = userData.plan || "free"
       const uid = u.uid
 
-      // 🔥 REDIRECTION INTELLIGENTE SAAS
+      // =========================
+      // 🚀 REDIRECTION SAAS LOGIC
+      // =========================
+
       if (plan === "free") {
         router.push("/builder1")
+        return
       }
 
-      else if (plan === "pro") {
+      if (plan === "pro") {
         router.push("/builder2")
+        return
       }
 
-      else if (plan === "premium") {
-        window.location.href = `https://saasgenerator/#/site/${uid}`
+      if (plan === "premium") {
+        window.location.href =
+          `https://musrh.github.io/SaaasGenerator/#/?uid=${uid}`
+        return
       }
+
+      // fallback
+      router.push("/builder1")
 
     } catch (err) {
       console.error(err)
@@ -58,7 +69,7 @@ onMounted(() => {
 
 <template>
   <div class="flex items-center justify-center h-screen">
-    
+
     <div v-if="loading" class="text-gray-600 text-lg">
       Chargement du dashboard...
     </div>
