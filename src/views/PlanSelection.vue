@@ -47,7 +47,7 @@
       <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto px-4">
 
         <!-- PLAN FREE -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
+        <div class="bg-white rounded-xl shadow p-6">
 
           <h3 class="text-xl font-bold text-blue-400 mb-2">
             Vitrine
@@ -56,7 +56,7 @@
           <p class="text-3xl font-bold mb-4">Gratuit</p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
-            <li>✔ 1 seule page</li>
+            <li>✔ 1 page</li>
             <li>✔ Builder simple</li>
             <li>✔ Hébergement inclus</li>
           </ul>
@@ -78,8 +78,7 @@
           </h3>
 
           <p class="text-3xl font-bold mb-4">
-            5€
-            <span class="text-sm text-gray-500">/mois</span>
+            5€ <span class="text-sm text-gray-500">/mois</span>
           </p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
@@ -98,15 +97,14 @@
         </div>
 
         <!-- PLAN PREMIUM -->
-        <div class="bg-white rounded-xl shadow hover:shadow-lg transition p-6">
+        <div class="bg-white rounded-xl shadow p-6">
 
           <h3 class="text-xl font-bold text-purple-500 mb-2">
             Premium
           </h3>
 
           <p class="text-3xl font-bold mb-4">
-            10€
-            <span class="text-sm text-gray-500">/mois</span>
+            10€ <span class="text-sm text-gray-500">/mois</span>
           </p>
 
           <ul class="text-gray-600 mb-6 space-y-2">
@@ -133,7 +131,7 @@
 
 <script setup>
 import { useRouter } from "vue-router"
-import { ref } from "vue"
+import { ref, onMounted } from "vue"
 
 const router = useRouter()
 const plansRef = ref(null)
@@ -144,18 +142,30 @@ const planPrices = {
   premium: 10
 }
 
+/* 🔥 AUTO REDIRECT SI FREE DÉJÀ ACTIF */
+onMounted(() => {
+  const userPlan = localStorage.getItem("userPlan")
+
+  if (userPlan === "free") {
+    router.push("/dashboard?plan=free")
+  }
+})
+
 /* 🚀 SELECT PLAN */
 const selectPlan = (plan) => {
 
-  // sauvegarde local
   localStorage.setItem("planChoisi", plan)
 
   // ================= FREE → DASHBOARD DIRECT =================
   if (plan === "free") {
+
+    localStorage.setItem("userPlan", "free")
+
     router.push({
       path: "/dashboard",
       query: { plan: "free" }
     })
+
     return
   }
 
