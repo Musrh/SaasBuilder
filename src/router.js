@@ -21,7 +21,7 @@ const routes = [
 },
   
 {
-      path: "/panier",
+      path: "/cancel",
       component: () => import("./views/Cancel.vue")
 },
  
