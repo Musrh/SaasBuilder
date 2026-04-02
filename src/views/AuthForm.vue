@@ -100,13 +100,33 @@ const login = async () => {
 // REGISTER
 const register = async () => {
   try {
-    await createUserWithEmailAndPassword(auth, email.value, password.value)
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      email.value,
+      password.value
+    )
 
+    const user = cred.user
+
+    // ✅ création du document Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      createdAt: serverTimestamp(),
+      email: user.email,
+      plan: selectedPlan.value || "free",
+      paid: false,
+      sections: [],
+      export: null
+    })
+
+    // 🔥 redirection
     router.push("/dashboard")
 
   } catch (e) {
-    alert("Erreur inscription")
     console.error(e)
+    alert("Erreur inscription")
   }
+}
+
+  
 }
 </script>
