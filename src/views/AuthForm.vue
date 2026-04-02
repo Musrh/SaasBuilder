@@ -53,6 +53,8 @@
 </template>
 
 <script setup>
+import { db } from "../firebase"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { auth } from "../firebase"
