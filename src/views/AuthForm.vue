@@ -1,208 +1,112 @@
-<!-- ============================================================
-  AuthForm.vue — Sassbuilder
-  Connexion / Inscription
-  Flux :
-    - Nouveau utilisateur → Panier (si plan payant) ou Dashboard (free)
-    - Utilisateur existant + payé + non expiré → SaaasGenerator Home
-    - Utilisateur existant + non payé ou expiré → Panier
-============================================================ -->
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center px-4">
+  <div class="min-h-screen flex items-center justify-center bg-gray-100">
 
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
 
-      <!-- PLAN badge -->
-      <div v-if="selectedPlan && selectedPlan !== 'free'" class="flex justify-center mb-6">
-        <span class="bg-blue-50 border border-blue-200 text-blue-600 text-sm font-semibold px-4 py-1 rounded-full">
-          Plan {{ selectedPlan.toUpperCase() }} sélectionné
-        </span>
+      <!-- PLAN SELECTIONNE -->
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
+        <p class="text-sm text-gray-500">Vous avez choisi</p>
+        <p class="text-2xl font-bold text-blue-600 capitalize">
+          {{ selectedPlan }}
+        </p>
       </div>
 
-      <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">
-        {{ isLogin ? "Connexion" : "Créer un compte" }}
-      </h1>
+      <!-- TITLE -->
+      <h2 class="text-2xl font-bold mb-6 text-center">
+        Connexion / Inscription
+      </h2>
 
-      <!-- ERROR -->
-      <div v-if="errorMsg" class="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 text-sm mb-4">
-        {{ errorMsg }}
-      </div>
+      <!-- EMAIL -->
+      <input
+        v-model="email"
+        type="email"
+        placeholder="Email"
+        class="w-full border p-3 rounded-lg mb-4"
+      />
 
-      <div class="space-y-4">
+      <!-- PASSWORD -->
+      <input
+        v-model="password"
+        type="password"
+        placeholder="Mot de passe"
+        class="w-full border p-3 rounded-lg mb-6"
+      />
 
-        <input
-          v-model="email"
-          type="email"
-          placeholder="Email"
-          class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none text-gray-800"
-        />
+      <!-- LOGIN -->
+      <button
+        @click="login"
+        class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg mb-3"
+      >
+        Se connecter
+      </button>
 
-        <input
-          v-model="password"
-          type="password"
-          placeholder="Mot de passe (6 caractères min)"
-          class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none text-gray-800"
-        />
-
-        <button
-          @click="handleSubmit"
-          :disabled="loading"
-          class="w-full py-3 rounded-xl text-white font-semibold transition flex items-center justify-center gap-2"
-          :class="isLogin ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'"
-        >
-          <span v-if="loading" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
-          {{ loading ? "Chargement..." : (isLogin ? "Se connecter" : "S'inscrire") }}
-        </button>
-
-      </div>
-
-      <div class="mt-6 text-center text-sm text-gray-500">
-        {{ isLogin ? "Pas de compte ?" : "Déjà un compte ?" }}
-        <button @click="isLogin = !isLogin; errorMsg = ''" class="text-blue-500 ml-1 font-semibold hover:underline">
-          {{ isLogin ? "Créer un compte" : "Se connecter" }}
-        </button>
-      </div>
-
-      <div class="mt-4 text-center">
-        <button @click="$router.push('/')" class="text-xs text-gray-400 hover:text-gray-600">
-          ← Retour aux offres
-        </button>
-      </div>
+      <!-- REGISTER -->
+      <button
+        @click="register"
+        class="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-lg"
+      >
+        S'inscrire
+      </button>
 
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
-import { useRouter, useRoute } from "vue-router"
-import { auth, db } from "../firebase"
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth"
-import { doc, setDoc, getDoc } from "firebase/firestore"
+import { ref, onMounted } from "vue"
+import { useRoute, useRouter } from "vue-router"
+import { auth } from "../firebase"
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from "firebase/auth"
 
+const route = useRoute()
 const router = useRouter()
-const route  = useRoute()
 
-const email       = ref("")
-const password    = ref("")
-const isLogin     = ref(true)
-const loading     = ref(false)
-const errorMsg    = ref("")
+const email = ref("")
+const password = ref("")
+const selectedPlan = ref("free")
 
-const selectedPlan = computed(() =>
-  route.query.plan || localStorage.getItem("planChoisi") || "free"
-)
-
+// 🔥 récupérer plan
 onMounted(() => {
-  // Si déjà connecté → vérifier et rediriger
-  auth.onAuthStateChanged(async (user) => {
-    if (user) await checkAndRedirect(user)
+  selectedPlan.value =
+    route.query.plan ||
+    localStorage.getItem("planChoisi") ||
+    "free"
+
+  // si déjà connecté → dashboard
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      router.push("/dashboard")
+    }
   })
 })
 
-// ── Vérification plan + expiry + redirection ──────────────────
-const checkAndRedirect = async (user) => {
+// LOGIN
+const login = async () => {
   try {
-    const snap = await getDoc(doc(db, "users", user.uid))
-    if (!snap.exists()) return // Nouvel utilisateur → rester sur auth
+    await signInWithEmailAndPassword(auth, email.value, password.value)
 
-    const data = snap.data()
-    const plan   = data.plan   || "free"
-    const paye   = data.paye   || false
-    const expiry = data.expiry || 0
+    const redirect = route.query.redirect || "/dashboard"
+    router.push(redirect)
 
-    const planExpired = expiry < Date.now()
-
-    // FREE → Dashboard (builder basique)
-    if (plan === "free") {
-      router.push("/dashboard")
-      return
-    }
-
-    // Payant + payé + non expiré → SaaasGenerator
-    if (paye && !planExpired) {
-      // Rediriger vers SaaasGenerator (application externe)
-      window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
-      return
-    }
-
-    // Payant mais pas payé ou expiré → Panier
-    router.push({ path: "/panier", query: { plan, price: plan === "pro" ? 5 : 10 } })
   } catch (e) {
+    alert("Erreur connexion")
     console.error(e)
   }
 }
 
-// ── Submit ────────────────────────────────────────────────────
-const handleSubmit = async () => {
-  errorMsg.value = ""
-  if (!email.value || !password.value) {
-    errorMsg.value = "Veuillez remplir tous les champs."
-    return
-  }
-  if (password.value.length < 6) {
-    errorMsg.value = "Le mot de passe doit faire au moins 6 caractères."
-    return
-  }
-
-  loading.value = true
-  const plan = selectedPlan.value
-
+// REGISTER
+const register = async () => {
   try {
+    await createUserWithEmailAndPassword(auth, email.value, password.value)
 
-    // ── CONNEXION ──────────────────────────────────────────────
-    if (isLogin.value) {
-      const cred = await signInWithEmailAndPassword(auth, email.value, password.value)
-      await checkAndRedirect(cred.user)
-    }
+    router.push("/dashboard")
 
-    // ── INSCRIPTION ────────────────────────────────────────────
-    else {
-      const cred = await createUserWithEmailAndPassword(auth, email.value, password.value)
-      const user = cred.user
-      const now  = Date.now()
-
-      // Créer le document Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        email:     email.value,
-        plan:      plan,
-        paye:      plan === "free",   // free = actif immédiatement
-        createdAt: now,
-        expiry:    plan === "free" ? now + 100 * 365 * 24 * 60 * 60 * 1000 : now, // free = 100 ans
-        sections:  [],
-        // Config paiement du store (vide, à remplir dans SaaasGenerator)
-        storePaymentConfig: {
-          stripe: { publishableKey: "", backendUrl: "", currency: "eur", mode: "test" },
-          paypal: { clientId: "", mode: "sandbox", currency: "EUR", createOrderUrl: "", captureOrderUrl: "" }
-        }
-      })
-
-      localStorage.setItem("planChoisi", plan)
-
-      // FREE → Dashboard direct
-      if (plan === "free") {
-        router.push("/dashboard")
-        return
-      }
-
-      // Payant → Panier pour payer
-      router.push({
-        path: "/panier",
-        query: { plan, price: plan === "pro" ? 5 : 10 }
-      })
-    }
-
-  } catch (err) {
-    console.error(err)
-    const msgs = {
-      "auth/email-already-in-use": "Cet email est déjà utilisé.",
-      "auth/user-not-found":       "Aucun compte avec cet email.",
-      "auth/wrong-password":       "Mot de passe incorrect.",
-      "auth/invalid-email":        "Adresse email invalide.",
-      "auth/too-many-requests":    "Trop de tentatives. Réessayez plus tard.",
-    }
-    errorMsg.value = msgs[err.code] || err.message
-  } finally {
-    loading.value = false
+  } catch (e) {
+    alert("Erreur inscription")
+    console.error(e)
   }
 }
 </script>
