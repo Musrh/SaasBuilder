@@ -115,13 +115,13 @@ const register = async () => {
       createdAt: serverTimestamp(),
       email: user.email,
       plan: selectedPlan.value || "free",
-      paid: false,
+      paye: false,
       sections: [],
-      export: null
+      expiry: serverTimestamp()
     })
 
     // 🔥 redirection
-    router.push("/dashboard")
+    router.push("/panier")
 
   } catch (e) {
     console.error(e)
