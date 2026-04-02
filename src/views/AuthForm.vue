@@ -125,7 +125,7 @@ const register = async () => {
     console.error(e)
     alert("Erreur inscription")
   }
-}
+
 
   
 }
