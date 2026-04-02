@@ -1,231 +1,194 @@
+<!-- ============================================================
+  Dashboard.vue — Sassbuilder
+  Espace personnel après connexion/paiement.
+  - Affiche le plan actif + statut
+  - Bouton principal → SaaasGenerator (builder)
+  - Lien → Commandes
+  - Avertissement si plan expiré
+============================================================ -->
 <template>
-  <div class="min-h-screen bg-gray-100 p-6">
+  <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
 
-    <!-- HEADER -->
-    <div class="max-w-5xl mx-auto flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold">Dashboard</h1>
+    <div class="max-w-4xl mx-auto">
 
-      <button
-        @click="logout"
-        class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
-      >
-        Déconnexion
-      </button>
-    </div>
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-10">
+        <div>
+          <h1 class="text-3xl font-bold">Mon espace Sassbuilder</h1>
+          <p class="text-gray-400 mt-1">{{ user?.email }}</p>
+        </div>
+        <button @click="logout" class="text-sm text-gray-400 hover:text-white border border-gray-600 px-4 py-2 rounded-lg transition">
+          Déconnexion
+        </button>
+      </div>
 
-    <!-- LOADING -->
-    <div v-if="loading" class="text-center text-gray-600">
-      Chargement...
-    </div>
+      <!-- Loading -->
+      <div v-if="loading" class="flex justify-center py-20">
+        <div class="w-10 h-10 border-4 border-gray-600 border-t-blue-400 rounded-full animate-spin"/>
+      </div>
 
-    <!-- ERROR -->
-    <div v-else-if="error" class="text-center text-red-500">
-      {{ error }}
-    </div>
+      <template v-else>
 
-    <!-- CONTENT -->
-    <div v-else class="max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
+        <!-- PLAN EXPIRÉ -->
+        <div v-if="planExpired && userData?.plan !== 'free'" class="bg-red-900/30 border border-red-500/50 rounded-2xl p-6 mb-6">
+          <h2 class="text-xl font-bold text-red-400 mb-2">⚠️ Plan expiré</h2>
+          <p class="text-gray-300 mb-4">Votre plan <strong>{{ userData?.plan }}</strong> a expiré. Renouvelez pour continuer à utiliser le builder.</p>
+          <button @click="renewPlan" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-semibold transition">
+            Renouveler mon plan
+          </button>
+        </div>
 
-      <!-- INFOS -->
-      <div class="bg-white p-6 rounded-xl shadow">
+        <!-- CARDS -->
+        <div class="grid md:grid-cols-3 gap-6 mb-8">
 
-        <h2 class="font-bold text-lg mb-4">Informations</h2>
+          <!-- Plan actif -->
+          <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <p class="text-gray-400 text-sm uppercase tracking-wider mb-2">Plan actif</p>
+            <p class="text-2xl font-bold capitalize" :class="planColor">{{ userData?.plan || 'free' }}</p>
+            <p class="text-xs text-gray-500 mt-2">
+              {{ planExpired ? '❌ Expiré' : `✓ Valide jusqu'au ${expiryFormatted}` }}
+            </p>
+          </div>
 
-        <p><b>Email :</b> {{ user.email }}</p>
+          <!-- Statut paiement -->
+          <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <p class="text-gray-400 text-sm uppercase tracking-wider mb-2">Paiement</p>
+            <p class="text-2xl font-bold" :class="userData?.paye ? 'text-green-400' : 'text-red-400'">
+              {{ userData?.paye ? '✓ Actif' : '✗ Non payé' }}
+            </p>
+            <p class="text-xs text-gray-500 mt-2">{{ userData?.email }}</p>
+          </div>
 
-        <p class="mt-2">
-          <b>Plan :</b>
-          <span
-            class="px-2 py-1 rounded text-white text-sm"
-            :class="planColor"
+          <!-- Config paiement store -->
+          <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <p class="text-gray-400 text-sm uppercase tracking-wider mb-2">Paiements store</p>
+            <p class="text-lg font-bold" :class="hasPaymentConfig ? 'text-green-400' : 'text-yellow-400'">
+              {{ hasPaymentConfig ? '✓ Configuré' : '⚠ À configurer' }}
+            </p>
+            <p class="text-xs text-gray-500 mt-2">Stripe & PayPal du store</p>
+          </div>
+
+        </div>
+
+        <!-- ACTION PRINCIPALE : Accéder au Builder -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 mb-6 text-center">
+          <h2 class="text-2xl font-bold mb-2">🏗️ Builder de site</h2>
+          <p class="text-blue-100 mb-6">Créez et gérez votre boutique en ligne</p>
+          <button
+            @click="goToBuilder"
+            :disabled="!canAccessBuilder"
+            class="bg-white text-blue-600 font-bold px-10 py-4 rounded-xl text-lg hover:bg-blue-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {{ user.plan }}
-          </span>
-        </p>
+            Accéder au Builder →
+          </button>
+          <p v-if="!canAccessBuilder" class="text-sm text-blue-200 mt-3">
+            Renouvelez votre plan pour accéder au builder
+          </p>
+        </div>
 
-        <p class="mt-2" v-if="expiryDate">
-          <b>Expiration :</b> {{ expiryDate }}
-        </p>
+        <!-- ACTIONS SECONDAIRES -->
+        <div class="grid md:grid-cols-2 gap-4">
 
-        <p class="mt-2" v-if="daysLeft !== null">
-          <b>Jours restants :</b>
-          <span :class="daysLeft < 5 ? 'text-red-500' : 'text-green-600'">
-            {{ daysLeft }}
-          </span>
-        </p>
+          <button
+            @click="goToOrders"
+            class="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-2xl p-6 text-left transition"
+          >
+            <div class="text-3xl mb-3">📦</div>
+            <h3 class="font-bold text-lg">Commandes clients</h3>
+            <p class="text-gray-400 text-sm mt-1">Suivez les achats de vos clients</p>
+          </button>
 
-        <p class="mt-2">
-          <b>Paiement :</b>
-          <span :class="user.paye ? 'text-green-600' : 'text-red-500'">
-            {{ user.paye ? "Payé" : "Non payé" }}
-          </span>
-        </p>
+          <button
+            @click="goToPlans"
+            class="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-2xl p-6 text-left transition"
+          >
+            <div class="text-3xl mb-3">⭐</div>
+            <h3 class="font-bold text-lg">Changer de plan</h3>
+            <p class="text-gray-400 text-sm mt-1">Passez à Pro ou Premium</p>
+          </button>
 
-      </div>
+        </div>
 
-      <!-- ACTIONS -->
-      <div class="bg-white p-6 rounded-xl shadow">
-
-        <h2 class="font-bold text-lg mb-4">Actions</h2>
-
-        <!-- BUILDER -->
-        <button
-          @click="goBuilder"
-          class="w-full mb-3 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600"
-        >
-          🚀 Accéder au Builder
-        </button>
-
-        <!-- UPGRADE -->
-        <button
-          v-if="user.plan !== 'premium'"
-          @click="upgrade"
-          class="w-full bg-yellow-500 text-white py-3 rounded-lg hover:bg-yellow-600"
-        >
-          ⭐ Upgrade
-        </button>
-
-        <!-- PLAN INFO -->
-        <p class="mt-4 text-sm text-gray-500">
-          {{ planDescription }}
-        </p>
-
-      </div>
-
+      </template>
     </div>
-
   </div>
+</div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from "vue"
 import { useRouter } from "vue-router"
-
 import { auth, db } from "../firebase"
-import { onAuthStateChanged, signOut } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
+import { signOut } from "firebase/auth"
 
-/* STATE */
-const router = useRouter()
+const router   = useRouter()
+const user     = ref(null)
+const userData = ref(null)
+const loading  = ref(true)
 
-const loading = ref(true)
-const error = ref("")
-const user = ref(null)
-const expiry = ref(null)
+const planExpired = computed(() => {
+  if (!userData.value) return false
+  if (userData.value.plan === "free") return false
+  return (userData.value.expiry || 0) < Date.now()
+})
 
-/* LOAD USER */
-onMounted(() => {
-  onAuthStateChanged(auth, async (u) => {
+const canAccessBuilder = computed(() => {
+  if (!userData.value) return false
+  if (userData.value.plan === "free") return true
+  return userData.value.paye && !planExpired.value
+})
 
-    if (!u) {
-      router.push("/auth")
-      return
-    }
-
-    try {
-      const snap = await getDoc(doc(db, "users", u.uid))
-
-      if (!snap.exists()) {
-        error.value = "Utilisateur introuvable"
-        return
-      }
-
-      user.value = {
-        ...snap.data(),
-        uid: u.uid
-      }
-
-      expiry.value = user.value.expiry
-
-    } catch (err) {
-      console.error(err)
-      error.value = "Erreur chargement"
-    } finally {
-      loading.value = false
-    }
+const expiryFormatted = computed(() => {
+  if (!userData.value?.expiry) return "—"
+  return new Date(userData.value.expiry).toLocaleDateString("fr-FR", {
+    day: "2-digit", month: "long", year: "numeric"
   })
 })
 
-/* DATE */
-const expiryDate = computed(() => {
-  if (!expiry.value) return null
-  return new Date(expiry.value).toLocaleDateString()
+const planColor = computed(() => ({
+  "text-gray-400":  userData.value?.plan === "free",
+  "text-blue-400":  userData.value?.plan === "pro",
+  "text-purple-400": userData.value?.plan === "premium",
+}))
+
+const hasPaymentConfig = computed(() => {
+  const cfg = userData.value?.storePaymentConfig?.stripe
+  return cfg && cfg.publishableKey && cfg.publishableKey.length > 5
 })
 
-/* DAYS */
-const daysLeft = computed(() => {
-  if (!expiry.value) return null
-  return Math.ceil((expiry.value - Date.now()) / (1000 * 60 * 60 * 24))
+onMounted(() => {
+  auth.onAuthStateChanged(async (u) => {
+    if (!u) { router.push("/auth"); return }
+    user.value = u
+    try {
+      const snap = await getDoc(doc(db, "users", u.uid))
+      if (snap.exists()) userData.value = snap.data()
+    } catch(e) { console.error(e) }
+    loading.value = false
+  })
 })
 
-/* PLAN COLOR */
-const planColor = computed(() => {
-  if (!user.value) return ""
-
-  return user.value.plan === "free"
-    ? "bg-gray-500"
-    : user.value.plan === "pro"
-    ? "bg-blue-500"
-    : "bg-purple-600"
-})
-
-/* PLAN DESC */
-const planDescription = computed(() => {
-  if (!user.value) return ""
-
-  if (user.value.plan === "free")
-    return "Plan gratuit : 1 seule page"
-  if (user.value.plan === "pro")
-    return "Plan Pro : multi pages"
-  if (user.value.plan === "premium")
-    return "Plan Premium : e-commerce + paiement"
-
-  return ""
-})
-
-/* BUILDER */
-const goBuilder = () => {
-
-  if (user.value.plan === "free") {
-    router.push("/builder1")
-  }
-
-  else if (user.value.plan === "pro") {
-
-    if (!user.value.paye) {
-      router.push("/panier?plan=pro&price=5")
-      return
-    }
-
-    router.push("/builder2")
-  }
-
-  else if (user.value.plan === "premium") {
-
-    if (!user.value.paye) {
-      router.push("/panier?plan=premium&price=10")
-      return
-    }
-
-    window.location.href =
-      `https://musrh.github.io/SaaasGenerator/#/?uid=${user.value.uid}`
-  }
+const goToBuilder = () => {
+  // Rediriger vers SaaasGenerator
+  window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
 }
 
-/* UPGRADE */
-const upgrade = () => {
-  if (user.value.plan === "free") {
-    router.push("/panier?plan=pro&price=5")
-  } else if (user.value.plan === "pro") {
-    router.push("/panier?plan=premium&price=10")
-  }
+const goToOrders = () => {
+  // Commandes dans SaaasGenerator
+  window.location.href = "https://musrh.github.io/SaaasGenerator/#/orders"
 }
 
-/* LOGOUT */
+const goToPlans  = () => router.push("/")
+const renewPlan  = () => {
+  const plan  = userData.value?.plan || "pro"
+  const price = plan === "pro" ? 5 : 10
+  router.push({ path: "/panier", query: { plan, price } })
+}
+
 const logout = async () => {
   await signOut(auth)
-
-  // 🔥 retour page accueil
-  window.location.href = "#/"
+  localStorage.removeItem("planChoisi")
+  router.push("/")
 }
 </script>
