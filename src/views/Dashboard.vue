@@ -142,7 +142,7 @@
             <div class="text-3xl mb-3">📦</div>
 
             <h3 class="font-bold text-lg">
-              Commandes clients
+              Commandes clients ↗
             </h3>
 
             <p class="text-gray-400 text-sm mt-1">
@@ -251,8 +251,12 @@ const goToBuilder = () => {
   window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
 }
 
+// 🔥 OUVERTURE NOUVEL ONGLET
 const goToOrders = () => {
-  window.location.href = "https://musrh.github.io/SaaasGenerator/#/orders"
+  window.open(
+    "https://musrh.github.io/SaaasGenerator/#/orders",
+    "_blank"
+  )
 }
 
 const goToPlans = () => {
