@@ -4,6 +4,7 @@ import PlanSelection from "./views/PlanSelection.vue";
 import AuthForm from "./views/AuthForm.vue";
 import Dashboard from "./views/Dashboard.vue";
 
+
 const routes = [
   {
     path: "/",
@@ -44,6 +45,10 @@ const routes = [
   {
     path: "/builder3",
     component: () => import("./views/Builder3.vue")
+  },
+  {
+    path: "/orders",
+    component: () => import("./views/Orders.vue")
   }
 
 ];
