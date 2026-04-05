@@ -3,7 +3,7 @@
 
     <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
 
-      <!-- PLAN SELECTIONNE -->
+      <!-- PLAN -->
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
         <p class="text-sm text-gray-500">Vous avez choisi</p>
         <p class="text-2xl font-bold text-blue-600 capitalize">
@@ -53,11 +53,10 @@
 </template>
 
 <script setup>
-import { db } from "../firebase"
+import { db, auth } from "../firebase"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { auth } from "../firebase"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword
@@ -77,7 +76,6 @@ onMounted(() => {
     localStorage.getItem("planChoisi") ||
     "free"
 
-  // si déjà connecté → dashboard
   auth.onAuthStateChanged((user) => {
     if (user) {
       router.push("/dashboard")
@@ -85,7 +83,9 @@ onMounted(() => {
   })
 })
 
+// =======================================================
 // LOGIN
+// =======================================================
 const login = async () => {
   try {
     await signInWithEmailAndPassword(auth, email.value, password.value)
@@ -94,12 +94,14 @@ const login = async () => {
     router.push(redirect)
 
   } catch (e) {
-    alert("Erreur connexion")
     console.error(e)
+    alert("Erreur connexion")
   }
 }
 
-// REGISTER
+// =======================================================
+// REGISTER (SAAS OWNER)
+// =======================================================
 const register = async () => {
   try {
     const cred = await createUserWithEmailAndPassword(
@@ -109,26 +111,38 @@ const register = async () => {
     )
 
     const user = cred.user
+    const uid = user.uid
 
-    // ✅ création du document Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      createdAt: serverTimestamp(),
+    // 🔥 SAAS STRUCTURE OWNER
+    const ownerId = uid
+    const storeId = uid
+
+    await setDoc(doc(db, "users", uid), {
+      uid: uid,
       email: user.email,
+
+      // SaaS roles
+      role: "owner",
+      ownerId: ownerId,
+      storeId: storeId,
+
+      // plan SaaS
       plan: selectedPlan.value || "free",
       paye: false,
+
       sections: [],
-      expiry: serverTimestamp()
+      createdAt: serverTimestamp(),
+      expiry: null
     })
 
-    // 🔥 redirection
-    router.push("/panier")
+    // 🔥 redirection vers panier Stripe
+    router.push(
+      `/panier?ownerId=${ownerId}&storeId=${storeId}&plan=${selectedPlan.value}`
+    )
 
   } catch (e) {
     console.error(e)
     alert("Erreur inscription")
   }
-
-
-  
 }
 </script>
