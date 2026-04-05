@@ -16,47 +16,63 @@ const search = ref("")
 
 let unsubscribe = null
 
-// 🔐 AUTH + ORDERS
+// 🔐 INIT SAFE (IMPORTANT FIX)
 onMounted(() => {
+
+  console.log("📦 Orders.vue mounted")
+
+  // 🔥 CAS 1 : utilisateur déjà connecté
+  const current = auth.currentUser
+
+  if (current) {
+    console.log("⚡ auth.currentUser =", current.uid)
+    startOrders(current.uid)
+  }
+
+  // 🔥 CAS 2 : écoute auth si pas encore prêt
   onAuthStateChanged(auth, (u) => {
+    console.log("🔐 onAuthStateChanged =", u?.uid)
 
-    // 🔥 DEBUG IMPORTANT
-    console.log("UID =", u?.uid)
-
-    if (!u || !u.uid) {
+    if (!u) {
       loading.value = false
       return
     }
 
-    user.value = u
-
-    // 🔥 CLEAN PREVIOUS LISTENER
-    if (unsubscribe) unsubscribe()
-
-    // 🔥 FIRESTORE QUERY (OWNER ONLY)
-    const q = query(
-      collection(db, "orders"),
-      where("ownerId", "==", u.uid)
-    )
-
-    unsubscribe = onSnapshot(q, (snap) => {
-
-      console.log("STORE ORDERS =>", snap.docs.length)
-
-      orders.value = snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-
-      loading.value = false
-    }, (err) => {
-      console.error("Firestore error:", err)
-      loading.value = false
-    })
+    startOrders(u.uid)
   })
 })
 
-// 🔍 FILTER CLIENT EMAIL
+// 🚀 CHARGE ORDERS
+function startOrders(uid) {
+
+  console.log("UID FINAL =", uid)
+
+  user.value = { uid }
+
+  if (unsubscribe) unsubscribe()
+
+  const q = query(
+    collection(db, "orders"),
+    where("ownerId", "==", uid)
+  )
+
+  unsubscribe = onSnapshot(q, (snap) => {
+
+    console.log("📦 ORDERS FOUND =", snap.docs.length)
+
+    orders.value = snap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+
+    loading.value = false
+  }, (err) => {
+    console.error("Firestore error:", err)
+    loading.value = false
+  })
+}
+
+// 🔍 FILTER
 const filteredOrders = computed(() => {
   if (!search.value) return orders.value
 
@@ -67,7 +83,7 @@ const filteredOrders = computed(() => {
   )
 })
 
-// 🕒 FORMAT DATE
+// 🕒 DATE FORMAT
 function formatDate(ts) {
   if (!ts) return "—"
   try {
@@ -83,27 +99,22 @@ function formatDate(ts) {
 
   <h2>📦 Commandes de mon store</h2>
 
-  <!-- SEARCH -->
   <input
     v-model="search"
     placeholder="🔍 Filtrer par email client"
     class="search"
   />
 
-  <!-- LOADING -->
   <div v-if="loading">Chargement...</div>
 
-  <!-- NOT LOGGED -->
   <div v-else-if="!user">
     Vous devez être connecté
   </div>
 
-  <!-- EMPTY -->
   <div v-else-if="filteredOrders.length === 0">
     Il n'y a pas de commandes
   </div>
 
-  <!-- LIST -->
   <div v-else>
     <div
       v-for="order in filteredOrders"
