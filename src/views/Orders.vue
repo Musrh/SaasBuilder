@@ -1,7 +1,14 @@
 <script setup>
 import { ref, onMounted } from "vue"
 import { db, auth } from "../firebase"
-import { collection, query, where, onSnapshot } from "firebase/firestore"
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc
+} from "firebase/firestore"
 import { onAuthStateChanged } from "firebase/auth"
 
 const orders = ref([])
@@ -12,7 +19,7 @@ let unsubscribe = null
 onMounted(() => {
   console.log("📦 Orders page mounted")
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     console.log("🔐 AUTH USER =", user?.uid)
 
     if (!user) {
@@ -21,18 +28,34 @@ onMounted(() => {
       return
     }
 
-    fetchOrders(user.uid)
+    // 🔥 IMPORTANT : récupérer ownerId depuis Firestore
+    const userRef = doc(db, "users", user.uid)
+    const userSnap = await getDoc(userRef)
+
+    if (!userSnap.exists()) {
+      console.log("❌ user doc not found")
+      loading.value = false
+      return
+    }
+
+    const userData = userSnap.data()
+
+    const ownerId = userData.ownerId || user.uid
+
+    console.log("🏪 OWNER ID =", ownerId)
+
+    fetchOrders(ownerId)
   })
 })
 
-function fetchOrders(uid) {
-  console.log("🚀 Fetch orders for ownerId =", uid)
+function fetchOrders(ownerId) {
+  console.log("🚀 Fetch orders for ownerId =", ownerId)
 
   if (unsubscribe) unsubscribe()
 
   const q = query(
     collection(db, "orders"),
-    where("ownerId", "==", uid)
+    where("ownerId", "==", ownerId)
   )
 
   unsubscribe = onSnapshot(q, (snap) => {
@@ -41,7 +64,6 @@ function fetchOrders(uid) {
     orders.value = snap.docs.map(doc => {
       const d = doc.data()
 
-      // ✅ SAFE MAPPING (IMPORTANT)
       const items = Array.isArray(d.items) ? d.items : []
 
       const total =
