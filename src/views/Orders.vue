@@ -20,21 +20,23 @@ onMounted(() => {
         const data = doc.data()
 
         console.log("📄 RAW ORDER =", doc.id, data)
+        console.log("📦 RAW ITEMS =", data.items)
 
         return {
           id: doc.id,
 
-          // sécurité champs (évite undefined)
+          // 🔥 champs sécurisés
           email: data.email ?? "❌ non défini",
           ownerId: data.ownerId ?? "❌ non défini",
           total: data.total ?? "❌ non défini",
           status: data.status ?? "unknown",
 
-          items: Array.isArray(data.items) ? data.items : [],
-
-          createdAt: data.createdAt?.toDate
-            ? data.createdAt.toDate()
-            : data.createdAt ?? null
+          // 🔥 FIX ULTRA IMPORTANT ITEMS
+          items: Array.isArray(data.items)
+            ? data.items
+            : data.items && typeof data.items === "object"
+              ? Object.values(data.items)
+              : []
         }
       })
 
@@ -63,7 +65,7 @@ onMounted(() => {
       <div
         v-for="o in orders"
         :key="o.id"
-        style="border:1px solid #ddd; padding:10px; margin-bottom:10px"
+        style="border:1px solid #ddd; padding:12px; margin-bottom:12px; border-radius:8px"
       >
 
         <p><b>ID:</b> {{ o.id }}</p>
@@ -86,17 +88,22 @@ onMounted(() => {
 
         <p><b>Status:</b> {{ o.status }}</p>
 
-        <p v-if="o.createdAt">
-          <b>Date:</b> {{ o.createdAt }}
-        </p>
-
-        <div v-if="o.items.length">
+        <!-- ITEMS -->
+        <div style="margin-top:10px">
           <b>Items:</b>
-          <ul>
-            <li v-for="(item, i) in o.items" :key="i">
-              {{ item.name }} — {{ item.qty }} x {{ item.price }}
-            </li>
-          </ul>
+
+          <div v-if="o.items && o.items.length">
+            <ul>
+              <li v-for="(item, i) in o.items" :key="i">
+                🛒 {{ item.name || 'Produit sans nom' }}
+                — {{ item.qty || 0 }} x {{ item.price || 0 }}
+              </li>
+            </ul>
+          </div>
+
+          <div v-else>
+            ❌ Aucun item
+          </div>
         </div>
 
       </div>
