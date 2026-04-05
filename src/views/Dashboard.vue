@@ -254,7 +254,7 @@ const goToBuilder = () => {
 // 🔥 OUVERTURE NOUVEL ONGLET
 const goToOrders = () => {
   window.open(
-    "https://musrh.github.io/SaaasGenerator/#/orders",
+    "https://musrh.github.io/SaasBuilder/#/orders",
     "_blank"
   )
 }
