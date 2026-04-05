@@ -1,72 +1,60 @@
-<template>
-  <div class="page">
-    <h2>📦 SaasBuilder — Commandes clients</h2>
-
-    <div v-if="loading">Chargement...</div>
-
-    <div v-else>
-      <div
-        v-for="order in orders"
-        :key="order.id"
-        class="card"
-      >
-        <div class="top">
-          <div>
-            <b>{{ order.email }}</b>
-            <p class="small">User: {{ order.userId }}</p>
-          </div>
-
-          <div class="status" :class="order.status">
-            {{ order.status }}
-          </div>
-        </div>
-
-        <div class="items">
-          <div
-            v-for="(item, i) in order.items"
-            :key="i"
-            class="item"
-          >
-            <span>{{ item.name }}</span>
-            <span>x{{ item.qty }}</span>
-            <span>{{ item.price }}€</span>
-          </div>
-        </div>
-
-        <div class="bottom">
-          <b>Total: {{ order.total }} {{ order.currency }}</b>
-        </div>
-
-        <p class="date">
-          {{ formatDate(order.createdAt) }}
-        </p>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { ref, onMounted } from "vue"
-import { db } from "../firebase"
-import { collection, onSnapshot } from "firebase/firestore"
+import { ref, onMounted, computed } from "vue"
+import { db, auth } from "../firebase"
+import {
+  collection,
+  query,
+  where,
+  onSnapshot
+} from "firebase/firestore"
+import { onAuthStateChanged } from "firebase/auth"
 
 const orders = ref([])
 const loading = ref(true)
+const user = ref(null)
+const search = ref("")
 
+// 🔐 AUTH
 onMounted(() => {
-  onSnapshot(collection(db, "orders"), (snap) => {
+  onAuthStateChanged(auth, (u) => {
 
-    console.log("SAASBUILDER ORDERS =>", snap.docs.map(d => d.data()))
+    if (!u) {
+      loading.value = false
+      return
+    }
 
-    orders.value = snap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }))
+    user.value = u
 
-    loading.value = false
+    // 🔥 FILTRE STORE OWNER
+    const q = query(
+      collection(db, "orders"),
+      where("ownerId", "==", u.uid)
+    )
+
+    onSnapshot(q, (snap) => {
+
+      console.log("STORE ORDERS =>", snap.docs.length)
+
+      orders.value = snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+
+      loading.value = false
+    })
   })
 })
 
+// 🔍 FILTRE PAR CLIENT (email)
+const filteredOrders = computed(() => {
+  if (!search.value) return orders.value
+
+  return orders.value.filter(o =>
+    (o.email || "").toLowerCase().includes(search.value.toLowerCase())
+  )
+})
+
+// 🕒 DATE
 function formatDate(ts) {
   if (!ts) return "—"
   try {
@@ -77,6 +65,76 @@ function formatDate(ts) {
 }
 </script>
 
+<template>
+<div class="page">
+
+  <h2>📦 Commandes de mon store</h2>
+
+  <!-- SEARCH -->
+  <input
+    v-model="search"
+    placeholder="🔍 Filtrer par email client"
+    class="search"
+  />
+
+  <!-- LOADING -->
+  <div v-if="loading">Chargement...</div>
+
+  <!-- NOT LOGGED -->
+  <div v-else-if="!user">
+    Vous devez être connecté
+  </div>
+
+  <!-- EMPTY -->
+  <div v-else-if="filteredOrders.length === 0">
+    Il n'y a pas de commandes
+  </div>
+
+  <!-- LIST -->
+  <div v-else>
+    <div
+      v-for="order in filteredOrders"
+      :key="order.id"
+      class="card"
+    >
+
+      <div class="top">
+        <div>
+          <b>{{ order.email }}</b>
+          <p class="small">Client ID: {{ order.userId }}</p>
+        </div>
+
+        <div class="status" :class="order.status">
+          {{ order.status }}
+        </div>
+      </div>
+
+      <div class="items">
+        <div
+          v-for="(item, i) in order.items"
+          :key="i"
+          class="item"
+        >
+          <span>{{ item.name }}</span>
+          <span>x{{ item.qty }}</span>
+          <span>{{ item.price }}€</span>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <b>Total: {{ order.total }} {{ order.currency }}</b>
+      </div>
+
+      <p class="date">
+        {{ formatDate(order.createdAt) }}
+      </p>
+
+    </div>
+  </div>
+
+</div>
+</template>
+
 <style scoped>
 .page {
   padding: 20px;
@@ -85,18 +143,24 @@ function formatDate(ts) {
   min-height: 100vh;
 }
 
+.search {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0 20px;
+  border-radius: 8px;
+  border: none;
+}
+
 .card {
   background: #1e293b;
   padding: 15px;
   margin: 15px 0;
   border-radius: 12px;
-  border: 1px solid #334155;
 }
 
 .top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
 .small {
@@ -104,46 +168,18 @@ function formatDate(ts) {
   opacity: 0.6;
 }
 
-.items {
-  margin-top: 10px;
-}
-
 .item {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
 }
 
-.bottom {
-  margin-top: 10px;
-}
-
-.date {
-  font-size: 11px;
-  opacity: 0.5;
-  margin-top: 8px;
-}
+.status.pending { background: orange; }
+.status.paid { background: green; }
+.status.shipped { background: blue; }
+.status.cancelled { background: red; }
 
 .status {
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 12px;
-  text-transform: capitalize;
-}
-
-.status.pending {
-  background: orange;
-}
-
-.status.paid {
-  background: green;
-}
-
-.status.shipped {
-  background: blue;
-}
-
-.status.cancelled {
-  background: red;
 }
 </style>
