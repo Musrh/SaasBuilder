@@ -166,7 +166,7 @@ const buyPlan = async () => {
 
   try {
     const res = await fetch(
-      "backendsaas-production.up.railway.app/create-stripe-session",
+      "https://backendsaas-production.up.railway.app/create-stripe-session",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
