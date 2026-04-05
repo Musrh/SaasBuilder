@@ -10,27 +10,23 @@ const loading = ref(true)
 let unsubscribe = null
 
 onMounted(() => {
-
   console.log("📦 Orders page mounted")
 
   onAuthStateChanged(auth, (user) => {
-
     console.log("🔐 AUTH USER =", user?.uid)
 
     if (!user) {
-      loading.value = false
       orders.value = []
+      loading.value = false
       return
     }
 
-    loadOrders(user.uid)
+    fetchOrders(user.uid)
   })
 })
 
-// 🔥 LOAD ORDERS (FIX COMPLET + SAFE MAPPING)
-function loadOrders(uid) {
-
-  console.log("🚀 LOAD ORDERS FOR UID =", uid)
+function fetchOrders(uid) {
+  console.log("🚀 Fetch orders for ownerId =", uid)
 
   if (unsubscribe) unsubscribe()
 
@@ -40,27 +36,28 @@ function loadOrders(uid) {
   )
 
   unsubscribe = onSnapshot(q, (snap) => {
-
     console.log("📦 ORDERS FOUND =", snap.size)
 
     orders.value = snap.docs.map(doc => {
-
       const d = doc.data()
+
+      // ✅ SAFE MAPPING (IMPORTANT)
+      const items = Array.isArray(d.items) ? d.items : []
+
+      const total =
+        typeof d.total === "number"
+          ? d.total
+          : items.reduce((sum, i) => {
+              return sum + (Number(i.price || 0) * Number(i.qty || 1))
+            }, 0)
 
       return {
         id: doc.id,
-
-        email: d.email || "",
-        userId: d.userId || "",
-
-        items: Array.isArray(d.items) ? d.items : [],
-
-        total: Number(d.total || 0),
+        email: d.email || "unknown",
+        items,
+        total,
         status: d.status || "pending",
-        currency: d.currency || "EUR",
-
         ownerId: d.ownerId || "",
-
         createdAt: d.createdAt || null
       }
     })
@@ -72,10 +69,8 @@ function loadOrders(uid) {
   })
 }
 
-// 🕒 FORMAT DATE SAFE
 function formatDate(ts) {
   if (!ts) return "—"
-
   try {
     if (ts.seconds) {
       return new Date(ts.seconds * 1000).toLocaleString()
@@ -110,7 +105,6 @@ function formatDate(ts) {
         <div class="top">
           <div>
             <b>{{ order.email }}</b>
-            <p class="small">Client: {{ order.userId }}</p>
           </div>
 
           <div class="status" :class="order.status">
@@ -133,13 +127,13 @@ function formatDate(ts) {
 
         <!-- TOTAL -->
         <div class="bottom">
-          <b>Total: {{ order.total }} {{ order.currency }}</b>
+          <b>Total: {{ order.total }} EUR</b>
         </div>
 
         <!-- DATE -->
-        <p class="date">
+        <div class="date">
           {{ formatDate(order.createdAt) }}
-        </p>
+        </div>
 
       </div>
 
@@ -168,11 +162,6 @@ function formatDate(ts) {
   justify-content: space-between;
 }
 
-.small {
-  font-size: 12px;
-  opacity: 0.6;
-}
-
 .items {
   margin-top: 10px;
 }
@@ -190,7 +179,6 @@ function formatDate(ts) {
 .status {
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 12px;
 }
 
 .status.pending { background: orange; }
