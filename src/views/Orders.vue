@@ -1,61 +1,73 @@
 <script setup>
 import { ref, onMounted } from "vue"
 import { db, auth } from "../firebase"
-import { collection, getDocs } from "firebase/firestore"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { onAuthStateChanged } from "firebase/auth"
 
 const orders = ref([])
-const log = ref("loading...")
 const loading = ref(true)
 
-onMounted(async () => {
+let unsub = null
 
-  console.log("🔥 ORDERS PAGE IS RUNNING")
-  log.value = "page loaded"
+onMounted(() => {
 
-  const user = auth.currentUser
+  console.log("📦 Orders mounted")
 
-  console.log("👤 currentUser =", user)
+  onAuthStateChanged(auth, (user) => {
 
-  if (!user) {
-    log.value = "NO USER LOGGED IN"
-    loading.value = false
-    return
-  }
+    console.log("🔐 AUTH USER =", user?.uid)
 
-  console.log("UID =", user.uid)
+    if (!user) {
+      loading.value = false
+      return
+    }
 
-  try {
-    const snap = await getDocs(collection(db, "orders"))
-
-    console.log("📦 TOTAL ORDERS IN DB =", snap.size)
-
-    orders.value = snap.docs.map(d => d.data())
-
-    log.value = "orders loaded: " + snap.size
-  } catch (e) {
-    console.error("❌ ERROR FIRESTORE", e)
-    log.value = "error"
-  }
-
-  loading.value = false
+    loadOrders(user.uid)
+  })
 })
+
+function loadOrders(uid) {
+
+  console.log("🚀 QUERY FOR OWNER =", uid)
+
+  if (unsub) unsub()
+
+  const q = query(
+    collection(db, "orders"),
+    where("ownerId", "==", uid)
+  )
+
+  unsub = onSnapshot(q, (snap) => {
+
+    console.log("📦 ORDERS FOUND =", snap.size)
+
+    orders.value = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }))
+
+    loading.value = false
+  })
+}
 </script>
 
 <template>
-  <div style="padding:20px;color:white;background:#0f172a;min-height:100vh">
+  <div style="padding:20px;background:#0f172a;color:white;min-height:100vh">
 
-    <h2>DEBUG ORDERS</h2>
+    <h2>📦 Paiements store</h2>
 
-    <p>{{ log }}</p>
+    <div v-if="loading">Chargement...</div>
 
-    <p v-if="loading">Loading...</p>
-
-    <div v-if="orders.length === 0 && !loading">
-      ❌ NO ORDERS FOUND
+    <div v-else-if="orders.length === 0">
+      ❌ Aucune commande trouvée
     </div>
 
-    <div v-for="(o,i) in orders" :key="i">
-      <pre>{{ o }}</pre>
+    <div v-for="o in orders" :key="o.id" style="padding:10px;margin:10px;background:#1e293b">
+
+      <div><b>{{ o.email }}</b></div>
+      <div>Total: {{ o.total }}</div>
+      <div>Status: {{ o.status }}</div>
+
     </div>
 
   </div>
