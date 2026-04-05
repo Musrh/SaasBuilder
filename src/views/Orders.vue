@@ -14,24 +14,32 @@ const loading = ref(true)
 const user = ref(null)
 const search = ref("")
 
-// 🔐 AUTH
+let unsubscribe = null
+
+// 🔐 AUTH + ORDERS
 onMounted(() => {
   onAuthStateChanged(auth, (u) => {
 
-    if (!u) {
+    // 🔥 DEBUG IMPORTANT
+    console.log("UID =", u?.uid)
+
+    if (!u || !u.uid) {
       loading.value = false
       return
     }
 
     user.value = u
 
-    // 🔥 FILTRE STORE OWNER
+    // 🔥 CLEAN PREVIOUS LISTENER
+    if (unsubscribe) unsubscribe()
+
+    // 🔥 FIRESTORE QUERY (OWNER ONLY)
     const q = query(
       collection(db, "orders"),
       where("ownerId", "==", u.uid)
     )
 
-    onSnapshot(q, (snap) => {
+    unsubscribe = onSnapshot(q, (snap) => {
 
       console.log("STORE ORDERS =>", snap.docs.length)
 
@@ -41,20 +49,25 @@ onMounted(() => {
       }))
 
       loading.value = false
+    }, (err) => {
+      console.error("Firestore error:", err)
+      loading.value = false
     })
   })
 })
 
-// 🔍 FILTRE PAR CLIENT (email)
+// 🔍 FILTER CLIENT EMAIL
 const filteredOrders = computed(() => {
   if (!search.value) return orders.value
 
   return orders.value.filter(o =>
-    (o.email || "").toLowerCase().includes(search.value.toLowerCase())
+    (o.email || "")
+      .toLowerCase()
+      .includes(search.value.toLowerCase())
   )
 })
 
-// 🕒 DATE
+// 🕒 FORMAT DATE
 function formatDate(ts) {
   if (!ts) return "—"
   try {
@@ -173,13 +186,13 @@ function formatDate(ts) {
   justify-content: space-between;
 }
 
-.status.pending { background: orange; }
-.status.paid { background: green; }
-.status.shipped { background: blue; }
-.status.cancelled { background: red; }
-
 .status {
   padding: 4px 8px;
   border-radius: 6px;
 }
+
+.status.pending { background: orange; }
+.status.paid { background: green; }
+.status.shipped { background: blue; }
+.status.cancelled { background: red; }
 </style>
