@@ -16,6 +16,7 @@ const loading = ref(true)
 
 let unsubscribe = null
 
+// 🔥 INIT
 onMounted(() => {
   console.log("📦 Orders page mounted")
 
@@ -28,26 +29,33 @@ onMounted(() => {
       return
     }
 
-    // 🔥 IMPORTANT : récupérer ownerId depuis Firestore
-    const userRef = doc(db, "users", user.uid)
-    const userSnap = await getDoc(userRef)
+    try {
+      // 🔥 récupérer ownerId depuis Firestore
+      const userRef = doc(db, "users", user.uid)
+      const userSnap = await getDoc(userRef)
 
-    if (!userSnap.exists()) {
-      console.log("❌ user doc not found")
+      if (!userSnap.exists()) {
+        console.log("❌ User document not found")
+        loading.value = false
+        return
+      }
+
+      const userData = userSnap.data()
+
+      const ownerId = userData.ownerId || user.uid
+
+      console.log("🏪 OWNER ID =", ownerId)
+
+      fetchOrders(ownerId)
+
+    } catch (e) {
+      console.error("❌ Error loading user:", e)
       loading.value = false
-      return
     }
-
-    const userData = userSnap.data()
-
-    const ownerId = userData.ownerId || user.uid
-
-    console.log("🏪 OWNER ID =", ownerId)
-
-    fetchOrders(ownerId)
   })
 })
 
+// 🔥 FETCH ORDERS
 function fetchOrders(ownerId) {
   console.log("🚀 Fetch orders for ownerId =", ownerId)
 
@@ -58,39 +66,59 @@ function fetchOrders(ownerId) {
     where("ownerId", "==", ownerId)
   )
 
-  unsubscribe = onSnapshot(q, (snap) => {
-    console.log("📦 ORDERS FOUND =", snap.size)
+  unsubscribe = onSnapshot(q,
+    (snap) => {
+      console.log("📦 ORDERS FOUND =", snap.size)
 
-    orders.value = snap.docs.map(doc => {
-      const d = doc.data()
+      orders.value = snap.docs.map(doc => {
+        const d = doc.data()
 
-      const items = Array.isArray(d.items) ? d.items : []
+        console.log("📄 RAW ORDER =", d) // 🔥 DEBUG
 
-      const total =
-        typeof d.total === "number"
-          ? d.total
-          : items.reduce((sum, i) => {
-              return sum + (Number(i.price || 0) * Number(i.qty || 1))
-            }, 0)
+        const items = Array.isArray(d.items) ? d.items : []
 
-      return {
-        id: doc.id,
-        email: d.email || "unknown",
-        items,
-        total,
-        status: d.status || "pending",
-        ownerId: d.ownerId || "",
-        createdAt: d.createdAt || null
-      }
-    })
+        // ✅ TOTAL SAFE
+        const total =
+          typeof d.total === "number"
+            ? d.total
+            : typeof d.montant === "number"
+            ? d.montant
+            : items.reduce((sum, i) => {
+                return sum + (Number(i.price || 0) * Number(i.qty || 1))
+              }, 0)
 
-    loading.value = false
-  }, (error) => {
-    console.error("❌ Firestore error:", error)
-    loading.value = false
-  })
+        return {
+          id: doc.id,
+
+          // ✅ EMAIL SAFE
+          email:
+            d.email ||
+            d.customerEmail ||
+            d.customer_email ||
+            "unknown",
+
+          items,
+
+          total,
+
+          status: d.status || "pending",
+
+          ownerId: d.ownerId || "",
+
+          createdAt: d.createdAt || null
+        }
+      })
+
+      loading.value = false
+    },
+    (error) => {
+      console.error("❌ Firestore error:", error)
+      loading.value = false
+    }
+  )
 }
 
+// 🕒 DATE FORMAT
 function formatDate(ts) {
   if (!ts) return "—"
   try {
@@ -109,12 +137,15 @@ function formatDate(ts) {
 
     <h2>📦 Paiements store</h2>
 
+    <!-- LOADING -->
     <div v-if="loading">Chargement...</div>
 
+    <!-- EMPTY -->
     <div v-else-if="orders.length === 0">
       ❌ Aucune commande trouvée
     </div>
 
+    <!-- LIST -->
     <div v-else>
 
       <div
