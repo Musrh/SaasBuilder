@@ -1,52 +1,46 @@
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+<template>
+  <div style="padding:20px;color:white">
+    <h2>📦 Orders</h2>
 
-    // ───────────────── USERS ─────────────────
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    <div v-if="loading">Loading...</div>
 
-      match /config/{doc} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
+    <div v-else>
+      <div
+        v-for="order in orders"
+        :key="order.id"
+        style="border:1px solid #444;padding:10px;margin:10px 0"
+      >
+        <p><b>{{ order.email }}</b></p>
+        <p>Status: {{ order.status }}</p>
+        <p>Total: {{ order.total }} {{ order.currency }}</p>
 
-      match /contacts/{contactId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-    }
+        <div v-for="(item, i) in order.items" :key="i">
+          - {{ item.name }} x{{ item.qty }} ({{ item.price }}€)
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
-    // ───────────────── ORDERS (GLOBAL) ─────────────────
-    match /orders/{orderId} {
+<script setup>
+import { ref, onMounted } from "vue"
+import { db } from "../firebase"
+import { collection, onSnapshot } from "firebase/firestore"
 
-      // 👇 admin / owner / client connecté
-      allow read: if request.auth != null;
+const orders = ref([])
+const loading = ref(true)
 
-      // 👇 création depuis checkout (Stripe / frontend)
-      allow create: if true;
+onMounted(() => {
+  onSnapshot(collection(db, "orders"), (snap) => {
 
-      // 👇 update (status payé / livré)
-      allow update: if request.auth != null;
+    console.log("ORDERS =>", snap.docs.map(d => d.data()))
 
-      allow delete: if false;
-    }
+    orders.value = snap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
 
-    // ───────────────── SLUGS PUBLICS ─────────────────
-    match /slugs/{slug} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    // ───────────────── CONTACTS GLOBAL ─────────────────
-    match /contacts/{contactId} {
-      allow read: if request.auth != null;
-      allow create: if true;
-      allow update: if request.auth != null;
-      allow delete: if false;
-    }
-
-    // ───────────────── Fallback ─────────────────
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
+    loading.value = false
+  })
+})
+</script>
