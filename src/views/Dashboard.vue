@@ -252,7 +252,7 @@ const goToBuilder = () => {
   const uid = user.value?.uid
   const email = user.value?.email
 
-  const url = `https://musrh.github.io/SaaasGenerator/#/?uid=${uid}&email=${email}`
+  const url = `https://musrh.github.io/SaaasGenerator/#/`
 
   window.location.href = url
 }
