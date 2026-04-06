@@ -247,10 +247,18 @@ onMounted(() => {
 })
 
 // ACTIONS
+
 const goToBuilder = () => {
-  window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
+  const uid = user.value?.uid
+  const email = user.value?.email
+
+  const url = `https://musrh.github.io/SaaasGenerator/#/?uid=${uid}&email=${email}`
+
+  window.location.href = url
 }
 
+
+  
 // 🔥 OUVERTURE NOUVEL ONGLET
 const goToOrders = () => {
   window.open(
