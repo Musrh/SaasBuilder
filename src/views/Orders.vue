@@ -1,20 +1,37 @@
 <script setup>
 import { ref, onMounted, computed } from "vue"
 import { db } from "../firebase"
-import { collection, onSnapshot } from "firebase/firestore"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
+import { getAuth } from "firebase/auth"
 import { useRouter } from "vue-router"
 
 const router = useRouter()
+const auth = getAuth()
 
 const orders = ref([])
 const loading = ref(true)
 const search = ref("")
 
 /* =========================================================
-   🔥 READ ONLY FIRESTORE (NO WRITE)
+   🔐 GET CURRENT USER
+========================================================= */
+const user = auth.currentUser
+
+/* =========================================================
+   🔥 FIRESTORE FILTER ownerUid
 ========================================================= */
 onMounted(() => {
-  const q = collection(db, "orders")
+
+  if (!user) {
+    console.error("❌ Pas d'utilisateur connecté")
+    return
+  }
+
+  // 🔥 filtre direct Firestore
+  const q = query(
+    collection(db, "orders"),
+    where("ownerUid", "==", user.uid)
+  )
 
   onSnapshot(
     q,
@@ -35,9 +52,7 @@ onMounted(() => {
           status: data.status ?? "unknown",
           createdAt: data.createdAt ?? null,
 
-          items: Array.isArray(data.items)
-            ? data.items
-            : []
+          items: Array.isArray(data.items) ? data.items : []
         }
       })
 
@@ -51,7 +66,7 @@ onMounted(() => {
 })
 
 /* =========================================================
-   🔍 FILTER BY CLIENT NAME
+   🔍 FILTER BY NAME (FRONT)
 ========================================================= */
 const filteredOrders = computed(() => {
   if (!search.value) return orders.value
@@ -62,7 +77,7 @@ const filteredOrders = computed(() => {
 })
 
 /* =========================================================
-   🔙 BACK TO DASHBOARD
+   🔙 NAVIGATION
 ========================================================= */
 function goDashboard() {
   router.push("/dashboard")
@@ -74,14 +89,14 @@ function goDashboard() {
 
     <!-- HEADER -->
     <div style="display:flex; justify-content:space-between; align-items:center">
-      <h2>📦 Commandes</h2>
+      <h2>📦 Mes commandes</h2>
       <button @click="goDashboard">🔙 Dashboard</button>
     </div>
 
     <!-- SEARCH -->
     <input
       v-model="search"
-      placeholder="🔍 Rechercher par nom client"
+      placeholder="🔍 Rechercher client"
       style="margin:10px 0; padding:8px; width:100%"
     />
 
@@ -90,7 +105,7 @@ function goDashboard() {
 
     <!-- EMPTY -->
     <div v-else-if="filteredOrders.length === 0">
-      ❌ Aucune commande trouvée
+      ❌ Aucune commande
     </div>
 
     <!-- ORDERS -->
@@ -101,18 +116,15 @@ function goDashboard() {
         style="border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:10px"
       >
 
-        <p><b>ID:</b> {{ o.id }}</p>
+        <p><b>👤 {{ o.customerName }}</b></p>
+        <p>📧 {{ o.customerEmail }}</p>
+        <p>📍 {{ o.customerAddress }}</p>
 
-        <p><b>👤 Nom:</b> {{ o.customerName }}</p>
-        <p><b>📧 Email:</b> {{ o.customerEmail }}</p>
-        <p><b>📍 Adresse:</b> {{ o.customerAddress }}</p>
-
-        <p><b>💰 Total:</b> {{ o.total }} {{ o.currency }}</p>
-        <p><b>📦 Statut:</b> {{ o.status }}</p>
+        <p>💰 {{ o.total }} {{ o.currency }}</p>
+        <p>📦 {{ o.status }}</p>
 
         <p v-if="o.createdAt">
-          <b>🕒 Date:</b>
-          {{
+          🕒 {{
             new Date(
               o.createdAt.seconds
                 ? o.createdAt.seconds * 1000
@@ -122,20 +134,11 @@ function goDashboard() {
         </p>
 
         <!-- ITEMS -->
-        <div style="margin-top:10px">
-          <b>🛒 Produits:</b>
-
-          <ul v-if="o.items.length">
-            <li v-for="(item, i) in o.items" :key="i">
-              {{ item.name || "Produit" }}
-              — {{ item.qty || 0 }} × {{ item.price || 0 }} {{ o.currency }}
-            </li>
-          </ul>
-
-          <div v-else>
-            ❌ Aucun produit
-          </div>
-        </div>
+        <ul v-if="o.items.length">
+          <li v-for="(item, i) in o.items" :key="i">
+            {{ item.name }} — {{ item.qty }} × {{ item.price }}
+          </li>
+        </ul>
 
       </div>
     </div>
