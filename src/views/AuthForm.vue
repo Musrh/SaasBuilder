@@ -69,7 +69,9 @@ const email = ref("")
 const password = ref("")
 const selectedPlan = ref("free")
 
-// 🔥 récupérer plan
+// =======================================================
+// INIT PLAN + AUTO LOGIN REDIRECT
+// =======================================================
 onMounted(() => {
   selectedPlan.value =
     route.query.plan ||
@@ -100,7 +102,7 @@ const login = async () => {
 }
 
 // =======================================================
-// REGISTER (SAAS OWNER)
+// REGISTER (SAAS OWNER + MODE FLEXIBLE)
 // =======================================================
 const register = async () => {
   try {
@@ -113,20 +115,17 @@ const register = async () => {
     const user = cred.user
     const uid = user.uid
 
-    // 🔥 SAAS STRUCTURE OWNER
     const ownerId = uid
     const storeId = uid
 
     await setDoc(doc(db, "users", uid), {
-      uid: uid,
+      uid,
       email: user.email,
 
-      // SaaS roles
       role: "owner",
-      ownerId: ownerId,
-      storeId: storeId,
+      ownerId,
+      storeId,
 
-      // plan SaaS
       plan: selectedPlan.value || "free",
       paye: false,
 
@@ -135,10 +134,22 @@ const register = async () => {
       expiry: null
     })
 
-    // 🔥 redirection vers panier Stripe
-    router.push(
-      `/panier?ownerId=${ownerId}&storeId=${storeId}&plan=${selectedPlan.value}`
-    )
+    // =======================================================
+    // 🔥 MODE SYSTEM (checkout ou panier)
+    // =======================================================
+    const mode = route.query.mode || "checkout"
+
+    if (mode === "checkout") {
+      // 👉 Paddle Checkout
+      router.push(
+        `/checkout?plan=${selectedPlan.value}&ownerId=${ownerId}&storeId=${storeId}`
+      )
+    } else {
+      // 👉 ancien système (Stripe / panier)
+      router.push(
+        `/panier?ownerId=${ownerId}&storeId=${storeId}&plan=${selectedPlan.value}`
+      )
+    }
 
   } catch (e) {
     console.error(e)
