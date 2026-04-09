@@ -4,7 +4,7 @@ import PlanSelection from "./views/PlanSelection.vue";
 import AuthForm from "./views/AuthForm.vue";
 import Dashboard from "./views/Dashboard.vue";
 
-import Checkout from "./views/Checkout.vue"
+import Checkout from "./views/Checkout.vue";
 const routes = [
   {
     path: "/",
