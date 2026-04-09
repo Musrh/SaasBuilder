@@ -14,7 +14,7 @@ onMounted(() => {
   Paddle.Environment.set("sandbox")
 
   Paddle.Initialize({
-    token: "test_xxxxx"
+    token: "test_bcf62c9216d90c1d51fe9de3cf3"
   })
 
   // 🔥 AUTO CHECKOUT
