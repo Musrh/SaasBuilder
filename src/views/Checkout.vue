@@ -7,7 +7,7 @@ const route = useRoute()
 const loading = ref(true)
 
 // =======================================================
-// 🧠 PLANS SAAS (PROPRE + SCALABLE)
+// 🧠 PLANS SAAS
 // =======================================================
 const plans = {
   pro: {
@@ -15,18 +15,27 @@ const plans = {
     name: "Plan Pro",
     price: "9.99€ / mois"
   }
-  
 }
 
 // =======================================================
 // 🚀 INIT PADDLE
 // =======================================================
 onMounted(() => {
-  Paddle.Environment.set("sandbox")
+  console.log("Init Checkout")
 
-  Paddle.Initialize({
+  if (!window.Paddle) {
+    console.error("❌ Paddle non chargé")
+    alert("Erreur: Paddle non chargé (vérifie index.html)")
+    return
+  }
+
+  window.Paddle.Environment.set("sandbox")
+
+  window.Paddle.Initialize({
     token: "test_bcf62c9216d90c1d51fe9de3cf3"
   })
+
+  console.log("✅ Paddle prêt")
 
   // auto checkout
   setTimeout(() => {
@@ -38,9 +47,21 @@ onMounted(() => {
 // 💳 PAYMENT FUNCTION
 // =======================================================
 function pay() {
+  console.log("🟢 CLICK PAY")
+
   const user = getAuth().currentUser
   const planKey = route.query.plan
   const plan = plans[planKey]
+
+  console.log("user:", user)
+  console.log("plan:", planKey)
+  console.log("Paddle:", window.Paddle)
+
+  // 🔒 sécurité Paddle
+  if (!window.Paddle) {
+    alert("Paddle non chargé")
+    return
+  }
 
   // 🔒 sécurité user
   if (!user) {
@@ -54,15 +75,14 @@ function pay() {
     return
   }
 
-  // 🚀 OPEN PADDLE CHECKOUT
-  Paddle.Checkout.open({
+  // 🚀 OPEN CHECKOUT
+  window.Paddle.Checkout.open({
     items: [
       {
         priceId: plan.priceId,
         quantity: 1
       }
     ],
-
     customData: {
       ownerUid: user.uid,
       plan: planKey,
@@ -83,11 +103,11 @@ function pay() {
       <h2 class="text-2xl font-bold">Checkout</h2>
 
       <p class="text-gray-600 mt-2">
-        {{ plans[route.query.plan]?.name }}
+        {{ plans[route.query.plan]?.name || "Plan inconnu" }}
       </p>
 
       <p class="text-sm text-gray-500">
-        {{ plans[route.query.plan]?.price }}
+        {{ plans[route.query.plan]?.price || "" }}
       </p>
     </div>
 
