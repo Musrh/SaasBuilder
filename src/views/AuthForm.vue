@@ -1,6 +1,9 @@
+<!-- ============================================================
+  AuthForm.vue — Connexion / Inscription SaaS
+  FLOW : PlanSelection → AuthForm → Dashboard
+============================================================ -->
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
-
     <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
 
       <!-- PLAN CHOISI -->
@@ -104,17 +107,17 @@ const login = async () => {
 
     const user = cred.user
 
-    // stock user local (IMPORTANT pour PlanSelection / Cart / Dashboard)
     localStorage.setItem("user", JSON.stringify({
       uid: user.uid,
       email: user.email
     }))
 
+    // ✅ Redirige vers Dashboard après connexion
     router.push("/dashboard")
 
   } catch (err) {
     console.error(err)
-    alert("Erreur connexion")
+    alert("Erreur connexion : " + err.message)
   }
 }
 
@@ -132,39 +135,33 @@ const register = async () => {
     const user = cred.user
     const uid = user.uid
 
-    // structure SaaS owner
     const userData = {
       uid,
       email: user.email,
-
       role: "owner",
       ownerId: uid,
       storeId: uid,
-
       plan: selectedPlan.value,
       subscriptionActive: false,
-
       stripeAccountId: null,
-
       createdAt: serverTimestamp(),
       expiry: null
     }
 
     await setDoc(doc(db, "users", uid), userData)
 
-    // stock local (IMPORTANT)
     localStorage.setItem("user", JSON.stringify({
       uid,
       email: user.email,
       plan: selectedPlan.value
     }))
 
-    // REDIRECTION → DASHBOARD
+    // ✅ Redirige vers Dashboard après inscription
     router.push("/dashboard")
 
   } catch (err) {
     console.error(err)
-    alert("Erreur inscription")
+    alert("Erreur inscription : " + err.message)
   }
 }
 </script>
