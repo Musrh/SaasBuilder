@@ -1,10 +1,9 @@
-//AuthForm.vue
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
 
     <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
 
-      <!-- PLAN -->
+      <!-- PLAN CHOISI -->
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
         <p class="text-sm text-gray-500">Vous avez choisi</p>
         <p class="text-2xl font-bold text-blue-600 capitalize">
@@ -54,10 +53,12 @@
 </template>
 
 <script setup>
-import { db, auth } from "../firebase"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
+
+import { db, auth } from "../firebase"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword
@@ -66,17 +67,23 @@ import {
 const route = useRoute()
 const router = useRouter()
 
+// =====================
+// STATE
+// =====================
 const email = ref("")
 const password = ref("")
 const selectedPlan = ref("free")
 
-// 🔥 récupérer plan
+// =====================
+// LOAD PLAN
+// =====================
 onMounted(() => {
   selectedPlan.value =
     route.query.plan ||
     localStorage.getItem("planChoisi") ||
     "free"
 
+  // si déjà connecté → dashboard direct
   auth.onAuthStateChanged((user) => {
     if (user) {
       router.push("/dashboard")
@@ -84,25 +91,36 @@ onMounted(() => {
   })
 })
 
-// =======================================================
+// =====================
 // LOGIN
-// =======================================================
+// =====================
 const login = async () => {
   try {
-    await signInWithEmailAndPassword(auth, email.value, password.value)
+    const cred = await signInWithEmailAndPassword(
+      auth,
+      email.value,
+      password.value
+    )
 
-    const redirect = route.query.redirect || "/dashboard"
-    router.push(redirect)
+    const user = cred.user
 
-  } catch (e) {
-    console.error(e)
+    // stock user local (IMPORTANT pour PlanSelection / Cart / Dashboard)
+    localStorage.setItem("user", JSON.stringify({
+      uid: user.uid,
+      email: user.email
+    }))
+
+    router.push("/dashboard")
+
+  } catch (err) {
+    console.error(err)
     alert("Erreur connexion")
   }
 }
 
-// =======================================================
-// REGISTER (SAAS OWNER)
-// =======================================================
+// =====================
+// REGISTER (OWNER SAAS)
+// =====================
 const register = async () => {
   try {
     const cred = await createUserWithEmailAndPassword(
@@ -114,35 +132,38 @@ const register = async () => {
     const user = cred.user
     const uid = user.uid
 
-    // 🔥 SAAS STRUCTURE OWNER
-    const ownerId = uid
-    const storeId = uid
-
-    await setDoc(doc(db, "users", uid), {
-      uid: uid,
+    // structure SaaS owner
+    const userData = {
+      uid,
       email: user.email,
 
-      // SaaS roles
       role: "owner",
-      ownerId: ownerId,
-      storeId: storeId,
+      ownerId: uid,
+      storeId: uid,
 
-      // plan SaaS
-      plan: selectedPlan.value || "free",
-      paye: false,
+      plan: selectedPlan.value,
+      subscriptionActive: false,
 
-      sections: [],
+      stripeAccountId: null,
+
       createdAt: serverTimestamp(),
       expiry: null
-    })
+    }
 
-    // 🔥 redirection vers panier Stripe
-    router.push(
-      `/panier?ownerId=${ownerId}&storeId=${storeId}&plan=${selectedPlan.value}`
-    )
+    await setDoc(doc(db, "users", uid), userData)
 
-  } catch (e) {
-    console.error(e)
+    // stock local (IMPORTANT)
+    localStorage.setItem("user", JSON.stringify({
+      uid,
+      email: user.email,
+      plan: selectedPlan.value
+    }))
+
+    // REDIRECTION → DASHBOARD
+    router.push("/dashboard")
+
+  } catch (err) {
+    console.error(err)
     alert("Erreur inscription")
   }
 }
