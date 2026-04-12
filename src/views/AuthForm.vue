@@ -80,20 +80,16 @@ const selectedPlan = ref("free")
 // =====================
 // LOAD PLAN
 // =====================
+
 onMounted(() => {
   selectedPlan.value =
     route.query.plan ||
     localStorage.getItem("planChoisi") ||
     "free"
 
-  // si déjà connecté → dashboard direct
-  auth.onAuthStateChanged((user) => {
-    if (user) {
-      router.push("/dashboard")
-    }
-  })
+  // ❌ SUPPRIMÉ : plus de redirection auto si déjà connecté
+  // L'utilisateur DOIT voir le formulaire et se connecter manuellement
 })
-
 // =====================
 // LOGIN
 // =====================
