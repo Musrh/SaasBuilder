@@ -1,29 +1,44 @@
 <script setup>
 import { ref, onMounted, computed } from "vue"
 
-// =========================
+// =====================================================
+// 🔥 BACKEND FINAL
+// =====================================================
+const BACKEND = "https://backendfinal-production-afd2.up.railway.app"
+
+// =====================================================
 // STATE SAFE
-// =========================
+// =====================================================
 const subscriptionActive = ref(false)
 const stripeConnected = ref(false)
-const plan = ref("")
+const plan = ref("free")
 
-const user = JSON.parse(localStorage.getItem("user") || "{}")
+const user = ref(null)
 
-// =========================
-// LOAD STATUS
-// =========================
+// =====================================================
+// LOAD USER SAFE
+// =====================================================
+const initUser = () => {
+  try {
+    const saved = localStorage.getItem("user")
+    user.value = saved ? JSON.parse(saved) : null
+  } catch (e) {
+    console.error("User parse error:", e)
+    user.value = null
+  }
+}
+
+// =====================================================
+// LOAD STATUS FROM BACKEND
+// =====================================================
 const loadStatus = async () => {
-  if (!user?.uid) {
+  if (!user.value?.uid) {
     console.error("User not found in localStorage")
     return
   }
 
   try {
-    const res = await fetch(
-      `https://backendfinal-production-afd2.up.railway.app/user-status/${user.uid}`
-    )
-
+    const res = await fetch(`${BACKEND}/user-status/${user.value.uid}`)
     const data = await res.json()
 
     subscriptionActive.value = data.subscriptionActive || false
@@ -35,43 +50,51 @@ const loadStatus = async () => {
   }
 }
 
-// =========================
-// CONNECT STRIPE
-// =========================
+// =====================================================
+// CONNECT STRIPE (CONNECT ACCOUNT)
+// =====================================================
 const connectStripe = async () => {
+  if (!user.value?.uid) return
+
   try {
-    const res = await fetch(
-      "https://backendfinal-production-afd2.up.railway.app/create-connect-account",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ownerUid: user.uid,
-          email: user.email
-        })
-      }
-    )
+    const res = await fetch(`${BACKEND}/create-connect-account`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ownerUid: user.value.uid,
+        email: user.value.email
+      })
+    })
 
     const data = await res.json()
 
     if (data.url) {
       window.location.href = data.url
+    } else {
+      console.error("Stripe connect error:", data)
     }
 
   } catch (err) {
-    console.error(err)
+    console.error("Stripe connect error:", err)
   }
 }
 
-// =========================
+// =====================================================
 // COMPUTED SAFE
-// =========================
+// =====================================================
 const canSell = computed(() => {
   return subscriptionActive.value && stripeConnected.value
 })
 
-// =========================
-onMounted(loadStatus)
+// =====================================================
+// INIT
+// =====================================================
+onMounted(async () => {
+  initUser()
+  await loadStatus()
+})
 </script>
 
 <template>
@@ -81,7 +104,9 @@ onMounted(loadStatus)
       Dashboard Store
     </h1>
 
+    <!-- ===================== -->
     <!-- ABONNEMENT -->
+    <!-- ===================== -->
     <div class="p-4 bg-gray-100 rounded-xl mb-6">
       <p class="font-semibold">Statut abonnement :</p>
 
@@ -94,7 +119,9 @@ onMounted(loadStatus)
       </p>
     </div>
 
+    <!-- ===================== -->
     <!-- STRIPE CONNECT -->
+    <!-- ===================== -->
     <div class="p-4 bg-blue-50 rounded-xl mb-6">
       <p class="font-semibold mb-2">
         Connexion Stripe
@@ -117,16 +144,18 @@ onMounted(loadStatus)
       </button>
     </div>
 
-    <!-- STATUS -->
+    <!-- ===================== -->
+    <!-- STATUS GLOBAL -->
+    <!-- ===================== -->
     <div class="p-4 bg-green-50 rounded-xl">
       <p class="font-semibold">Store status</p>
 
       <p v-if="canSell" class="text-green-600">
-        🚀 Store actif
+        🚀 Store actif et prêt à recevoir des paiements
       </p>
 
       <p v-else class="text-gray-500">
-        🔒 Active abonnement + Stripe
+        🔒 Active abonnement + Stripe pour commencer
       </p>
     </div>
 
