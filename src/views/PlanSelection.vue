@@ -1,5 +1,5 @@
 <!-- ============================================================
-  PlanSelection.vue — SaaS FLOW CLEAN (FINAL)
+  PlanSelection.vue — SaaS FLOW UPDATED
 ============================================================ -->
 <template>
   <div class="w-full">
@@ -9,69 +9,100 @@
       <img
         src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1600&q=80"
         class="absolute inset-0 w-full h-full object-cover"
+        alt="hero"
       />
-
       <div class="absolute inset-0 bg-gradient-to-br from-blue-900/80 to-purple-900/70"></div>
 
       <div class="relative z-10 px-6 max-w-2xl mx-auto text-white">
-        <h1 class="text-4xl font-bold mb-4">
+        <h1 class="text-4xl md:text-6xl font-bold mb-4 leading-tight">
           Créez votre boutique en ligne
         </h1>
 
-        <p class="mb-2">Plateforme SaaS complète : builder + paiements + commandes</p>
+        <p class="text-lg text-blue-100 mb-2">
+          Plateforme SaaS complète : builder + paiements + commandes
+        </p>
 
-        <p class="text-xl font-bold mb-6">
-          À partir de 5€ / mois
+        <p class="text-2xl font-bold mb-8">
+          À partir de <span class="text-yellow-300">5€ / mois</span>
         </p>
 
         <button
           @click="scrollToPlans"
-          class="bg-blue-500 px-6 py-3 rounded-xl font-semibold hover:bg-blue-600"
+          class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
         >
-          Voir les offres
+          Voir les offres ↓
         </button>
       </div>
     </section>
 
     <!-- PLANS -->
-    <section ref="plansRef" class="py-20 text-center bg-gray-50">
+    <section ref="plansRef" class="py-20 bg-gray-50 text-center">
+      <h2 class="text-3xl font-bold text-gray-800 mb-2">Nos offres</h2>
+      <p class="text-gray-500 mb-12">Choisissez le plan adapté à votre activité</p>
 
-      <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto px-4">
+      <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto px-4">
 
         <!-- FREE -->
-        <div class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-xl font-bold">Free</h3>
-          <p class="text-gray-500 mb-4">0€ / mois</p>
+        <div class="bg-white rounded-2xl shadow-md p-8 flex flex-col">
+          <div class="text-gray-400 font-bold text-sm mb-3">Gratuit</div>
+          <div class="text-5xl font-black mb-1">0€</div>
+          <div class="text-gray-400 text-sm mb-6">/mois</div>
+
+          <ul class="text-gray-600 mb-8 space-y-2 text-left flex-1">
+            <li>✓ 1 page</li>
+            <li>✓ Builder visuel</li>
+            <li>✗ Paiements clients</li>
+          </ul>
 
           <button
             @click="selectPlan('free')"
-            class="bg-gray-200 px-4 py-2 rounded-lg w-full"
+            class="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-xl font-semibold"
           >
             Commencer gratuitement
           </button>
         </div>
 
         <!-- PRO -->
-        <div class="bg-white p-6 rounded-xl border-2 border-blue-500 shadow-lg">
-          <h3 class="text-xl font-bold">Pro</h3>
-          <p class="text-gray-500 mb-4">5€ / mois</p>
+        <div class="bg-white rounded-2xl shadow-xl border-2 border-blue-500 p-8 flex flex-col relative scale-105">
+
+          <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-4 py-1 rounded-full">
+            Populaire
+          </div>
+
+          <div class="text-blue-500 font-bold text-sm mb-3">Pro</div>
+          <div class="text-5xl font-black mb-1">5€</div>
+          <div class="text-gray-400 text-sm mb-6">/mois</div>
+
+          <ul class="text-gray-600 mb-8 space-y-2 text-left flex-1">
+            <li>✓ Pages illimitées</li>
+            <li>✓ Produits</li>
+            <li>✓ Paiements Stripe</li>
+            <li>✓ Commandes</li>
+          </ul>
 
           <button
             @click="selectPlan('pro')"
-            class="bg-blue-500 text-white px-4 py-2 rounded-lg w-full hover:bg-blue-600"
+            class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold"
           >
             Choisir Pro
           </button>
         </div>
 
         <!-- PREMIUM -->
-        <div class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-xl font-bold">Premium</h3>
-          <p class="text-gray-500 mb-4">10€ / mois</p>
+        <div class="bg-white rounded-2xl shadow-md p-8 flex flex-col">
+          <div class="text-purple-500 font-bold text-sm mb-3">Premium</div>
+          <div class="text-5xl font-black mb-1">10€</div>
+          <div class="text-gray-400 text-sm mb-6">/mois</div>
+
+          <ul class="text-gray-600 mb-8 space-y-2 text-left flex-1">
+            <li>✓ Multi-stores</li>
+            <li>✓ Analytics</li>
+            <li>✓ Support prioritaire</li>
+          </ul>
 
           <button
             @click="selectPlan('premium')"
-            class="bg-purple-500 text-white px-4 py-2 rounded-lg w-full hover:bg-purple-600"
+            class="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-xl font-semibold"
           >
             Choisir Premium
           </button>
@@ -92,14 +123,14 @@ const plansRef = ref(null)
 
 // =====================================================
 // 🔥 SAAS FLOW CLEAN
-// PlanSelection → AuthForm
+// PlanSelection → AuthForm → Dashboard
 // =====================================================
 const selectPlan = (plan) => {
 
-  // 💾 sauvegarde plan local (backup sécurité)
+  // 💾 sauvegarde locale (sécurité fallback)
   localStorage.setItem("planChoisi", plan)
 
-  // 👉 redirection vers AUTH (OBLIGATOIRE)
+  // 👉 redirection obligatoire vers AUTH
   router.push({
     path: "/auth",
     query: { plan }
