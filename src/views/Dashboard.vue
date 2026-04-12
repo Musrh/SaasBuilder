@@ -1,3 +1,79 @@
+<script setup>
+import { ref, onMounted, computed } from "vue"
+
+// =========================
+// STATE SAFE
+// =========================
+const subscriptionActive = ref(false)
+const stripeConnected = ref(false)
+const plan = ref("")
+
+const user = JSON.parse(localStorage.getItem("user") || "{}")
+
+// =========================
+// LOAD STATUS
+// =========================
+const loadStatus = async () => {
+  if (!user?.uid) {
+    console.error("User not found in localStorage")
+    return
+  }
+
+  try {
+    const res = await fetch(
+      `https://backendfinal-production-afd2.up.railway.app/user-status/${user.uid}`
+    )
+
+    const data = await res.json()
+
+    subscriptionActive.value = data.subscriptionActive || false
+    stripeConnected.value = !!data.stripeAccountId
+    plan.value = data.plan || "free"
+
+  } catch (err) {
+    console.error("Dashboard load error:", err)
+  }
+}
+
+// =========================
+// CONNECT STRIPE
+// =========================
+const connectStripe = async () => {
+  try {
+    const res = await fetch(
+      "https://backendfinal-production-afd2.up.railway.app/create-connect-account",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerUid: user.uid,
+          email: user.email
+        })
+      }
+    )
+
+    const data = await res.json()
+
+    if (data.url) {
+      window.location.href = data.url
+    }
+
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+// =========================
+// COMPUTED SAFE
+// =========================
+const canSell = computed(() => {
+  return subscriptionActive.value && stripeConnected.value
+})
+
+// =========================
+onMounted(loadStatus)
+</script>
+
 <template>
   <div class="p-6">
 
@@ -5,9 +81,7 @@
       Dashboard Store
     </h1>
 
-    <!-- ===================== -->
-    <!-- 🔐 STATUS ABONNEMENT -->
-    <!-- ===================== -->
+    <!-- ABONNEMENT -->
     <div class="p-4 bg-gray-100 rounded-xl mb-6">
       <p class="font-semibold">Statut abonnement :</p>
 
@@ -20,13 +94,10 @@
       </p>
     </div>
 
-    <!-- ===================== -->
-    <!-- 💳 STRIPE CONNECT -->
-    <!-- ===================== -->
+    <!-- STRIPE CONNECT -->
     <div class="p-4 bg-blue-50 rounded-xl mb-6">
-
       <p class="font-semibold mb-2">
-        Connexion Stripe (recevoir paiements)
+        Connexion Stripe
       </p>
 
       <p v-if="!stripeConnected" class="text-red-500 mb-3">
@@ -46,77 +117,18 @@
       </button>
     </div>
 
-    <!-- ===================== -->
-    <!-- 🚀 STORE STATUS -->
-    <!-- ===================== -->
+    <!-- STATUS -->
     <div class="p-4 bg-green-50 rounded-xl">
-
-      <p class="font-semibold">
-        Store status
-      </p>
+      <p class="font-semibold">Store status</p>
 
       <p v-if="canSell" class="text-green-600">
-        🚀 Ton store est actif et peut recevoir des paiements
+        🚀 Store actif
       </p>
 
       <p v-else class="text-gray-500">
-        🔒 Active ton abonnement + Stripe pour commencer
+        🔒 Active abonnement + Stripe
       </p>
-
     </div>
 
   </div>
 </template>
-
-<script setup>
-import { ref, onMounted } from "vue"
-
-// =========================
-// STATE
-// =========================
-const subscriptionActive = ref(false)
-const stripeConnected = ref(false)
-const plan = ref("")
-
-const user = JSON.parse(localStorage.getItem("user"))
-
-// =========================
-// CHECK FIRESTORE (SIMPLIFIÉ)
-// =========================
-const loadStatus = async () => {
-  const res = await fetch(`https://ton-backend.com/user-status/${user.uid}`)
-  const data = await res.json()
-
-  subscriptionActive.value = data.subscriptionActive
-  stripeConnected.value = !!data.stripeAccountId
-  plan.value = data.plan
-}
-
-// =========================
-// CONNECT STRIPE
-// =========================
-const connectStripe = async () => {
-  const res = await fetch("https://ton-backend.com/create-connect-account", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      ownerUid: user.uid,
-      email: user.email
-    })
-  })
-
-  const data = await res.json()
-
-  // 🔥 redirection Stripe onboarding
-  window.location.href = data.url
-}
-
-// =========================
-const canSell = computed(() => {
-  return subscriptionActive.value && stripeConnected.value
-})
-
-onMounted(loadStatus)
-</script>
