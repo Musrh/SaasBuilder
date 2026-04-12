@@ -1,5 +1,5 @@
 <!-- ============================================================
-  Dashboard.vue — Sassbuilder (UPDATED + Stripe Connect)
+  Dashboard.vue — Sassbuilder (UPDATED + Stripe Connect FIX)
 ============================================================ -->
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
@@ -28,29 +28,10 @@
 
       <template v-else>
 
-        <!-- PLAN EXPIRÉ -->
-        <div
-          v-if="planExpired && userData?.plan !== 'free'"
-          class="bg-red-900/30 border border-red-500/50 rounded-2xl p-6 mb-6"
-        >
-          <h2 class="text-xl font-bold text-red-400 mb-2">⚠️ Plan expiré</h2>
-
-          <p class="text-gray-300 mb-4">
-            Votre plan <strong>{{ userData?.plan }}</strong> a expiré.
-          </p>
-
-          <button
-            @click="renewPlan"
-            class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-semibold"
-          >
-            Renouveler mon plan
-          </button>
-        </div>
-
         <!-- CARDS -->
         <div class="grid md:grid-cols-3 gap-6 mb-8">
 
-          <!-- Plan -->
+          <!-- PLAN -->
           <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
             <p class="text-gray-400 text-sm uppercase mb-2">Plan actif</p>
             <p class="text-2xl font-bold capitalize" :class="planColor">
@@ -58,7 +39,7 @@
             </p>
           </div>
 
-          <!-- Paiement -->
+          <!-- PAIEMENT -->
           <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
             <p class="text-gray-400 text-sm uppercase mb-2">Paiement</p>
             <p class="text-2xl font-bold">
@@ -66,11 +47,9 @@
             </p>
           </div>
 
-          <!-- STRIPE CONNECT (NEW) -->
+          <!-- STRIPE CONNECT -->
           <div class="bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <p class="text-gray-400 text-sm uppercase mb-2">
-              Stripe Connect
-            </p>
+            <p class="text-gray-400 text-sm uppercase mb-2">Stripe Connect</p>
 
             <p v-if="userData?.stripeAccountId" class="text-green-400 font-bold">
               ✓ Connecté
@@ -92,7 +71,7 @@
         </div>
 
         <!-- BUILDER -->
-        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 mb-6 text-center">
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-center">
 
           <h2 class="text-2xl font-bold mb-2">🏗️ Builder de site</h2>
 
@@ -123,13 +102,13 @@ import { signOut } from "firebase/auth"
 // =========================
 const BACKEND = "https://backendfinal-production-afd2.up.railway.app"
 
-const router   = useRouter()
-const user     = ref(null)
+const router = useRouter()
+const user = ref(null)
 const userData = ref(null)
-const loading  = ref(true)
+const loading = ref(true)
 
 // =========================
-// LOAD USER FIREBASE
+// LOAD USER
 // =========================
 onMounted(() => {
   auth.onAuthStateChanged(async (u) => {
@@ -140,9 +119,13 @@ onMounted(() => {
 
     user.value = u
 
-    const snap = await getDoc(doc(db, "users", u.uid))
-    if (snap.exists()) {
-      userData.value = snap.data()
+    try {
+      const snap = await getDoc(doc(db, "users", u.uid))
+      if (snap.exists()) {
+        userData.value = snap.data()
+      }
+    } catch (e) {
+      console.error(e)
     }
 
     loading.value = false
@@ -150,10 +133,15 @@ onMounted(() => {
 })
 
 // =========================
-// STRIPE CONNECT (NEW)
+// STRIPE CONNECT (FIXED)
 // =========================
 const connectStripe = async () => {
   try {
+    if (!user.value?.uid || !user.value?.email) {
+      alert("Utilisateur non chargé")
+      return
+    }
+
     const res = await fetch(`${BACKEND}/create-connect-account`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -165,24 +153,24 @@ const connectStripe = async () => {
 
     const data = await res.json()
 
-    if (data.url) {
-      window.location.href = data.url
+    console.log("Stripe Connect response:", data)
+
+    if (!res.ok || !data.url) {
+      alert(data.error || "Erreur Stripe Connect")
+      return
     }
+
+    window.location.href = data.url
 
   } catch (err) {
     console.error("Stripe connect error:", err)
+    alert("Erreur connexion Stripe")
   }
 }
 
 // =========================
-// COMPUTED (UNCHANGED)
+// UI HELPERS
 // =========================
-const planExpired = computed(() => {
-  if (!userData.value) return false
-  if (userData.value.plan === "free") return false
-  return (userData.value.expiry || 0) < Date.now()
-})
-
 const planColor = computed(() => ({
   "text-gray-400": userData.value?.plan === "free",
   "text-blue-400": userData.value?.plan === "pro",
@@ -190,7 +178,7 @@ const planColor = computed(() => ({
 }))
 
 // =========================
-// NAVIGATION (UNCHANGED)
+// NAVIGATION
 // =========================
 const goToBuilder = () => {
   window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
