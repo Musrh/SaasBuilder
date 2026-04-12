@@ -1,5 +1,6 @@
 <!-- ============================================================
-  PlanSelection.vue — SaaS FLOW UPDATED
+  PlanSelection.vue — SaaS FLOW
+  FLOW : PlanSelection → AuthForm (avec ?plan=xxx) → Dashboard
 ============================================================ -->
 <template>
   <div class="w-full">
@@ -34,22 +35,22 @@
 
     <!-- PLANS -->
     <section ref="plansRef" class="py-20 px-6 bg-gray-50">
-      <h2 class="text-3xl font-bold text-center mb-4">Nos offres</h2>
-      <p class="text-center text-gray-500 mb-12">
+      <h2 class="text-3xl font-bold text-center mb-2">Nos offres</h2>
+      <p class="text-gray-500 text-center mb-12">
         Choisissez le plan adapté à votre activité
       </p>
 
-      <div class="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
+      <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
 
         <!-- FREE -->
-        <div class="bg-white rounded-2xl shadow-lg p-8 flex flex-col">
+        <div class="bg-white rounded-2xl shadow p-8 text-center">
           <h3 class="text-xl font-bold mb-2">Gratuit</h3>
-          <p class="text-4xl font-extrabold">0€</p>
+          <p class="text-4xl font-bold">0€</p>
           <p class="text-gray-400 mb-6">/mois</p>
-          <ul class="space-y-2 mb-8 flex-1">
+          <ul class="text-left space-y-2 mb-8 text-sm">
             <li>✓ 1 page</li>
             <li>✓ Builder visuel</li>
-            <li class="text-gray-400">✗ Paiements clients</li>
+            <li>✗ Paiements clients</li>
           </ul>
           <button
             @click="selectPlan('free')"
@@ -60,14 +61,14 @@
         </div>
 
         <!-- PRO -->
-        <div class="bg-white rounded-2xl shadow-xl p-8 flex flex-col border-2 border-blue-500 relative">
-          <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-4 py-1 rounded-full">
+        <div class="bg-white rounded-2xl shadow-xl border-2 border-blue-500 p-8 text-center relative">
+          <span class="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-4 py-1 rounded-full">
             Populaire
           </span>
           <h3 class="text-xl font-bold mb-2">Pro</h3>
-          <p class="text-4xl font-extrabold">5€</p>
+          <p class="text-4xl font-bold">5€</p>
           <p class="text-gray-400 mb-6">/mois</p>
-          <ul class="space-y-2 mb-8 flex-1">
+          <ul class="text-left space-y-2 mb-8 text-sm">
             <li>✓ Pages illimitées</li>
             <li>✓ Produits</li>
             <li>✓ Paiements Stripe</li>
@@ -82,11 +83,11 @@
         </div>
 
         <!-- PREMIUM -->
-        <div class="bg-white rounded-2xl shadow-lg p-8 flex flex-col">
+        <div class="bg-white rounded-2xl shadow p-8 text-center">
           <h3 class="text-xl font-bold mb-2">Premium</h3>
-          <p class="text-4xl font-extrabold">10€</p>
+          <p class="text-4xl font-bold">10€</p>
           <p class="text-gray-400 mb-6">/mois</p>
-          <ul class="space-y-2 mb-8 flex-1">
+          <ul class="text-left space-y-2 mb-8 text-sm">
             <li>✓ Multi-stores</li>
             <li>✓ Analytics</li>
             <li>✓ Support prioritaire</li>
@@ -113,11 +114,17 @@ const router = useRouter()
 const plansRef = ref(null)
 
 // =====================================================
-// 🔥 SAAS FLOW : PlanSelection → AuthForm → Dashboard
+// FLOW : PlanSelection → AuthForm → Dashboard
 // =====================================================
 const selectPlan = (plan) => {
+  // Sauvegarde locale (fallback)
   localStorage.setItem("planChoisi", plan)
-  router.push({ path: "/auth", query: { plan } })
+
+  // ✅ Redirige vers AuthForm avec le plan en query
+  router.push({
+    path: "/auth",
+    query: { plan }
+  })
 }
 
 const scrollToPlans = () => {
