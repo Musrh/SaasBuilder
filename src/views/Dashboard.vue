@@ -152,7 +152,7 @@ const planColor = computed(() => ({
 // UPGRADE
 const upgradeToPro = async () => {
   try {
-    const res = await fetch(`${BACKEND}/create-checkout-session`, {
+    const res = await fetch(`${BACKEND}/create-billing-session`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
