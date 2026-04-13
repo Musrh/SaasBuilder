@@ -1,5 +1,5 @@
 <!-- ============================================================
-  Dashboard.vue — Sassbuilder (FINAL VERSION)
+  Dashboard.vue — Sassbuilder (FINAL + PRO UPGRADE)
 ============================================================ -->
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
@@ -59,23 +59,29 @@
               ⚠ Non connecté
             </p>
 
-<button
-  v-if="!userData?.stripeAccountId"
-  @click="connectStripe"
-  :disabled="(userData?.plan || '').toLowerCase() === 'free'"
-  class="mt-3 px-4 py-2 rounded-lg text-white transition"
-  :class="(userData?.plan || '').toLowerCase() === 'free'
-    ? 'bg-gray-600 cursor-not-allowed opacity-50'
-    : 'bg-blue-500 hover:bg-blue-600'"
->
-  {{ (userData?.plan || '').toLowerCase() === 'free'
-    ? 'Plan Pro requis'
-    : 'Connecter Stripe'
-  }}
-</button>
-            
+            <button
+              v-if="!userData?.stripeAccountId"
+              @click="connectStripe"
+              :disabled="isFree"
+              class="mt-3 px-4 py-2 rounded-lg text-white transition"
+              :class="isFree
+                ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                : 'bg-blue-500 hover:bg-blue-600'"
+            >
+              {{ isFree ? 'Plan Pro requis' : 'Connecter Stripe' }}
+            </button>
           </div>
 
+        </div>
+
+        <!-- 🚀 UPGRADE PLAN -->
+        <div v-if="isFree" class="mb-8 text-center">
+          <button
+            @click="upgradeToPro"
+            class="bg-green-500 hover:bg-green-600 px-8 py-4 rounded-xl font-bold text-lg"
+          >
+            🚀 Passer au plan Pro
+          </button>
         </div>
 
         <!-- BUILDER -->
@@ -106,7 +112,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
 // =========================
-// BACKEND FINAL
+// BACKEND
 // =========================
 const BACKEND = "https://backendfinal-production-afd2.up.railway.app"
 
@@ -141,22 +147,67 @@ onMounted(() => {
 })
 
 // =========================
-// STRIPE CONNECT (SECURE)
+// COMPUTED
 // =========================
-const connectStripe = async () => {
+const isFree = computed(() =>
+  (userData.value?.plan || "").toLowerCase() === "free"
+)
 
-  // 🚫 Bloque plan FREE
-  if (userData.value?.plan === "free") {
-    alert("Passez au plan Pro pour connecter Stripe")
-    return
-  }
+const planColor = computed(() => ({
+  "text-gray-400": userData.value?.plan === "free",
+  "text-blue-400": userData.value?.plan === "pro",
+  "text-purple-400": userData.value?.plan === "premium",
+}))
 
+// =========================
+// UPGRADE TO PRO
+// =========================
+const upgradeToPro = async () => {
   try {
     if (!user.value?.uid || !user.value?.email) {
       alert("Utilisateur non chargé")
       return
     }
 
+    const res = await fetch(`${BACKEND}/create-checkout-session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ownerUid: user.value.uid,
+        email: user.value.email,
+        plan: "pro"
+      })
+    })
+
+    const data = await res.json()
+
+    if (!res.ok || !data.url) {
+      alert(data.error || "Erreur paiement")
+      return
+    }
+
+    // 🔥 Redirection Stripe Checkout
+    window.location.href = data.url
+
+  } catch (err) {
+    console.error(err)
+    alert("Erreur checkout")
+  }
+}
+
+// =========================
+// STRIPE CONNECT
+// =========================
+const connectStripe = async () => {
+
+  if (isFree.value) {
+    alert("Passez au plan Pro pour connecter Stripe")
+    return
+  }
+
+  try {
     const res = await fetch(`${BACKEND}/create-connect-account`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -166,42 +217,4 @@ const connectStripe = async () => {
       })
     })
 
-    const data = await res.json()
-
-    console.log("Stripe Connect response:", data)
-
-    if (!res.ok || !data.url) {
-      alert(data.error || "Erreur Stripe Connect")
-      return
-    }
-
-    window.location.href = data.url
-
-  } catch (err) {
-    console.error("Stripe connect error:", err)
-    alert("Erreur connexion Stripe")
-  }
-}
-
-// =========================
-// UI HELPERS
-// =========================
-const planColor = computed(() => ({
-  "text-gray-400": userData.value?.plan === "free",
-  "text-blue-400": userData.value?.plan === "pro",
-  "text-purple-400": userData.value?.plan === "premium",
-}))
-
-// =========================
-// NAVIGATION
-// =========================
-const goToBuilder = () => {
-  window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
-}
-
-const logout = async () => {
-  await signOut(auth)
-  localStorage.removeItem("planChoisi")
-  router.push("/")
-}
-</script>
+    const data = await res
