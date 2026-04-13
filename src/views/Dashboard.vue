@@ -59,17 +59,21 @@
               ⚠ Non connecté
             </p>
 
-            <button
-              v-if="!userData?.stripeAccountId"
-              @click="connectStripe"
-              :disabled="userData?.plan === 'free'"
-              class="mt-3 px-4 py-2 rounded-lg text-white transition"
-              :class="userData?.plan === 'free'
-                ? 'bg-gray-600 cursor-not-allowed opacity-50'
-                : 'bg-blue-500 hover:bg-blue-600'"
-            >
-              {{ userData?.plan === 'free' ? 'Plan Pro requis' : 'Connecter Stripe' }}
-            </button>
+<button
+  v-if="!userData?.stripeAccountId"
+  @click="connectStripe"
+  :disabled="(userData?.plan || '').toLowerCase() === 'free'"
+  class="mt-3 px-4 py-2 rounded-lg text-white transition"
+  :class="(userData?.plan || '').toLowerCase() === 'free'
+    ? 'bg-gray-600 cursor-not-allowed opacity-50'
+    : 'bg-blue-500 hover:bg-blue-600'"
+>
+  {{ (userData?.plan || '').toLowerCase() === 'free'
+    ? 'Plan Pro requis'
+    : 'Connecter Stripe'
+  }}
+</button>
+            
           </div>
 
         </div>
