@@ -5,6 +5,9 @@ import AuthForm from "./views/AuthForm.vue";
 import Dashboard from "./views/Dashboard.vue";
 
 import Checkout from "./views/Checkout.vue";
+
+import PrivacyPolicy from './views/PrivacyPolicy.vue'
+
 const routes = [
   {
     path: "/",
@@ -54,7 +57,13 @@ const routes = [
   {
     path: "/orders",
     component: () => import("./views/Orders.vue")
-  }
+  },
+    
+{
+    path: '/privacy-policy',
+    name: 'PrivacyPolicy',
+    component: PrivacyPolicy
+}
 
 ];
 
