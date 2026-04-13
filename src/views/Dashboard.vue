@@ -1,5 +1,5 @@
 <!-- ============================================================
-  Dashboard.vue — Sassbuilder (UPDATED + Stripe Connect FIX)
+  Dashboard.vue — Sassbuilder (FINAL VERSION)
 ============================================================ -->
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
@@ -60,16 +60,16 @@
             </p>
 
             <button
-  v-if="!userData?.stripeAccountId"
-  @click="connectStripe"
-  :disabled="userData?.plan === 'free'"
-  class="mt-3 px-4 py-2 rounded-lg text-white transition"
-  :class="userData?.plan === 'free'
-    ? 'bg-gray-600 cursor-not-allowed opacity-50'
-    : 'bg-blue-500 hover:bg-blue-600'"
->
-  Connecter Stripe
-</button>
+              v-if="!userData?.stripeAccountId"
+              @click="connectStripe"
+              :disabled="userData?.plan === 'free'"
+              class="mt-3 px-4 py-2 rounded-lg text-white transition"
+              :class="userData?.plan === 'free'
+                ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                : 'bg-blue-500 hover:bg-blue-600'"
+            >
+              {{ userData?.plan === 'free' ? 'Plan Pro requis' : 'Connecter Stripe' }}
+            </button>
           </div>
 
         </div>
@@ -137,9 +137,16 @@ onMounted(() => {
 })
 
 // =========================
-// STRIPE CONNECT (FIXED)
+// STRIPE CONNECT (SECURE)
 // =========================
 const connectStripe = async () => {
+
+  // 🚫 Bloque plan FREE
+  if (userData.value?.plan === "free") {
+    alert("Passez au plan Pro pour connecter Stripe")
+    return
+  }
+
   try {
     if (!user.value?.uid || !user.value?.email) {
       alert("Utilisateur non chargé")
