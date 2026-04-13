@@ -50,7 +50,6 @@
             <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
               <li>✓ 1 page</li>
               <li>✓ Builder visuel</li>
-              <li>✗ Paiements clients</li>
             </ul>
             <button
               @click="selectPlan('free')"
@@ -61,42 +60,22 @@
           </div>
 
           <!-- PRO -->
-          <div class="bg-white rounded-2xl shadow-lg border-2 border-blue-500 p-8 relative flex flex-col">
-            <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs px-4 py-1 rounded-full">
-              Populaire
-            </span>
-            <h3 class="text-xl font-bold mb-2">Pro</h3>
-            <p class="text-4xl font-bold">5€</p>
-            <p class="text-gray-400 mb-6">/mois</p>
-            <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
-              <li>✓ Pages illimitées</li>
-              <li>✓ Produits</li>
-              <li>✓ Paiements Stripe</li>
-              <li>✓ Commandes</li>
-            </ul>
-            <button
-              @click="selectPlan('pro')"
-              class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold"
-            >
-              Choisir Pro
-            </button>
-          </div>
-
-          <!-- PREMIUM -->
           <div class="bg-white rounded-2xl shadow p-8 flex flex-col">
             <h3 class="text-xl font-bold mb-2">Premium</h3>
             <p class="text-4xl font-bold">10€</p>
             <p class="text-gray-400 mb-6">/mois</p>
             <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
-              <li>✓ Multi-stores</li>
+              <li>✓ Multi-pages</li>
+              <li>✓ Builder visuel</li>
+              <li>✓ Configuration Paiement</li>
               <li>✓ Analytics</li>
               <li>✓ Support prioritaire</li>
             </ul>
             <button
-              @click="selectPlan('premium')"
+              @click="selectPlan('pro')"
               class="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-xl font-semibold"
             >
-              Choisir Premium
+              Choisir Pro
             </button>
           </div>
 
