@@ -60,12 +60,16 @@
             </p>
 
             <button
-              v-if="!userData?.stripeAccountId"
-              @click="connectStripe"
-              class="mt-3 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              Connecter Stripe
-            </button>
+  v-if="!userData?.stripeAccountId"
+  @click="connectStripe"
+  :disabled="userData?.plan === 'free'"
+  class="mt-3 px-4 py-2 rounded-lg text-white transition"
+  :class="userData?.plan === 'free'
+    ? 'bg-gray-600 cursor-not-allowed opacity-50'
+    : 'bg-blue-500 hover:bg-blue-600'"
+>
+  Connecter Stripe
+</button>
           </div>
 
         </div>
