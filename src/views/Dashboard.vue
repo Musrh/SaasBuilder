@@ -1,9 +1,8 @@
 <!-- ============================================================
-  Dashboard.vue — Sassbuilder (FINAL + PRO UPGRADE)
+  Dashboard.vue — Sassbuilder (FIX BUILD + PRO)
 ============================================================ -->
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
-
     <div class="max-w-4xl mx-auto">
 
       <!-- Header -->
@@ -26,7 +25,8 @@
         <div class="w-10 h-10 border-4 border-gray-600 border-t-blue-400 rounded-full animate-spin"></div>
       </div>
 
-      <template v-else>
+      <!-- CONTENT -->
+      <div v-else>
 
         <!-- CARDS -->
         <div class="grid md:grid-cols-3 gap-6 mb-8">
@@ -74,7 +74,7 @@
 
         </div>
 
-        <!-- 🚀 UPGRADE PLAN -->
+        <!-- UPGRADE -->
         <div v-if="isFree" class="mb-8 text-center">
           <button
             @click="upgradeToPro"
@@ -86,7 +86,6 @@
 
         <!-- BUILDER -->
         <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-center">
-
           <h2 class="text-2xl font-bold mb-2">🏗️ Builder de site</h2>
 
           <button
@@ -95,11 +94,9 @@
           >
             Accéder au Builder →
           </button>
-
         </div>
 
-      </template>
-
+      </div>
     </div>
   </div>
 </template>
@@ -111,9 +108,6 @@ import { auth, db } from "../firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
-// =========================
-// BACKEND
-// =========================
 const BACKEND = "https://backendfinal-production-afd2.up.railway.app"
 
 const router = useRouter()
@@ -121,9 +115,7 @@ const user = ref(null)
 const userData = ref(null)
 const loading = ref(true)
 
-// =========================
 // LOAD USER
-// =========================
 onMounted(() => {
   auth.onAuthStateChanged(async (u) => {
     if (!u) {
@@ -146,9 +138,7 @@ onMounted(() => {
   })
 })
 
-// =========================
 // COMPUTED
-// =========================
 const isFree = computed(() =>
   (userData.value?.plan || "").toLowerCase() === "free"
 )
@@ -159,16 +149,9 @@ const planColor = computed(() => ({
   "text-purple-400": userData.value?.plan === "premium",
 }))
 
-// =========================
-// UPGRADE TO PRO
-// =========================
+// UPGRADE
 const upgradeToPro = async () => {
   try {
-    if (!user.value?.uid || !user.value?.email) {
-      alert("Utilisateur non chargé")
-      return
-    }
-
     const res = await fetch(`${BACKEND}/create-checkout-session`, {
       method: "POST",
       headers: {
@@ -188,7 +171,6 @@ const upgradeToPro = async () => {
       return
     }
 
-    // 🔥 Redirection Stripe Checkout
     window.location.href = data.url
 
   } catch (err) {
@@ -197,13 +179,10 @@ const upgradeToPro = async () => {
   }
 }
 
-// =========================
 // STRIPE CONNECT
-// =========================
 const connectStripe = async () => {
-
   if (isFree.value) {
-    alert("Passez au plan Pro pour connecter Stripe")
+    alert("Passez au plan Pro")
     return
   }
 
@@ -217,4 +196,27 @@ const connectStripe = async () => {
       })
     })
 
-    const data = await res
+    const data = await res.json()
+
+    if (!res.ok || !data.url) {
+      alert("Erreur Stripe")
+      return
+    }
+
+    window.location.href = data.url
+
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+// NAV
+const goToBuilder = () => {
+  window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
+}
+
+const logout = async () => {
+  await signOut(auth)
+  router.push("/")
+}
+</script>
