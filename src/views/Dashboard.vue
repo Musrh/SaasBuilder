@@ -1,8 +1,9 @@
 <!-- ============================================================
-  Dashboard.vue — Sassbuilder (FIX BUILD + PRO)
+  Dashboard.vue — Sassbuilder (UPDATED + Stripe Connect FIX)
 ============================================================ -->
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
+
     <div class="max-w-4xl mx-auto">
 
       <!-- Header -->
@@ -25,8 +26,7 @@
         <div class="w-10 h-10 border-4 border-gray-600 border-t-blue-400 rounded-full animate-spin"></div>
       </div>
 
-      <!-- CONTENT -->
-      <div v-else>
+      <template v-else>
 
         <!-- CARDS -->
         <div class="grid md:grid-cols-3 gap-6 mb-8">
@@ -60,32 +60,23 @@
             </p>
 
             <button
-              v-if="!userData?.stripeAccountId"
-              @click="connectStripe"
-              :disabled="isFree"
-              class="mt-3 px-4 py-2 rounded-lg text-white transition"
-              :class="isFree
-                ? 'bg-gray-600 cursor-not-allowed opacity-50'
-                : 'bg-blue-500 hover:bg-blue-600'"
-            >
-              {{ isFree ? 'Plan Pro requis' : 'Connecter Stripe' }}
-            </button>
+  v-if="!userData?.stripeAccountId"
+  @click="connectStripe"
+  :disabled="userData?.plan === 'free'"
+  class="mt-3 px-4 py-2 rounded-lg text-white transition"
+  :class="userData?.plan === 'free'
+    ? 'bg-gray-600 cursor-not-allowed opacity-50'
+    : 'bg-blue-500 hover:bg-blue-600'"
+>
+  Connecter Stripe
+</button>
           </div>
 
         </div>
 
-        <!-- UPGRADE -->
-        <div v-if="isFree" class="mb-8 text-center">
-          <button
-            @click="upgradeToPro"
-            class="bg-green-500 hover:bg-green-600 px-8 py-4 rounded-xl font-bold text-lg"
-          >
-            🚀 Passer au plan Pro
-          </button>
-        </div>
-
         <!-- BUILDER -->
         <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-center">
+
           <h2 class="text-2xl font-bold mb-2">🏗️ Builder de site</h2>
 
           <button
@@ -94,9 +85,11 @@
           >
             Accéder au Builder →
           </button>
+
         </div>
 
-      </div>
+      </template>
+
     </div>
   </div>
 </template>
@@ -108,6 +101,9 @@ import { auth, db } from "../firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
+// =========================
+// BACKEND FINAL
+// =========================
 const BACKEND = "https://backendfinal-production-afd2.up.railway.app"
 
 const router = useRouter()
@@ -115,7 +111,9 @@ const user = ref(null)
 const userData = ref(null)
 const loading = ref(true)
 
+// =========================
 // LOAD USER
+// =========================
 onMounted(() => {
   auth.onAuthStateChanged(async (u) => {
     if (!u) {
@@ -138,55 +136,16 @@ onMounted(() => {
   })
 })
 
-// COMPUTED
-const isFree = computed(() =>
-  (userData.value?.plan || "").toLowerCase() === "free"
-)
-
-const planColor = computed(() => ({
-  "text-gray-400": userData.value?.plan === "free",
-  "text-blue-400": userData.value?.plan === "pro",
-  "text-purple-400": userData.value?.plan === "premium",
-}))
-
-// UPGRADE
-const upgradeToPro = async () => {
+// =========================
+// STRIPE CONNECT (FIXED)
+// =========================
+const connectStripe = async () => {
   try {
-    const res = await fetch(`${BACKEND}/create-billing-session`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        ownerUid: user.value.uid,
-        email: user.value.email,
-        plan: "pro"
-      })
-    })
-
-    const data = await res.json()
-
-    if (!res.ok || !data.url) {
-      alert(data.error || "Erreur paiement")
+    if (!user.value?.uid || !user.value?.email) {
+      alert("Utilisateur non chargé")
       return
     }
 
-    window.location.href = data.url
-
-  } catch (err) {
-    console.error(err)
-    alert("Erreur checkout")
-  }
-}
-
-// STRIPE CONNECT
-const connectStripe = async () => {
-  if (isFree.value) {
-    alert("Passez au plan Pro")
-    return
-  }
-
-  try {
     const res = await fetch(`${BACKEND}/create-connect-account`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -198,25 +157,40 @@ const connectStripe = async () => {
 
     const data = await res.json()
 
+    console.log("Stripe Connect response:", data)
+
     if (!res.ok || !data.url) {
-      alert("Erreur Stripe")
+      alert(data.error || "Erreur Stripe Connect")
       return
     }
 
     window.location.href = data.url
 
   } catch (err) {
-    console.error(err)
+    console.error("Stripe connect error:", err)
+    alert("Erreur connexion Stripe")
   }
 }
 
-// NAV
+// =========================
+// UI HELPERS
+// =========================
+const planColor = computed(() => ({
+  "text-gray-400": userData.value?.plan === "free",
+  "text-blue-400": userData.value?.plan === "pro",
+  "text-purple-400": userData.value?.plan === "premium",
+}))
+
+// =========================
+// NAVIGATION
+// =========================
 const goToBuilder = () => {
   window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
 }
 
 const logout = async () => {
   await signOut(auth)
+  localStorage.removeItem("planChoisi")
   router.push("/")
 }
 </script>
