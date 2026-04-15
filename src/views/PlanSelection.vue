@@ -20,9 +20,23 @@
         <p class="text-lg text-blue-100 mb-2">
           Plateforme SaaS complète : builder + paiements + commandes
         </p>
-        <p class="text-2xl font-bold mb-8">
+        <p class="text-2xl font-bold mb-4">
           À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
+
+        <!-- 🔥 NOUVEAU : Déjà un compte -->
+        <div class="mb-8">
+          <p class="text-sm text-blue-200 mb-2">
+            Tu as déjà un compte ?
+          </p>
+          <button
+            @click="goToLogin"
+            class="bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-lg font-medium transition"
+          >
+            Se connecter
+          </button>
+        </div>
+
         <button
           @click="scrollToPlans"
           class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
@@ -94,18 +108,20 @@ const router = useRouter()
 const plansRef = ref(null)
 
 // =====================================================
-// FLUX OBLIGATOIRE : PlanSelection → AuthForm → Dashboard
-// On ne va JAMAIS directement au Dashboard !
+// FLUX : PlanSelection → AuthForm → Dashboard
 // =====================================================
 const selectPlan = (plan) => {
-  // Sauvegarde du plan choisi
   localStorage.setItem("planChoisi", plan)
 
-  // Redirection vers AuthForm (PAS vers /dashboard)
   router.push({
     path: "/auth",
     query: { plan }
   })
+}
+
+// 🔥 NOUVEAU : accès direct login
+const goToLogin = () => {
+  router.push("/auth")
 }
 
 const scrollToPlans = () => {
