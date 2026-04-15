@@ -21,7 +21,7 @@
           Plateforme SaaS complète : builder + paiements + commandes
         </p>
         <p class="text-2xl font-bold mb-8">
-          À partir de <span class="text-yellow-300">5€ / mois</span>
+          À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
         <button
           @click="scrollToPlans"
@@ -61,7 +61,7 @@
 
           <!-- PRO -->
           <div class="bg-white rounded-2xl shadow p-8 flex flex-col">
-            <h3 class="text-xl font-bold mb-2">Premium</h3>
+            <h3 class="text-xl font-bold mb-2">Pro</h3>
             <p class="text-4xl font-bold">10€</p>
             <p class="text-gray-400 mb-6">/mois</p>
             <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
