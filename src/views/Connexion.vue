@@ -45,7 +45,7 @@
         Se connecter
       </button>
 
-      <!-- 🔥 NOUVEAU : RETOUR PLAN -->
+      <!-- 🔙 RETOUR PLAN -->
       <button
         @click="goToPlans"
         class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-medium transition"
@@ -79,7 +79,7 @@ const email = ref("")
 const password = ref("")
 const selectedPlan = ref("free")
 const loading = ref(false)
-const errorMsg = ref("")
+const errorMsg = ref("")]
 
 // =====================
 // BACKEND URL
@@ -103,7 +103,7 @@ onMounted(() => {
 })
 
 // =====================
-// 🔥 RETOUR PLAN
+// 🔙 RETOUR PLAN
 // =====================
 const goToPlans = () => {
   router.push("/")
@@ -133,7 +133,14 @@ const login = async () => {
 
   } catch (err) {
     console.error(err)
-    errorMsg.value = "Erreur connexion : " + err.message
+
+    // 🔥 Message propre utilisateur
+    if (err.code === "auth/invalid-credential") {
+      errorMsg.value = "Vérifier votre email et mot de passe"
+    } else {
+      errorMsg.value = "Une erreur est survenue, réessayez"
+    }
+
   } finally {
     loading.value = false
   }
@@ -176,6 +183,7 @@ const register = async () => {
       plan: selectedPlan.value
     }))
 
+    // Stripe si plan payant
     if (selectedPlan.value === "pro" || selectedPlan.value === "basic") {
       const res = await fetch(`${API_URL}/create-billing-session`, {
         method: "POST",
