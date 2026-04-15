@@ -24,7 +24,7 @@
           À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
 
-        <!-- 🔥 NOUVEAU : Déjà un compte -->
+        <!-- 🔥 Déjà un compte -->
         <div class="mb-8">
           <p class="text-sm text-blue-200 mb-2">
             Tu as déjà un compte ?
@@ -119,11 +119,10 @@ const selectPlan = (plan) => {
   })
 }
 
-// 🔥 NOUVEAU : accès direct login
+// 🔥 CORRECTION : ouvre Connection.vue
 const goToLogin = () => {
-  router.push("/auth")
+  router.push("/connection")
 }
-  
 
 const scrollToPlans = () => {
   plansRef.value?.scrollIntoView({ behavior: "smooth" })
