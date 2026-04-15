@@ -7,17 +7,11 @@
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
     <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
 
-      <!-- PLAN CHOISI -->
-      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
-        <p class="text-sm text-gray-500">Vous avez choisi</p>
-        <p class="text-2xl font-bold text-blue-600 capitalize">
-          {{ selectedPlan }}
-        </p>
-      </div>
+      
 
       <!-- TITLE -->
       <h2 class="text-2xl font-bold mb-6 text-center">
-        Connexion / Inscription
+        Connexion pour compte déjà existant 
       </h2>
 
       <!-- EMAIL -->
