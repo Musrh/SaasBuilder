@@ -123,6 +123,7 @@ const selectPlan = (plan) => {
 const goToLogin = () => {
   router.push("/auth")
 }
+  
 
 const scrollToPlans = () => {
   plansRef.value?.scrollIntoView({ behavior: "smooth" })
