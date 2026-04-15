@@ -1,13 +1,9 @@
-
 <!-- ============================================================
   AuthForm.vue — Connexion / Inscription SaaS
-  FLOW : PlanSelection → AuthForm → Stripe (si payant) → Dashboard
 ============================================================ -->
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
     <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-
-      
 
       <!-- TITLE -->
       <h2 class="text-2xl font-bold mb-6 text-center">
@@ -49,7 +45,13 @@
         Se connecter
       </button>
 
-      
+      <!-- 🔥 NOUVEAU : RETOUR PLAN -->
+      <button
+        @click="goToPlans"
+        class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-medium transition"
+      >
+        ← Retour vers choix du plan
+      </button>
 
     </div>
   </div>
@@ -93,13 +95,19 @@ onMounted(() => {
     localStorage.getItem("planChoisi") ||
     "free"
 
-  // si déjà connecté → dashboard direct
   auth.onAuthStateChanged((user) => {
     if (user) {
       router.push("/dashboard")
     }
   })
 })
+
+// =====================
+// 🔥 RETOUR PLAN
+// =====================
+const goToPlans = () => {
+  router.push("/")
+}
 
 // =====================
 // LOGIN
@@ -121,7 +129,6 @@ const login = async () => {
       email: user.email
     }))
 
-    // ✅ Redirige vers Dashboard après connexion
     router.push("/dashboard")
 
   } catch (err) {
@@ -133,7 +140,7 @@ const login = async () => {
 }
 
 // =====================
-// REGISTER (OWNER SAAS)
+// REGISTER
 // =====================
 const register = async () => {
   errorMsg.value = ""
@@ -169,7 +176,6 @@ const register = async () => {
       plan: selectedPlan.value
     }))
 
-    // ✅ Si plan payant → paiement Stripe AVANT dashboard
     if (selectedPlan.value === "pro" || selectedPlan.value === "basic") {
       const res = await fetch(`${API_URL}/create-billing-session`, {
         method: "POST",
@@ -184,14 +190,13 @@ const register = async () => {
       const data = await res.json()
 
       if (data.url) {
-        window.location.href = data.url // → Stripe Checkout
+        window.location.href = data.url
         return
       } else {
         errorMsg.value = "Erreur paiement : impossible de créer la session Stripe."
       }
     }
 
-    // Plan free → dashboard direct
     router.push("/dashboard")
 
   } catch (err) {
