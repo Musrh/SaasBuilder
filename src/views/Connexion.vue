@@ -55,14 +55,7 @@
         Se connecter
       </button>
 
-      <!-- REGISTER -->
-      <button
-        @click="register"
-        :disabled="loading"
-        class="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-lg disabled:opacity-50"
-      >
-        S'inscrire
-      </button>
+      
 
     </div>
   </div>
