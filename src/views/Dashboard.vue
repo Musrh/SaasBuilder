@@ -1,6 +1,3 @@
-<!-- ============================================================
-  Dashboard.vue — Sassbuilder (UPDATED + Stripe Connect FIX)
-============================================================ -->
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
     <div class="max-w-4xl mx-auto">
@@ -11,6 +8,7 @@
           <h1 class="text-3xl font-bold">Mon espace Sassbuilder</h1>
           <p class="text-gray-400 mt-1">{{ user?.email }}</p>
         </div>
+
         <button
           @click="logout"
           class="text-sm text-gray-400 hover:text-white border border-gray-600 px-4 py-2 rounded-lg transition"
@@ -20,7 +18,9 @@
       </div>
 
       <!-- Loading -->
-      <div v-if="loading" class="text-center text-gray-400 py-20">Chargement...</div>
+      <div v-if="loading" class="text-center text-gray-400 py-20">
+        Chargement...
+      </div>
 
       <!-- Content -->
       <div v-else class="space-y-8">
@@ -33,39 +33,38 @@
           </p>
         </div>
 
-        <!-- Stripe Connect -->
+        <!-- Stripe / Upgrade -->
         <div class="bg-gray-800 rounded-2xl p-6">
           <h2 class="text-lg font-semibold mb-2">Paiements</h2>
 
-          <!-- Bouton Connecter Stripe (désactivé si free) -->
+          <!-- Bouton Upgrade Pro (visible seulement si free) -->
           <button
+            v-if="userData?.plan === 'free'"
+            @click="upgradeToPro"
+            class="mt-3 px-5 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-semibold transition"
+          >
+            Change Pro
+          </button>
+
+          <!-- Bouton Stripe Connect (visible seulement si PRO) -->
+          <button
+            v-if="userData?.plan !== 'free'"
             @click="connectStripe"
-            :disabled="userData?.plan === 'free'"
-            class="mt-3 px-4 py-2 rounded-lg text-white transition"
-            :class="userData?.plan === 'free'
-              ? 'bg-gray-600 cursor-not-allowed opacity-50'
-              : 'bg-blue-500 hover:bg-blue-600'"
+            class="mt-3 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition"
           >
             Connecter Stripe
           </button>
 
-          <!-- Bouton Changer en Pro (visible uniquement si free) -->
-          <button
-            v-if="userData?.plan === 'free'"
-            @click="upgradeToPro"
-            class="mt-3 ml-3 px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white font-semibold transition"
-          >
-            Changer en Pro
-          </button>
-
+          <!-- Message info -->
           <p v-if="userData?.plan === 'free'" class="text-gray-400 text-sm mt-2">
-            Passez au plan Pro pour connecter Stripe et recevoir des paiements.
+            Passez au plan Pro pour activer Stripe et recevoir des paiements.
           </p>
         </div>
 
         <!-- Builder -->
         <div class="bg-gray-800 rounded-2xl p-6 text-center">
           <h2 class="text-lg font-semibold mb-4">🏗️ Builder de site</h2>
+
           <button
             @click="goToBuilder"
             class="bg-white text-blue-600 font-bold px-10 py-4 rounded-xl hover:bg-gray-100 transition"
@@ -99,26 +98,23 @@ onMounted(() => {
       router.push("/auth")
       return
     }
+
     user.value = u
-    try {
-      const snap = await getDoc(doc(db, "users", u.uid))
-      if (snap.exists()) {
-        userData.value = snap.data()
-      }
-    } catch (e) {
-      console.error(e)
+
+    const snap = await getDoc(doc(db, "users", u.uid))
+    if (snap.exists()) {
+      userData.value = snap.data()
     }
+
     loading.value = false
   })
 })
 
-// Stripe Connect
+/* =========================
+   STRIPE CONNECT
+========================= */
 const connectStripe = async () => {
   try {
-    if (!user.value?.uid || !user.value?.email) {
-      alert("Utilisateur non chargé")
-      return
-    }
     const res = await fetch(`${BACKEND}/create-connect-account`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -127,25 +123,26 @@ const connectStripe = async () => {
         email: user.value.email
       })
     })
+
     const data = await res.json()
+
     if (!res.ok || !data.url) {
       alert(data.error || "Erreur Stripe Connect")
       return
     }
+
     window.location.href = data.url
   } catch (err) {
-    console.error("Stripe connect error:", err)
+    console.error(err)
     alert("Erreur connexion Stripe")
   }
 }
 
-// Upgrade to Pro → Stripe Billing
+/* =========================
+   UPGRADE PRO
+========================= */
 const upgradeToPro = async () => {
   try {
-    if (!user.value?.uid || !user.value?.email) {
-      alert("Utilisateur non chargé")
-      return
-    }
     const res = await fetch(`${BACKEND}/create-billing-session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -155,18 +152,24 @@ const upgradeToPro = async () => {
         ownerUid: user.value.uid
       })
     })
+
     const data = await res.json()
+
     if (!res.ok || !data.url) {
-      alert(data.error || "Erreur création session de paiement")
+      alert(data.error || "Erreur paiement")
       return
     }
+
     window.location.href = data.url
   } catch (err) {
-    console.error("Upgrade error:", err)
-    alert("Erreur lors de la mise à niveau")
+    console.error(err)
+    alert("Erreur upgrade Pro")
   }
 }
 
+/* =========================
+   UI HELPERS
+========================= */
 const planColor = computed(() => ({
   "text-gray-400": userData.value?.plan === "free",
   "text-blue-400": userData.value?.plan === "pro",
@@ -179,7 +182,6 @@ const goToBuilder = () => {
 
 const logout = async () => {
   await signOut(auth)
-  localStorage.removeItem("planChoisi")
   router.push("/")
 }
 </script>
