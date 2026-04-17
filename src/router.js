@@ -52,7 +52,7 @@ const routes = [
   {
     path: "/site/:uid",
     name: "SiteViewer",
-    component: () => import("./views/SiteViewer.vue"),
+    component: () => import("./views/Siteviewer.vue"),
     props: true
   },
 
