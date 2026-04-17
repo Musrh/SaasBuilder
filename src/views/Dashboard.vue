@@ -177,7 +177,7 @@ const planColor = computed(() => ({
 }))
 
 const goToBuilder = () => {
-  router.push("/Saasgenerator")
+  router.push("/saasgenerator")
 }
   
 const logout = async () => {
