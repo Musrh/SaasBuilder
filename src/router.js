@@ -68,6 +68,11 @@ const routes = [
   path: "/connection",
   name: "Connection",
   component: () => import("./views/Connexion.vue")
+},
+{
+  path: "/saasgenerator",
+  name: "Saasgenerator",
+  component: () => import("./views/Saasgenerator.vue")
 }
 
 ];
