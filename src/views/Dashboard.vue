@@ -177,9 +177,9 @@ const planColor = computed(() => ({
 }))
 
 const goToBuilder = () => {
-  window.location.href = "https://musrh.github.io/SaaasGenerator/#/"
+  router.push("/Saasgenerator")
 }
-
+  
 const logout = async () => {
   await signOut(auth)
   router.push("/")
