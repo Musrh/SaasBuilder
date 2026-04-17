@@ -60,7 +60,7 @@ const routes = [
   {
     path: "/store-auth",
     name: "StoreAuth",
-    component: () => import("./views/StoreAuth.vue")
+    component: () => import("./views/Storeauth.vue")
   },
 
   // 👉 Paiement client store
