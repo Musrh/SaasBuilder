@@ -1,146 +1,73 @@
 <script setup>
-import { ref, onMounted, computed } from "vue"
-import { db } from "../firebase"
+import { ref, onMounted } from "vue"
+import { db, auth } from "../firebase"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
-import { getAuth } from "firebase/auth"
-import { useRouter } from "vue-router"
-
-const router = useRouter()
-const auth = getAuth()
+import { onAuthStateChanged } from "firebase/auth"
 
 const orders = ref([])
 const loading = ref(true)
-const search = ref("")
 
-/* =========================================================
-   🔐 GET CURRENT USER
-========================================================= */
-const user = auth.currentUser
+let unsub = null
 
-/* =========================================================
-   🔥 FIRESTORE FILTER ownerUid
-========================================================= */
 onMounted(() => {
 
-  if (!user) {
-    console.error("❌ Pas d'utilisateur connecté")
-    return
-  }
+  console.log("📦 Orders mounted")
 
-  // 🔥 filtre direct Firestore
+  onAuthStateChanged(auth, (user) => {
+
+    console.log("🔐 AUTH USER =", user?.uid)
+
+    if (!user) {
+      loading.value = false
+      return
+    }
+
+    loadOrders(user.uid)
+  })
+})
+
+function loadOrders(uid) {
+
+  console.log("🚀 QUERY FOR OWNER =", uid)
+
+  if (unsub) unsub()
+
   const q = query(
     collection(db, "orders"),
-    where("ownerUid", "==", user.uid)
+    where("ownerId", "==", uid)
   )
 
-  onSnapshot(
-    q,
-    (snap) => {
+  unsub = onSnapshot(q, (snap) => {
 
-      orders.value = snap.docs.map((doc) => {
-        const data = doc.data()
+    console.log("📦 ORDERS FOUND =", snap.size)
 
-        return {
-          id: doc.id,
+    orders.value = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }))
 
-          customerName: data.customerName ?? "Non défini",
-          customerEmail: data.customerEmail ?? "Non défini",
-          customerAddress: data.customerAddress ?? "Non défini",
-
-          total: data.total ?? 0,
-          currency: data.currency ?? "€",
-          status: data.status ?? "unknown",
-          createdAt: data.createdAt ?? null,
-
-          items: Array.isArray(data.items) ? data.items : []
-        }
-      })
-
-      loading.value = false
-    },
-    (err) => {
-      console.error("❌ Firestore error:", err)
-      loading.value = false
-    }
-  )
-})
-
-/* =========================================================
-   🔍 FILTER BY NAME (FRONT)
-========================================================= */
-const filteredOrders = computed(() => {
-  if (!search.value) return orders.value
-
-  return orders.value.filter((o) =>
-    o.customerName.toLowerCase().includes(search.value.toLowerCase())
-  )
-})
-
-/* =========================================================
-   🔙 NAVIGATION
-========================================================= */
-function goDashboard() {
-  router.push("/dashboard")
+    loading.value = false
+  })
 }
 </script>
 
 <template>
-  <div style="padding:20px">
+  <div style="padding:20px;background:#0f172a;color:white;min-height:100vh">
 
-    <!-- HEADER -->
-    <div style="display:flex; justify-content:space-between; align-items:center">
-      <h2>📦 Mes commandes</h2>
-      <button @click="goDashboard">🔙 Dashboard</button>
-    </div>
+    <h2>📦 Paiements store</h2>
 
-    <!-- SEARCH -->
-    <input
-      v-model="search"
-      placeholder="🔍 Rechercher client"
-      style="margin:10px 0; padding:8px; width:100%"
-    />
-
-    <!-- LOADING -->
     <div v-if="loading">Chargement...</div>
 
-    <!-- EMPTY -->
-    <div v-else-if="filteredOrders.length === 0">
-      ❌ Aucune commande
+    <div v-else-if="orders.length === 0">
+      ❌ Aucune commande trouvée
     </div>
 
-    <!-- ORDERS -->
-    <div v-else>
-      <div
-        v-for="o in filteredOrders"
-        :key="o.id"
-        style="border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:10px"
-      >
+    <div v-for="o in orders" :key="o.id" style="padding:10px;margin:10px;background:#1e293b">
 
-        <p><b>👤 {{ o.customerName }}</b></p>
-        <p>📧 {{ o.customerEmail }}</p>
-        <p>📍 {{ o.customerAddress }}</p>
+      <div><b>{{ o.email }}</b></div>
+      <div>Total: {{ o.total }}</div>
+      <div>Status: {{ o.status }}</div>
 
-        <p>💰 {{ o.total }} {{ o.currency }}</p>
-        <p>📦 {{ o.status }}</p>
-
-        <p v-if="o.createdAt">
-          🕒 {{
-            new Date(
-              o.createdAt.seconds
-                ? o.createdAt.seconds * 1000
-                : o.createdAt
-            ).toLocaleString()
-          }}
-        </p>
-
-        <!-- ITEMS -->
-        <ul v-if="o.items.length">
-          <li v-for="(item, i) in o.items" :key="i">
-            {{ item.name }} — {{ item.qty }} × {{ item.price }}
-          </li>
-        </ul>
-
-      </div>
     </div>
 
   </div>
