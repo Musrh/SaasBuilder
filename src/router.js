@@ -66,11 +66,11 @@ const routes = [
   // 👉 Paiement client store
   {
     path: "/payment-success",
-    component: () => import("./views/PaymentSuccess.vue")
+    component: () => import("./views/Paymentsuccess.vue")
   },
   {
     path: "/payment-cancel",
-    component: () => import("./views/PaymentCancel.vue")
+    component: () => import("./views/Paymentcancel.vue")
   },
 
   // ── 404 ─────────────────────────────────
