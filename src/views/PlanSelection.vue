@@ -38,14 +38,14 @@
             Se connecter
           </button>
         </div>
-<div class="box">
+        <div>
         <button
           @click="scrollToPlans"
           class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
         >
           Voir les offres ↓
         </button>
-      </div>
+      
     </section>
 
     <!-- PLANS -->
