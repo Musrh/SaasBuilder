@@ -1,0 +1,1 @@
+import{l as e,x as t}from"./runtime-core.esm-bundler-Dx_lmiDL.js";import{h as n}from"./index-WWP1I5QB.js";var r={};function i(n,r){return t(),e(`h1`,null,`This plan Under Construction`)}var a=n(r,[[`render`,i]]);export{a as default};
