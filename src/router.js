@@ -38,7 +38,7 @@ const routes = [
   {
     path: "/mentions",
     name: "MentionsLegales",
-    component: MentionsLegales
+    component: Mentions
   },
   {
     path: "/confidentialite",
