@@ -3,81 +3,84 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import PlanSelection from "./views/PlanSelection.vue";
 import AuthForm from "./views/AuthForm.vue";
 import Dashboard from "./views/Dashboard.vue";
-
 import Checkout from "./views/Checkout.vue";
-
-import PrivacyPolicy from './views/PrivacyPolicy.vue'
+import PrivacyPolicy from "./views/PrivacyPolicy.vue";
 
 const routes = [
-  {
-    path: "/",
-    component: PlanSelection
-  },
-  {
-    path: "/auth",
-    component: AuthForm
-  },
-  {
-    path: "/dashboard",
-    component: Dashboard
-  },
+  // ── APP SAAS ─────────────────────────────
+  { path: "/", component: PlanSelection },
+  { path: "/auth", component: AuthForm },
+  { path: "/dashboard", component: Dashboard },
+
+  { path: "/panier", component: () => import("./views/Panier.vue") },
+  { path: "/checkout", name: "Checkout", component: Checkout },
+
+  { path: "/success", component: () => import("./views/Success.vue") },
+  { path: "/cancel", component: () => import("./views/Cancel.vue") },
+
+  { path: "/orders", component: () => import("./views/Orders.vue") },
 
   {
-    path: "/panier",
-    component: () => import("./views/Panier.vue")
-  },
-  {
-  path: "/checkout",
-  name: "Checkout",
-  component: Checkout
-  },
-
-  {
-    path: "/success",
-    component: () => import("./views/Success.vue")
-  },
-
-  {
-    path: "/cancel",
-    component: () => import("./views/Cancel.vue")
-  },
-
-  {
-    path: "/builder1",
-    component: () => import("./views/Builder1.vue")
-  },
-  {
-    path: "/builder2",
-    component: () => import("./views/Builder.vue")
-  },
-  {
-    path: "/builder3",
-    component: () => import("./views/Builder3.vue")
-  },
-  {
-    path: "/orders",
-    component: () => import("./views/Orders.vue")
-  },
-    
-{
-    path: '/privacy-policy',
-    name: 'PrivacyPolicy',
+    path: "/privacy-policy",
+    name: "PrivacyPolicy",
     component: PrivacyPolicy
-},
-{
-  path: "/connection",
-  name: "Connection",
-  component: () => import("./views/Connexion.vue")
-},
-{
-  path: "/saasgenerator",
-  name: "Saasgenerator",
-  component: () => import("./views/Saasgenerator.vue")
-}
+  },
 
+  {
+    path: "/connection",
+    name: "Connection",
+    component: () => import("./views/Connexion.vue")
+  },
+
+  // ── BUILDER (fusionné ici) ─────────────────
+
+  // 👉 Page principale builder
+  {
+    path: "/saasgenerator",
+    name: "Saasgenerator",
+    component: () => import("./views/Saasgenerator.vue") // ancien Home du builder
+  },
+
+  // 👉 Cart
+  {
+    path: "/cart",
+    name: "Cart",
+    component: () => import("./views/Cart.vue")
+  },
+
+  // 👉 Site public
+  {
+    path: "/site/:uid",
+    name: "SiteViewer",
+    component: () => import("./views/SiteViewer.vue"),
+    props: true
+  },
+
+  // 👉 Auth client store
+  {
+    path: "/store-auth",
+    name: "StoreAuth",
+    component: () => import("./views/StoreAuth.vue")
+  },
+
+  // 👉 Paiement client store
+  {
+    path: "/payment-success",
+    component: () => import("./views/PaymentSuccess.vue")
+  },
+  {
+    path: "/payment-cancel",
+    component: () => import("./views/PaymentCancel.vue")
+  },
+
+  // ── 404 ─────────────────────────────────
+  {
+    path: "/:pathMatch(.*)*",
+    component: () => import("./views/NotFound.vue")
+  }
 ];
 
 export default createRouter({
-  history: createWebHashHistory(), // ✅ FIX IMPORTANT
+  history: createWebHashHistory(),
   routes,
 });
