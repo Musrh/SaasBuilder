@@ -5,7 +5,10 @@ import AuthForm from "./views/AuthForm.vue";
 import Dashboard from "./views/Dashboard.vue";
 import Checkout from "./views/Checkout.vue";
 import PrivacyPolicy from "./views/PrivacyPolicy.vue";
-
+import Remboursement from "./views/Remboursement.vue";
+import Mentions from "./views/Mentions.vue";
+import Confidentialite from "./views/Confidentialite.vue";
+import Conditions from "./views/Conditions.vue";
 const routes = [
   // ── APP SAAS ─────────────────────────────
   { path: "/", component: PlanSelection },
@@ -26,6 +29,29 @@ const routes = [
     component: PrivacyPolicy
   },
 
+{
+    path: "/remboursement",
+    name: "Remboursement",
+    component: Remboursement
+  },
+
+  {
+    path: "/mentions",
+    name: "MentionsLegales",
+    component: MentionsLegales
+  },
+  {
+    path: "/confidentialite",
+    name: "Confidentialite",
+    component: Confidentialite
+  },
+  {
+    path: "/conditions",
+    name: "Conditions",
+    component: Conditions
+  },
+
+  
   {
     path: "/connection",
     name: "Connection",
