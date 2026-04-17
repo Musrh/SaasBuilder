@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
-import VoiceAssistantClient from "../components/VoiceAssistantClient.vue"
+import VoiceAssistantClient from "./components/VoiceAssistantClient.vue"
 import { db, auth } from "../firebase.js"
 import { doc, getDoc, setDoc, addDoc, deleteDoc, collection } from "firebase/firestore"
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
