@@ -25,9 +25,11 @@
         </p>
 
         <!-- 🔥 Déjà un compte -->
-        <div class="mb-8">
+        
+        <div class="box">
           <p class="text-sm text-blue-200 mb-2">
             Tu as déjà un compte ?
+         
           </p>
           <button
             @click="goToLogin"
@@ -36,7 +38,7 @@
             Se connecter
           </button>
         </div>
-
+<div class="box">
         <button
           @click="scrollToPlans"
           class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
@@ -128,3 +130,9 @@ const scrollToPlans = () => {
   plansRef.value?.scrollIntoView({ behavior: "smooth" })
 }
 </script>
+
+<style>
+.box {
+  text-align: center;
+}
+</style>
