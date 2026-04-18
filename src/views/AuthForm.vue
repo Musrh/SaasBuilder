@@ -1,39 +1,40 @@
-<!-- ============================================================
-  AuthForm.vue — Connexion / Inscription SaaS
-  FLOW : PlanSelection → AuthForm → Stripe (si payant) → Dashboard
-============================================================ -->
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-100">
-    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-100 px-4">
 
-      <!-- PLAN CHOISI -->
-      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
-        <p class="text-sm text-gray-500">Vous avez choisi</p>
-        <p class="text-2xl font-bold text-blue-600 capitalize">
+    <div class="bg-white/90 backdrop-blur-lg p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/40">
+
+      <!-- PLAN -->
+      <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl p-4 mb-6 text-center shadow">
+        <p class="text-sm opacity-80">Plan sélectionné</p>
+        <p class="text-2xl font-bold capitalize">
           {{ selectedPlan }}
         </p>
       </div>
 
       <!-- TITLE -->
-      <h2 class="text-2xl font-bold mb-6 text-center">
+      <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">
         Connexion / Inscription
       </h2>
 
       <!-- EMAIL -->
-      <input
-        v-model="email"
-        type="email"
-        placeholder="Email"
-        class="w-full border p-3 rounded-lg mb-4"
-      />
+      <div class="mb-4">
+        <input
+          v-model="email"
+          type="email"
+          placeholder="Email"
+          class="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none transition"
+        />
+      </div>
 
       <!-- PASSWORD -->
-      <input
-        v-model="password"
-        type="password"
-        placeholder="Mot de passe"
-        class="w-full border p-3 rounded-lg mb-6"
-      />
+      <div class="mb-6">
+        <input
+          v-model="password"
+          type="password"
+          placeholder="Mot de passe"
+          class="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-400 outline-none transition"
+        />
+      </div>
 
       <!-- ERROR -->
       <p v-if="errorMsg" class="text-red-500 text-sm mb-4 text-center">
@@ -49,7 +50,7 @@
       <button
         @click="login"
         :disabled="loading"
-        class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg mb-3 disabled:opacity-50"
+        class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90 text-white py-3 rounded-xl font-semibold mb-3 transition disabled:opacity-50"
       >
         Se connecter
       </button>
@@ -58,159 +59,20 @@
       <button
         @click="register"
         :disabled="loading"
-        class="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-lg disabled:opacity-50"
+        class="w-full bg-gray-100 hover:bg-gray-200 py-3 rounded-xl font-semibold transition disabled:opacity-50"
       >
         S'inscrire
       </button>
 
+      <!-- FOOTER LINKS -->
+      <div class="mt-6 text-center text-sm text-gray-500 space-y-2">
+        <p class="hover:text-blue-500 cursor-pointer">Privacy Policy</p>
+        <p class="hover:text-blue-500 cursor-pointer">Remboursement</p>
+        <p class="hover:text-blue-500 cursor-pointer">Confidentialité</p>
+        <p class="hover:text-blue-500 cursor-pointer">Mentions légales</p>
+        <p class="hover:text-blue-500 cursor-pointer">Conditions</p>
+      </div>
+
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, onMounted } from "vue"
-import { useRoute, useRouter } from "vue-router"
-
-import { db, auth } from "../firebase"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
-
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
-} from "firebase/auth"
-
-const route = useRoute()
-const router = useRouter()
-
-// =====================
-// STATE
-// =====================
-const email = ref("")
-const password = ref("")
-const selectedPlan = ref("free")
-const loading = ref(false)
-const errorMsg = ref("")
-
-// =====================
-// BACKEND URL
-// =====================
-const API_URL = "https://backendfinal-production-afd2.up.railway.app"
-
-// =====================
-// LOAD PLAN
-// =====================
-onMounted(() => {
-  selectedPlan.value =
-    route.query.plan ||
-    localStorage.getItem("planChoisi") ||
-    "free"
-
-  // si déjà connecté → dashboard direct
-  auth.onAuthStateChanged((user) => {
-    if (user) {
-      router.push("/dashboard")
-    }
-  })
-})
-
-// =====================
-// LOGIN
-// =====================
-const login = async () => {
-  errorMsg.value = ""
-  loading.value = true
-  try {
-    const cred = await signInWithEmailAndPassword(
-      auth,
-      email.value,
-      password.value
-    )
-
-    const user = cred.user
-
-    localStorage.setItem("user", JSON.stringify({
-      uid: user.uid,
-      email: user.email
-    }))
-
-    // ✅ Redirige vers Dashboard après connexion
-    router.push("/dashboard")
-
-  } catch (err) {
-    console.error(err)
-    errorMsg.value = "Erreur connexion : " + err.message
-  } finally {
-    loading.value = false
-  }
-}
-
-// =====================
-// REGISTER (OWNER SAAS)
-// =====================
-const register = async () => {
-  errorMsg.value = ""
-  loading.value = true
-  try {
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      email.value,
-      password.value
-    )
-
-    const user = cred.user
-    const uid = user.uid
-
-    const userData = {
-      uid,
-      email: user.email,
-      role: "owner",
-      ownerId: uid,
-      storeId: uid,
-      plan: selectedPlan.value,
-      subscriptionActive: false,
-      stripeAccountId: null,
-      createdAt: serverTimestamp(),
-      expiry: null
-    }
-
-    await setDoc(doc(db, "users", uid), userData)
-
-    localStorage.setItem("user", JSON.stringify({
-      uid,
-      email: user.email,
-      plan: selectedPlan.value
-    }))
-
-    // ✅ Si plan payant → paiement Stripe AVANT dashboard
-    if (selectedPlan.value === "pro" || selectedPlan.value === "basic") {
-      const res = await fetch(`${API_URL}/create-billing-session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: user.email,
-          plan: selectedPlan.value,
-          ownerUid: uid
-        })
-      })
-
-      const data = await res.json()
-
-      if (data.url) {
-        window.location.href = data.url // → Stripe Checkout
-        return
-      } else {
-        errorMsg.value = "Erreur paiement : impossible de créer la session Stripe."
-      }
-    }
-
-    // Plan free → dashboard direct
-    router.push("/dashboard")
-
-  } catch (err) {
-    console.error(err)
-    errorMsg.value = "Erreur inscription : " + err.message
-  } finally {
-    loading.value = false
-  }
-}
-</script>
