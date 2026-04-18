@@ -1,42 +1,49 @@
+<!-- ============================================================
+  PlanSelection.vue — VERSION DESIGN AMÉLIORÉ
+  ✔ Image réduite à 300px
+  ✔ Style coloré moderne
+  ✔ Fonctionnalités intactes
+============================================================ -->
 <template>
   <div class="w-full font-sans">
 
     <!-- HERO -->
-    <section class="relative min-h-[85vh] flex items-center justify-center text-center overflow-hidden">
+    <section class="relative min-h-[80vh] flex flex-col items-center justify-center text-center bg-gradient-to-br from-green-50 to-blue-50 overflow-hidden px-4">
 
-      <!-- IMAGE -->
+      <!-- formes décoratives -->
+      <div class="absolute top-0 left-0 w-72 h-72 bg-green-200 rounded-full blur-3xl opacity-30"></div>
+      <div class="absolute bottom-0 right-0 w-72 h-72 bg-blue-200 rounded-full blur-3xl opacity-30"></div>
+
+      <!-- IMAGE (300px) -->
       <img
-        src="https://images.unsplash.com/photo-1498579809087-ef1e558fd1da?auto=format&fit=crop&w=1600&q=80"
-        class="absolute inset-0 w-full h-full object-cover"
+        src="https://images.unsplash.com/photo-1498579809087-ef1e558fd1da?auto=format&fit=crop&w=800&q=80"
+        class="w-[300px] mb-6 rounded-2xl shadow-lg relative z-10"
         alt="store"
       />
 
-      <!-- OVERLAY COLORÉ -->
-      <div class="absolute inset-0 bg-gradient-to-br from-green-700/80 via-emerald-500/70 to-blue-600/70"></div>
-
       <!-- CONTENU -->
-      <div class="relative z-10 px-6 max-w-2xl mx-auto text-white">
-        <h1 class="text-4xl md:text-6xl font-bold mb-4">
+      <div class="relative z-10 max-w-2xl text-gray-800">
+        <h1 class="text-4xl md:text-5xl font-bold mb-4">
           Créez votre boutique
         </h1>
 
-        <p class="text-lg text-white/90 mb-2">
+        <p class="text-lg text-gray-600 mb-2">
           Builder + Paiements + Commandes en un seul outil
         </p>
 
         <p class="text-2xl font-bold mb-6">
-          À partir de <span class="text-yellow-300">10€ / mois</span>
+          À partir de <span class="text-green-600">10€ / mois</span>
         </p>
 
         <!-- LOGIN -->
         <div class="mb-4">
-          <p class="text-sm text-white/80 mb-2">
+          <p class="text-sm text-gray-500 mb-2">
             Déjà un compte ?
           </p>
 
           <button
             @click="goToLogin"
-            class="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-xl transition backdrop-blur"
+            class="border border-gray-300 px-6 py-2 rounded-xl hover:bg-gray-100 transition"
           >
             Se connecter
           </button>
@@ -45,7 +52,7 @@
         <!-- CTA -->
         <button
           @click="scrollToPlans"
-          class="mt-4 bg-white text-green-700 hover:bg-green-100 px-8 py-4 rounded-xl text-lg font-semibold transition shadow-lg"
+          class="mt-4 bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition shadow"
         >
           Voir les offres ↓
         </button>
@@ -54,8 +61,8 @@
 
     <!-- PLANS -->
     <section ref="plansRef" class="py-20 bg-gradient-to-b from-green-50 to-blue-50">
-
       <div class="max-w-5xl mx-auto px-6">
+
         <h2 class="text-3xl font-bold text-center mb-4 text-gray-800">
           Nos offres
         </h2>
@@ -130,6 +137,9 @@ import { useRouter } from "vue-router"
 const router = useRouter()
 const plansRef = ref(null)
 
+// =====================================================
+// FLUX : PlanSelection → AuthForm → Dashboard
+// =====================================================
 const selectPlan = (plan) => {
   localStorage.setItem("planChoisi", plan)
 
@@ -147,3 +157,9 @@ const scrollToPlans = () => {
   plansRef.value?.scrollIntoView({ behavior: "smooth" })
 }
 </script>
+
+<style>
+body {
+  font-family: 'Inter', sans-serif;
+}
+</style>
