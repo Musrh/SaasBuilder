@@ -1,124 +1,98 @@
 <!-- ============================================================
-  PlanSelection.vue — IMAGE APP FULL WIDTH
-  ✔ Image locale (appImage)
-  ✔ Pleine largeur (w-full)
-  ✔ Hauteur 300px
-  ✔ Fonctionnalités intactes
+  PlanSelection.vue — SaaS FLOW: Plan → AuthForm → Dashboard
 ============================================================ -->
 <template>
-  <div class="w-full font-sans">
+  <div class="w-full">
 
     <!-- HERO -->
-    <section class="relative min-h-[80vh] flex flex-col items-center justify-center text-center bg-gradient-to-br from-green-50 to-blue-50 overflow-hidden px-4">
-
-      <!-- formes décoratives -->
-      <div class="absolute top-0 left-0 w-72 h-72 bg-green-200 rounded-full blur-3xl opacity-30"></div>
-      <div class="absolute bottom-0 right-0 w-72 h-72 bg-blue-200 rounded-full blur-3xl opacity-30"></div>
-
-      <!-- IMAGE APP (FULL WIDTH / 300px height) -->
+    <section class="relative h-[80vh] flex items-center justify-center text-center overflow-hidden">
       <img
-        :src="appImage"
-        class="w-[100] h-[100px] object-cover mb-6 rounded-xl shadow relative z-10"
-        alt="Aperçu de l'application"
+        src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1600&q=80"
+        class="absolute inset-0 w-full h-full object-cover"
+        alt="hero"
       />
+      <div class="absolute inset-0 bg-gradient-to-br from-blue-900/80 to-purple-900/70"></div>
 
-      <!-- CONTENU -->
-      <div class="relative z-10 max-w-6xl text-gray-800">
-        <h1 class="text-4xl md:text-5xl font-bold mb-4">
-          Créez votre boutique
+      <div class="relative z-10 px-6 max-w-2xl mx-auto text-white">
+        <h1 class="text-4xl md:text-6xl font-bold mb-4 leading-tight">
+          Créez votre boutique en ligne
         </h1>
-
-        <p class="text-5xl text-gray-600 mb-2">
-          Builder + Paiements + Commandes en un seul outil
+        <p class="text-lg text-blue-100 mb-2">
+          Plateforme SaaS complète : builder + paiements + commandes
+        </p>
+        <p class="text-2xl font-bold mb-4">
+          À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
 
-        <p class="text-5xl font-bold mb-6">
-          À partir de <span class="text-green-600">10€ / mois</span>
-        </p>
-
-        <!-- LOGIN -->
-        <div class="mb-4">
-          <p class="text-5xl text-gray-500 mb-2">
-            Déjà un compte ?
+        <!-- 🔥 Déjà un compte -->
+        <div class="box">
+          <p class="text-sm text-blue-200 mb-2">
+            Tu as déjà un compte ?
           </p>
 
           <button
             @click="goToLogin"
-            class="border border-gray-300 px-6 py-2 rounded-xl hover:bg-gray-100 transition"
+            class="bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-lg font-medium transition"
           >
             Se connecter
           </button>
         </div>
 
-        <!-- CTA -->
-        <button
-          @click="scrollToPlans"
-          class="mt-4 bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition shadow"
-        >
-          Voir les offres ↓
-        </button>
+        <!-- bouton offres -->
+        <div class="mt-6">
+          <button
+            @click="scrollToPlans"
+            class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
+          >
+            Voir les offres ↓
+          </button>
+        </div>
+
       </div>
     </section>
 
     <!-- PLANS -->
-    <section ref="plansRef" class="py-20 bg-gradient-to-b from-green-50 to-blue-50">
+    <section ref="plansRef" class="py-20 bg-gray-50">
       <div class="max-w-5xl mx-auto px-6">
-
-        <h2 class="text-5xl font-bold text-center mb-4 text-gray-800">
-          Nos offres
-        </h2>
-
+        <h2 class="text-3xl font-bold text-center mb-4">Nos offres</h2>
         <p class="text-gray-500 text-center mb-12">
           Choisissez le plan adapté à votre activité
         </p>
 
-        <div class="grid md:grid-cols-2 gap-8">
+        <div class="grid md:grid-cols-3 gap-8">
 
           <!-- FREE -->
-          <div class="bg-white rounded-2xl p-8 flex flex-col shadow-md hover:shadow-xl transition border-t-4 border-green-400">
-
-            <h3 class="text-5xl font-bold mb-2 text-gray-800">Gratuit</h3>
-
-            <p class="text-5xl font-bold text-green-600">0€</p>
+          <div class="bg-white rounded-2xl shadow p-8 flex flex-col">
+            <h3 class="text-xl font-bold mb-2">Gratuit</h3>
+            <p class="text-4xl font-bold">0€</p>
             <p class="text-gray-400 mb-6">/mois</p>
-
-            <ul class="space-y-2 text-5xl text-gray-600 mb-8 flex-1">
-              <li>• 1 page</li>
-              <li>• Builder visuel</li>
+            <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
+              <li>✓ 1 page</li>
+              <li>✓ Builder visuel</li>
             </ul>
-
             <button
               @click="selectPlan('free')"
-              class="w-full bg-green-100 hover:bg-green-200 py-3 rounded-xl font-semibold text-green-800 transition"
+              class="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-xl font-semibold"
             >
               Commencer gratuitement
             </button>
           </div>
 
           <!-- PRO -->
-          <div class="bg-white rounded-5xl p-8 flex flex-col shadow-lg hover:shadow-2xl transition border-t-4 border-blue-500 relative">
-
-            <!-- badge -->
-            <div class="absolute top-4 right-4 bg-blue-500 text-white text-xs px-3 py-1 rounded-full shadow">
-              POPULAIRE
-            </div>
-
-            <h3 class="text-5xl font-bold mb-2 text-gray-800">Pro</h3>
-
-            <p class="text-5xl font-bold text-blue-600">10€</p>
+          <div class="bg-white rounded-2xl shadow p-8 flex flex-col">
+            <h3 class="text-xl font-bold mb-2">Pro</h3>
+            <p class="text-4xl font-bold">10€</p>
             <p class="text-gray-400 mb-6">/mois</p>
-
-            <ul class="space-y-2 text-5xl text-gray-600 mb-8 flex-1">
-              <li>• Multi-pages</li>
-              <li>• Builder visuel</li>
-              <li>• Paiement</li>
-              <li>• Analytics</li>
-              <li>• Support prioritaire</li>
+            <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
+              <li>✓ Multi-pages</li>
+              <li>✓ Builder visuel</li>
+              <li>✓ Configuration Paiement</li>
+              <li>✓ Analytics</li>
+              <li>✓ Support prioritaire</li>
             </ul>
-
             <button
               @click="selectPlan('pro')"
-              class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold transition"
+              class="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-xl font-semibold"
             >
               Choisir Pro
             </button>
@@ -134,9 +108,6 @@
 <script setup>
 import { ref } from "vue"
 import { useRouter } from "vue-router"
-
-// ✅ IMPORT IMAGE
-import appImage from "../assets/Website.png"
 
 const router = useRouter()
 const plansRef = ref(null)
@@ -163,7 +134,7 @@ const scrollToPlans = () => {
 </script>
 
 <style>
-body {
-  font-family: 'Inter', sans-serif;
+.box {
+  text-align: center;
 }
 </style>
