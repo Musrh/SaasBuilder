@@ -28,17 +28,17 @@
           Créez votre boutique
         </h1>
 
-        <p class="text-lg text-gray-600 mb-2">
+        <p class="text-5xl text-gray-600 mb-2">
           Builder + Paiements + Commandes en un seul outil
         </p>
 
-        <p class="text-2xl font-bold mb-6">
+        <p class="text-5xl font-bold mb-6">
           À partir de <span class="text-green-600">10€ / mois</span>
         </p>
 
         <!-- LOGIN -->
         <div class="mb-4">
-          <p class="text-sm text-gray-500 mb-2">
+          <p class="text-5xl text-gray-500 mb-2">
             Déjà un compte ?
           </p>
 
@@ -64,7 +64,7 @@
     <section ref="plansRef" class="py-20 bg-gradient-to-b from-green-50 to-blue-50">
       <div class="max-w-5xl mx-auto px-6">
 
-        <h2 class="text-3xl font-bold text-center mb-4 text-gray-800">
+        <h2 class="text-5xl font-bold text-center mb-4 text-gray-800">
           Nos offres
         </h2>
 
@@ -77,12 +77,12 @@
           <!-- FREE -->
           <div class="bg-white rounded-2xl p-8 flex flex-col shadow-md hover:shadow-xl transition border-t-4 border-green-400">
 
-            <h3 class="text-xl font-bold mb-2 text-gray-800">Gratuit</h3>
+            <h3 class="text-5xl font-bold mb-2 text-gray-800">Gratuit</h3>
 
-            <p class="text-4xl font-bold text-green-600">0€</p>
+            <p class="text-5xl font-bold text-green-600">0€</p>
             <p class="text-gray-400 mb-6">/mois</p>
 
-            <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
+            <ul class="space-y-2 text-5xl text-gray-600 mb-8 flex-1">
               <li>• 1 page</li>
               <li>• Builder visuel</li>
             </ul>
@@ -96,19 +96,19 @@
           </div>
 
           <!-- PRO -->
-          <div class="bg-white rounded-2xl p-8 flex flex-col shadow-lg hover:shadow-2xl transition border-t-4 border-blue-500 relative">
+          <div class="bg-white rounded-5xl p-8 flex flex-col shadow-lg hover:shadow-2xl transition border-t-4 border-blue-500 relative">
 
             <!-- badge -->
             <div class="absolute top-4 right-4 bg-blue-500 text-white text-xs px-3 py-1 rounded-full shadow">
               POPULAIRE
             </div>
 
-            <h3 class="text-xl font-bold mb-2 text-gray-800">Pro</h3>
+            <h3 class="text-5xl font-bold mb-2 text-gray-800">Pro</h3>
 
-            <p class="text-4xl font-bold text-blue-600">10€</p>
+            <p class="text-5xl font-bold text-blue-600">10€</p>
             <p class="text-gray-400 mb-6">/mois</p>
 
-            <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
+            <ul class="space-y-2 text-5xl text-gray-600 mb-8 flex-1">
               <li>• Multi-pages</li>
               <li>• Builder visuel</li>
               <li>• Paiement</li>
