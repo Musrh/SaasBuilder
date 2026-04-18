@@ -18,7 +18,7 @@
       <!-- IMAGE APP (FULL WIDTH / 300px height) -->
       <img
         :src="appImage"
-        class="w-full h-[300px] object-cover mb-6 rounded-xl shadow relative z-10"
+        class="w-[1000] h-[200px] object-cover mb-6 rounded-xl shadow relative z-10"
         alt="Aperçu de l'application"
       />
 
