@@ -136,7 +136,7 @@ import { ref } from "vue"
 import { useRouter } from "vue-router"
 
 // ✅ IMPORT IMAGE
-import appImage from "../assets/hero.png"
+import appImage from "../assets/Website.png"
 
 const router = useRouter()
 const plansRef = ref(null)
