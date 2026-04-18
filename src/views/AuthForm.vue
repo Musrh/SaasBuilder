@@ -1,9 +1,7 @@
-<!-- ============================================================
-  AuthForm.vue — Connexion / Inscription SaaS
-  FLOW : PlanSelection → AuthForm → Stripe (si payant) → Dashboard
-============================================================ -->
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-100">
+  <div class="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">
+
+    <!-- CARD -->
     <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
 
       <!-- PLAN CHOISI -->
@@ -64,19 +62,16 @@
       </button>
 
     </div>
+
+    <!-- 🔙 RETOUR -->
+    <button
+      @click="goToPlans"
+      class="mt-4 w-full max-w-md bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-medium transition"
+    >
+      ← Retour vers choix du plan
+    </button>
+
   </div>
-
-  <div>
-<!-- 🔙 RETOUR -->
-      <button
-        @click="goToPlans"
-        class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-medium transition"
-      >
-        ← Retour vers choix du plan
-      </button>
-
-    </div>
-  
 </template>
 
 <script setup>
@@ -94,40 +89,28 @@ import {
 const route = useRoute()
 const router = useRouter()
 
-// =====================
 // STATE
-// =====================
 const email = ref("")
 const password = ref("")
 const selectedPlan = ref("free")
 const loading = ref(false)
 const errorMsg = ref("")
 
-// =====================
-// BACKEND URL
-// =====================
 const API_URL = "https://backendfinal-production-afd2.up.railway.app"
 
-// =====================
 // LOAD PLAN
-// =====================
 onMounted(() => {
   selectedPlan.value =
     route.query.plan ||
     localStorage.getItem("planChoisi") ||
     "free"
 
-  // si déjà connecté → dashboard direct
   auth.onAuthStateChanged((user) => {
-    if (user) {
-      router.push("/dashboard")
-    }
+    if (user) router.push("/dashboard")
   })
 })
 
-// =====================
 // LOGIN
-// =====================
 const login = async () => {
   errorMsg.value = ""
   loading.value = true
@@ -145,20 +128,16 @@ const login = async () => {
       email: user.email
     }))
 
-    // ✅ Redirige vers Dashboard après connexion
     router.push("/dashboard")
 
   } catch (err) {
-    console.error(err)
     errorMsg.value = "Erreur connexion : " + err.message
   } finally {
     loading.value = false
   }
 }
 
-// =====================
-// REGISTER (OWNER SAAS)
-// =====================
+// REGISTER
 const register = async () => {
   errorMsg.value = ""
   loading.value = true
@@ -193,7 +172,6 @@ const register = async () => {
       plan: selectedPlan.value
     }))
 
-    // ✅ Si plan payant → paiement Stripe AVANT dashboard
     if (selectedPlan.value === "pro" || selectedPlan.value === "basic") {
       const res = await fetch(`${API_URL}/create-billing-session`, {
         method: "POST",
@@ -208,28 +186,24 @@ const register = async () => {
       const data = await res.json()
 
       if (data.url) {
-        window.location.href = data.url // → Stripe Checkout
+        window.location.href = data.url
         return
       } else {
         errorMsg.value = "Erreur paiement : impossible de créer la session Stripe."
       }
     }
 
-    // Plan free → dashboard direct
     router.push("/dashboard")
 
   } catch (err) {
-    console.error(err)
     errorMsg.value = "Erreur inscription : " + err.message
   } finally {
     loading.value = false
   }
+}
 
-// RETOUR PLAN
-// =====================
+// ✅ FIX : fonction bien placée
 const goToPlans = () => {
   router.push("/")
-}
-  
 }
 </script>
