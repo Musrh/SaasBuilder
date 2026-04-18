@@ -38,13 +38,82 @@ const configEditorTarget = ref("stripe")
 const configEditorContent = ref("")
 const showExportModal  = ref(false)
 
-// ── Import / Export thème ──────────────────────────────────
+// ── Système de thème ──────────────────────────────────────
+// Un thème = fichier JSON avec des variables CSS et propriétés de style
+// Format : { name, accent, bg, text, btnRadius, btnFont, heroFont, ... }
 const showThemeModal   = ref(false)
 const themeImportError = ref("")
-const themeScope       = ref("site")   // "site" | "page"
+const currentTheme     = ref(null)   // thème actif
 
-// Appliquer un thème JSON sur tout le site ou la page courante
-const applyTheme = (event) => {
+// Thèmes prédéfinis intégrés
+const builtinThemes = [
+  {
+    name: "Violet Élégant (défaut)",
+    accent: "#6c63ff", accentHover: "#4f46e5",
+    bg: "#ffffff", bgAlt: "#fafafa", bgHero: "linear-gradient(135deg,#f8f7ff,#ede9fe)",
+    text: "#1a1a2e", textSub: "#6b7280",
+    btnRadius: "10px", btnPadding: "14px 32px",
+    cardRadius: "16px", cardShadow: "0 2px 12px rgba(0,0,0,.06)",
+    heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif",
+    navBg: "#ffffff", navBorder: "#e5e7eb",
+  },
+  {
+    name: "Noir Moderne",
+    accent: "#f59e0b", accentHover: "#d97706",
+    bg: "#0f0f0f", bgAlt: "#1a1a1a", bgHero: "linear-gradient(135deg,#0f0f0f,#1a1a1a)",
+    text: "#f9fafb", textSub: "#9ca3af",
+    btnRadius: "4px", btnPadding: "14px 32px",
+    cardRadius: "8px", cardShadow: "0 2px 20px rgba(0,0,0,.4)",
+    heroFont: "'DM Sans',sans-serif", bodyFont: "'DM Sans',sans-serif",
+    navBg: "#0f0f0f", navBorder: "#2a2a2a",
+  },
+  {
+    name: "Rose Boutique",
+    accent: "#ec4899", accentHover: "#db2777",
+    bg: "#fff5f7", bgAlt: "#fce7f3", bgHero: "linear-gradient(135deg,#fff5f7,#fce7f3)",
+    text: "#1f2937", textSub: "#6b7280",
+    btnRadius: "100px", btnPadding: "12px 30px",
+    cardRadius: "20px", cardShadow: "0 4px 20px rgba(236,72,153,.12)",
+    heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif",
+    navBg: "#ffffff", navBorder: "#fce7f3",
+  },
+  {
+    name: "Vert Nature",
+    accent: "#059669", accentHover: "#047857",
+    bg: "#f0fdf4", bgAlt: "#dcfce7", bgHero: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
+    text: "#14532d", textSub: "#4b7563",
+    btnRadius: "8px", btnPadding: "13px 28px",
+    cardRadius: "12px", cardShadow: "0 2px 12px rgba(5,150,105,.1)",
+    heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif",
+    navBg: "#ffffff", navBorder: "#bbf7d0",
+  },
+]
+
+// Appliquer un thème (prédéfini ou importé)
+const applyThemeObj = (theme) => {
+  currentTheme.value = theme
+  const root = document.documentElement
+  root.style.setProperty("--theme-accent",      theme.accent        || "#6c63ff")
+  root.style.setProperty("--theme-accent-hover", theme.accentHover  || "#4f46e5")
+  root.style.setProperty("--theme-bg",           theme.bg           || "#ffffff")
+  root.style.setProperty("--theme-bg-alt",       theme.bgAlt        || "#fafafa")
+  root.style.setProperty("--theme-bg-hero",      theme.bgHero       || "linear-gradient(135deg,#f8f7ff,#ede9fe)")
+  root.style.setProperty("--theme-text",         theme.text         || "#1a1a2e")
+  root.style.setProperty("--theme-text-sub",     theme.textSub      || "#6b7280")
+  root.style.setProperty("--theme-btn-radius",   theme.btnRadius    || "10px")
+  root.style.setProperty("--theme-btn-padding",  theme.btnPadding   || "14px 32px")
+  root.style.setProperty("--theme-card-radius",  theme.cardRadius   || "16px")
+  root.style.setProperty("--theme-card-shadow",  theme.cardShadow   || "0 2px 12px rgba(0,0,0,.06)")
+  root.style.setProperty("--theme-hero-font",    theme.heroFont     || "'Playfair Display',serif")
+  root.style.setProperty("--theme-body-font",    theme.bodyFont     || "'DM Sans',sans-serif")
+  root.style.setProperty("--theme-nav-bg",       theme.navBg        || "#ffffff")
+  root.style.setProperty("--theme-nav-border",   theme.navBorder    || "#e5e7eb")
+  notify(`✅ Thème "${theme.name}" appliqué !`, "success")
+  showThemeModal.value = false
+}
+
+// Importer un thème depuis un fichier JSON externe
+const importThemeFile = (event) => {
   const file = event.target.files?.[0]
   if (!file) return
   themeImportError.value = ""
@@ -52,66 +121,27 @@ const applyTheme = (event) => {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result)
-
-      if (themeScope.value === "site") {
-        // ── Import sur tout le site ────────────────────────
-        if (data.pages && Array.isArray(data.pages)) {
-          // Thème complet : pages + sections
-          site.value = { pages: data.pages }
-          notify("✅ Thème appliqué sur tout le site !", "success")
-          showThemeModal.value = false
-        } else if (data.sections && Array.isArray(data.sections)) {
-          // Seulement des sections → appliquer à toutes les pages
-          site.value.pages.forEach(p => {
-            p.sections = data.sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
-          })
-          notify("✅ Sections du thème appliquées à toutes les pages !", "success")
-          showThemeModal.value = false
-        } else if (data.style) {
-          // Thème de style uniquement → appliquer le style à toutes les pages
-          site.value.pages.forEach(p => { p.style = { ...p.style, ...data.style } })
-          notify("✅ Style du thème appliqué à tout le site !", "success")
-          showThemeModal.value = false
-        } else {
-          themeImportError.value = "Format invalide. Attendu : { pages: [...] } ou { sections: [...] } ou { style: {...} }"
-        }
-      } else {
-        // ── Import sur la page courante seulement ──────────
-        const page = currentPage.value
-        if (!page) { themeImportError.value = "Aucune page active."; return }
-
-        if (data.pages && Array.isArray(data.pages) && data.pages[0]?.sections) {
-          page.sections = data.pages[0].sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
-          notify(`✅ Thème appliqué sur « ${page.name} » !`, "success")
-          showThemeModal.value = false
-        } else if (data.sections && Array.isArray(data.sections)) {
-          page.sections = data.sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
-          notify(`✅ Sections du thème appliquées sur « ${page.name} » !`, "success")
-          showThemeModal.value = false
-        } else if (data.style) {
-          page.style = { ...page.style, ...data.style }
-          notify(`✅ Style appliqué sur « ${page.name} » !`, "success")
-          showThemeModal.value = false
-        } else {
-          themeImportError.value = "Format invalide. Attendu : { sections: [...] } ou { style: {...} }"
-        }
+      if (!data.accent && !data.bg && !data.name) {
+        themeImportError.value = "Format invalide. Le fichier doit contenir des propriétés de thème (accent, bg, text...)"
+        return
       }
+      applyThemeObj({ name: data.name || "Thème importé", ...data })
     } catch(err) {
       themeImportError.value = "Fichier JSON invalide : " + err.message
     }
-    event.target.value = ""   // reset pour permettre re-sélection
+    event.target.value = ""
   }
   reader.readAsText(file)
 }
 
-// Exporter le site courant comme fichier thème JSON
-const exportTheme = () => {
-  const themeData = JSON.stringify(site.value, null, 2)
-  const blob = new Blob([themeData], { type: "application/json" })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement("a")
-  a.href     = url
-  a.download = `theme-${siteName.value || "site"}-${Date.now()}.json`
+// Exporter le thème actuel
+const exportCurrentTheme = () => {
+  const theme = currentTheme.value || builtinThemes[0]
+  const blob  = new Blob([JSON.stringify(theme, null, 2)], { type: "application/json" })
+  const url   = URL.createObjectURL(blob)
+  const a     = document.createElement("a")
+  a.href      = url
+  a.download  = `theme-${(theme.name || "saas").replace(/\s+/g,"-").toLowerCase()}.json`
   a.click()
   URL.revokeObjectURL(url)
   notify("✅ Thème exporté !", "success")
@@ -727,8 +757,7 @@ const sectionTypes = computed(() => [
   { key: "video",    label: t.value.videoLabel,   icon: "▶️", desc: t.value.sVideo },
   { key: "products", label: t.value.productsLabel.split(" ")[0], icon: "🛍️", desc: t.value.sProducts },
   { key: "features", label: "Features",    icon: "✦",   desc: t.value.sFeatures },
-  // Section Paiement masquée — Stripe Connect intégré pour les Pro
-  // { key: "payment",  label: t.value.publish==="نشر"?"دفع":"Paiement", icon: "💳", desc: t.value.sPayment },
+  // { key: "payment",  label: t.value.publish==="نشر"?"دفع":"Paiement", icon: "💳", desc: t.value.sPayment }, // masqué
   { key: "form",     label: t.value.contactLabel.split(" ")[0], icon: "✉️", desc: t.value.sForm },
   { key: "divider",  label: t.value.publish==="نشر"?"فاصل":"Séparateur", icon: "—", desc: t.value.sDivider },
 ])
@@ -1618,12 +1647,11 @@ const setPageStyle = (type, value) => {
       <select class="lang-select" v-model="currentLang">
         <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
       </select>
-      <!-- Boutons Stripe/PayPal masqués : les plans Pro utilisent Stripe Connect -->
+      <!-- Stripe/PayPal masqués : les Pro utilisent Stripe Connect -->
       <!-- <button class="btn-action icon-btn" @click="openConfigEditor('stripe')" :title="t.configureStripe">💳</button> -->
       <!-- <button class="btn-action icon-btn" @click="openConfigEditor('paypal')" :title="t.configurePaypal">🅿</button> -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
-      <button class="btn-action icon-btn theme-import-btn" @click="showThemeModal=true" title="Importer un thème">🎨</button>
-      <button class="btn-action icon-btn theme-export-btn" @click="exportTheme" title="Exporter le thème">📤</button>
+      <button class="btn-action icon-btn btn-theme-pick" @click="showThemeModal=true" title="Choisir / Importer un thème">🎨</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -1928,51 +1956,53 @@ const setPageStyle = (type, value) => {
   </div>
 </div>
 
-  <!-- ── MODAL IMPORT THÈME ──────────────────────────────── -->
+  <!-- ── MODAL THÈME ─────────────────────────────────────── -->
   <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false; themeImportError=''">
-    <div class="modal-box theme-modal">
+    <div class="modal-box theme-pick-modal">
       <button class="modal-close" @click="showThemeModal=false; themeImportError=''">✕</button>
-      <h3 class="theme-modal-title">🎨 Importer un thème</h3>
-      <p class="theme-modal-sub">Chargez un fichier <strong>.json</strong> exporté depuis SaasBuilder</p>
+      <h3 class="tpm-title">🎨 Thème du site</h3>
+      <p class="tpm-sub">Choisissez un thème prédéfini ou importez votre propre fichier <code>.json</code></p>
 
-      <!-- Portée -->
-      <div class="theme-scope-row">
-        <button :class="['theme-scope-btn', themeScope==='site' && 'active']" @click="themeScope='site'">
-          🌐 Tout le site
-        </button>
-        <button :class="['theme-scope-btn', themeScope==='page' && 'active']" @click="themeScope='page'">
-          📄 {{ currentPage?.name || 'Page courante' }}
+      <!-- Thèmes prédéfinis -->
+      <p class="tpm-section-label">THÈMES PRÉDÉFINIS</p>
+      <div class="tpm-grid">
+        <button
+          v-for="th in builtinThemes" :key="th.name"
+          class="tpm-card"
+          :class="{ active: currentTheme?.name === th.name }"
+          @click="applyThemeObj(th)"
+        >
+          <div class="tpm-preview">
+            <div class="tpm-prev-bg" :style="{ background: th.bg }">
+              <div class="tpm-prev-nav" :style="{ background: th.navBg, borderBottom: '1px solid ' + th.navBorder }"></div>
+              <div class="tpm-prev-hero" :style="{ background: th.bgHero }"></div>
+              <div class="tpm-prev-btn" :style="{ background: th.accent, borderRadius: th.btnRadius }"></div>
+              <div class="tpm-prev-card" :style="{ background: th.bgAlt, borderRadius: th.cardRadius }"></div>
+            </div>
+          </div>
+          <span class="tpm-name">{{ th.name }}</span>
+          <span class="tpm-dot" :style="{ background: th.accent }"></span>
         </button>
       </div>
-      <p class="theme-scope-hint">
-        <span v-if="themeScope==='site'">⚠ Remplace toutes les pages du site actuel</span>
-        <span v-else>Importe uniquement dans la page « {{ currentPage?.name }} »</span>
+
+      <!-- Import JSON -->
+      <p class="tpm-section-label" style="margin-top:20px">IMPORTER UN THÈME EXTERNE</p>
+      <p class="tpm-import-hint">
+        Chargez un fichier <code>.json</code> contenant les propriétés du thème :<br/>
+        <code>{ "name":"Mon thème", "accent":"#ff0066", "bg":"#fff", "text":"#111", ... }</code>
       </p>
-
-      <!-- Formats supportés -->
-      <div class="theme-formats">
-        <div class="theme-format-badge">📦 <code>{ pages: [...] }</code> — site complet</div>
-        <div class="theme-format-badge">🗂 <code>{ sections: [...] }</code> — sections</div>
-        <div class="theme-format-badge">🎨 <code>{ style: {...} }</code> — style uniquement</div>
-      </div>
-
-      <!-- Zone de sélection fichier -->
-      <label class="theme-drop-zone" for="theme-file-input">
-        <span class="theme-drop-icon">📁</span>
+      <label class="tpm-drop-zone" for="theme-json-input">
+        <span class="tpm-drop-icon">📂</span>
         <span>Cliquez pour choisir un fichier <strong>.json</strong></span>
-        <input
-          id="theme-file-input"
-          type="file"
-          accept=".json,application/json"
-          style="display:none"
-          @change="applyTheme"
-        />
+        <input id="theme-json-input" type="file" accept=".json,application/json"
+               style="display:none" @change="importThemeFile"/>
       </label>
+      <div v-if="themeImportError" class="tpm-error">⚠ {{ themeImportError }}</div>
 
-      <div v-if="themeImportError" class="theme-error">⚠ {{ themeImportError }}</div>
-
-      <div class="theme-modal-footer">
-        <small>Pour exporter votre thème actuel : bouton <strong>📤</strong> dans la barre d'outils</small>
+      <!-- Export thème actuel -->
+      <div class="tpm-export-row">
+        <span>Thème actuel : <strong>{{ currentTheme?.name || 'Défaut' }}</strong></span>
+        <button class="tpm-export-btn" @click="exportCurrentTheme">📤 Exporter</button>
       </div>
     </div>
   </div>
@@ -2190,10 +2220,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .sec-divider{padding:12px 40px}
 .divider-line{border:none;border-top:1px solid #e5e7eb}
 .preview-mode{font-family:'DM Sans',sans-serif}
-.prev-hero{padding:100px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
-.prev-hero-title{font-family:'Playfair Display',serif;font-size:52px;font-weight:600;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:16px}
-.prev-hero-sub{font-size:20px;color:#6b7280;margin-bottom:32px}
-.prev-hero-cta{background:#6c63ff;color:white;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
+.prev-hero{padding:80px 40px;background:var(--theme-bg-hero,linear-gradient(135deg,#f8f7ff,#ede9fe));text-align:center}
+.prev-hero-title{font-family:var(--theme-hero-font,'Playfair Display',serif);font-size:clamp(28px,5vw,52px);font-weight:600;color:var(--theme-text,#1a1a2e);line-height:1.15;white-space:pre-line;margin-bottom:16px}
+.prev-hero-sub{font-size:clamp(14px,2.5vw,20px);color:var(--theme-text-sub,#6b7280);margin-bottom:32px}
+.prev-hero-cta{background:var(--theme-accent,#6c63ff);color:white;border:none;border-radius:var(--theme-btn-radius,10px);padding:var(--theme-btn-padding,14px 32px);font-size:clamp(13px,2vw,16px);font-weight:600;cursor:pointer;font-family:var(--theme-body-font,'DM Sans',sans-serif);transition:all .2s}
 .prev-hero-cta:hover{transform:translateY(-2px)}
 .prev-text{padding:48px 60px}
 .prev-text p{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
@@ -2208,9 +2238,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .prev-video-title{font-family:'Playfair Display',serif;font-size:24px;color:#1a1a2e;margin-bottom:16px}
 .prev-video-wrap{border-radius:12px;overflow:hidden}
 .prev-video-iframe{width:100%;height:400px;border:none;display:block}
-.prev-products{padding:48px 60px;background:#fafafa}
-.prev-products-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.prev-product-card{background:white;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);transition:transform .2s}
+.prev-products{padding:clamp(24px,4vw,48px) clamp(16px,5vw,60px);background:var(--theme-bg-alt,#fafafa)}
+.prev-products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}
+.prev-product-card{background:var(--theme-bg,white);border:1px solid #e5e7eb;border-radius:var(--theme-card-radius,16px);overflow:hidden;box-shadow:var(--theme-card-shadow,0 2px 12px rgba(0,0,0,.06));transition:transform .2s}
 .prev-product-card:hover{transform:translateY(-4px)}
 .prev-product-img-wrap{position:relative}
 .prev-product-img{width:100%;height:180px;object-fit:cover;display:block}
@@ -2220,8 +2250,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .prev-product-name{font-size:15px;font-weight:600;color:#111;margin-bottom:6px}
 .prev-product-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:14px}
 .prev-product-footer{display:flex;align-items:center;justify-content:space-between}
-.prev-product-price{font-size:18px;font-weight:700;color:#6c63ff}
-.prev-product-btn{background:#6c63ff;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.prev-product-price{font-size:18px;font-weight:700;color:var(--theme-accent,#6c63ff)}
+.prev-product-btn{background:var(--theme-accent,#6c63ff);color:white;border:none;border-radius:calc(var(--theme-btn-radius,10px) * 0.6);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--theme-body-font,'DM Sans',sans-serif)}
 .prev-features{padding:60px;background:#fafafa}
 .prev-features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:840px;margin:0 auto}
 .prev-feature-card{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:28px 24px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.04)}
@@ -2315,29 +2345,61 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
 
-/* ── Thème Import/Export ─────────────────────────────────── */
-.theme-import-btn { background: linear-gradient(135deg, #a78bfa, #6c63ff); color: #fff; }
-.theme-import-btn:hover { background: linear-gradient(135deg, #6c63ff, #4f46e5); }
-.theme-export-btn { background: linear-gradient(135deg, #34d399, #059669); color: #fff; }
-.theme-export-btn:hover { background: linear-gradient(135deg, #059669, #047857); }
+/* ── APERÇU PUBLIC — correctifs layout et responsive ─────── */
+.public-preview-overlay{position:fixed;inset:0;z-index:900;background:var(--theme-bg,#fff);overflow-y:auto;display:flex;flex-direction:column}
+.pub-preview-close{position:fixed;top:12px;right:12px;z-index:1000;background:#ef4444;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.pub-preview-nav{position:sticky;top:0;z-index:800;background:var(--theme-nav-bg,#fff);border-bottom:1px solid var(--theme-nav-border,#e5e7eb);display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.pub-preview-brand-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0;min-width:0}
+.pub-preview-logo{height:32px;width:auto;max-width:120px;object-fit:contain;border-radius:6px;flex-shrink:0}
+.pub-preview-brand-icon{font-size:22px;flex-shrink:0}
+.pub-preview-brand-name{font-size:15px;font-weight:700;color:var(--theme-text,#1a1a2e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.pub-preview-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;justify-content:center}
+.pub-preview-tabs::-webkit-scrollbar{display:none}
+.pub-preview-tab{background:none;border:none;color:var(--theme-text-sub,#6b7280);font-size:14px;font-weight:500;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:var(--theme-body-font,'DM Sans',sans-serif)}
+.pub-preview-tab.active,.pub-preview-tab:hover{background:var(--theme-accent,#6c63ff);color:white}
+.pub-preview-cart{background:var(--theme-accent,#6c63ff);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pub-preview-content{flex:1;width:100%;max-width:100%}
 
-.theme-modal { max-width: 480px; width: 92%; }
-.theme-modal-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.theme-modal-sub { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+/* Responsive grids en aperçu mobile */
+@media(max-width:600px){
+  .prev-hero{padding:48px 16px}
+  .prev-products{padding:24px 12px}
+  .prev-products-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+  .prev-features-grid{grid-template-columns:1fr!important}
+  .prev-product-img,.prev-product-img-ph{height:130px}
+  .pub-preview-brand-name{max-width:80px;font-size:13px}
+  .pub-preview-close{top:8px;right:8px;padding:6px 10px;font-size:12px}
+}
 
-.theme-scope-row { display: flex; gap: 8px; margin-bottom: 8px; }
-.theme-scope-btn { flex: 1; padding: 9px 0; border-radius: 8px; border: 2px solid var(--border2); background: transparent; color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: .2s; font-family: 'DM Sans', sans-serif; }
-.theme-scope-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
-.theme-scope-hint { font-size: 12px; color: var(--text3); margin-bottom: 14px; padding: 8px 12px; background: rgba(108,99,255,.07); border-radius: 8px; border-left: 3px solid var(--accent); }
+/* ── Bouton thème dans topbar ─────────────────────────────── */
+.btn-theme-pick{background:linear-gradient(135deg,#a78bfa,#6c63ff);color:#fff}
+.btn-theme-pick:hover{background:linear-gradient(135deg,#6c63ff,#4f46e5)}
 
-.theme-formats { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-.theme-format-badge { font-size: 12px; color: var(--text2); padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; gap: 8px; }
-.theme-format-badge code { font-family: monospace; color: var(--accent); font-size: 11px; }
+/* ── Modal Thème ──────────────────────────────────────────── */
+.theme-pick-modal{max-width:520px;width:94%;max-height:88vh;overflow-y:auto}
+.tpm-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px}
+.tpm-sub{font-size:13px;color:var(--text2);margin-bottom:16px}
+.tpm-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px}
+.tpm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:8px}
+.tpm-card{background:var(--surface2);border:2px solid var(--border);border-radius:12px;padding:10px;cursor:pointer;text-align:left;transition:.2s;display:flex;flex-direction:column;gap:8px;position:relative}
+.tpm-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tpm-card.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.2)}
+.tpm-preview{border-radius:8px;overflow:hidden;height:72px;border:1px solid var(--border)}
+.tpm-prev-bg{height:100%;display:flex;flex-direction:column;gap:3px;padding:4px}
+.tpm-prev-nav{height:14px;border-radius:3px;flex-shrink:0}
+.tpm-prev-hero{flex:1;border-radius:3px}
+.tpm-prev-btn{height:12px;width:40%;border-radius:4px;margin-top:2px}
+.tpm-prev-card{height:16px;border-radius:4px;margin-top:2px;width:80%}
+.tpm-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tpm-dot{width:10px;height:10px;border-radius:50%;position:absolute;top:10px;right:10px}
+.tpm-import-hint{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;background:var(--surface2);padding:10px 12px;border-radius:8px;border-left:3px solid var(--accent)}
+.tpm-import-hint code{font-family:monospace;color:var(--accent2,#10b981);font-size:11px}
+.tpm-drop-zone{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px;border:2px dashed var(--border2);border-radius:12px;cursor:pointer;transition:.2s;color:var(--text2);text-align:center;margin-bottom:12px}
+.tpm-drop-zone:hover{border-color:var(--accent);background:rgba(108,99,255,.05);color:var(--accent)}
+.tpm-drop-icon{font-size:26px}
+.tpm-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444;margin-bottom:12px}
+.tpm-export-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--text2)}
+.tpm-export-btn{background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+.tpm-export-btn:hover{background:var(--accent);color:white;border-color:var(--accent)}
 
-.theme-drop-zone { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 16px; border: 2px dashed var(--border2); border-radius: 12px; cursor: pointer; transition: .2s; color: var(--text2); text-align: center; margin-bottom: 12px; }
-.theme-drop-zone:hover { border-color: var(--accent); background: rgba(108,99,255,.05); color: var(--accent); }
-.theme-drop-icon { font-size: 30px; }
-
-.theme-error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #ef4444; margin-bottom: 12px; }
-.theme-modal-footer { font-size: 11px; color: var(--text3); text-align: center; padding-top: 8px; border-top: 1px solid var(--border); }
 </style>
