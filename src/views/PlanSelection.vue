@@ -18,12 +18,12 @@
       <!-- IMAGE APP (FULL WIDTH / 300px height) -->
       <img
         :src="appImage"
-        class="w-[200] h-[100px] object-cover mb-6 rounded-xl shadow relative z-10"
+        class="w-[100] h-[100px] object-cover mb-6 rounded-xl shadow relative z-10"
         alt="Aperçu de l'application"
       />
 
       <!-- CONTENU -->
-      <div class="relative z-10 max-w-2xl text-gray-800">
+      <div class="relative z-10 max-w-6xl text-gray-800">
         <h1 class="text-4xl md:text-5xl font-bold mb-4">
           Créez votre boutique
         </h1>
