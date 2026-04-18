@@ -1,45 +1,55 @@
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] px-4">
 
     <!-- CARD -->
-    <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+    <div class="w-full max-w-md rounded-3xl p-8 bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-white">
 
-      <!-- PLAN CHOISI -->
-      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
-        <p class="text-sm text-gray-500">Vous avez choisi</p>
-        <p class="text-2xl font-bold text-blue-600 capitalize">
+      <!-- EMOJI / TITLE -->
+      <div class="text-center mb-6">
+        <div class="text-5xl mb-2">👋</div>
+        <h2 class="text-2xl font-semibold">
+          Connexion / Inscription
+        </h2>
+        <p class="text-sm text-gray-300 mt-2">
+          Accédez à votre espace SaaS
+        </p>
+      </div>
+
+      <!-- PLAN -->
+      <div class="bg-white/10 border border-white/10 rounded-xl p-3 mb-6 text-center">
+        <p class="text-xs text-gray-300">Plan choisi</p>
+        <p class="text-lg font-bold capitalize text-purple-400">
           {{ selectedPlan }}
         </p>
       </div>
 
-      <!-- TITLE -->
-      <h2 class="text-2xl font-bold mb-6 text-center">
-        Connexion / Inscription
-      </h2>
-
       <!-- EMAIL -->
-      <input
-        v-model="email"
-        type="email"
-        placeholder="Email"
-        class="w-full border p-3 rounded-lg mb-4"
-      />
+      <div class="mb-4">
+        <input
+          v-model="email"
+          type="email"
+          placeholder="votre@email.com"
+          class="w-full p-3 rounded-xl bg-white/10 border border-white/10 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+      </div>
 
       <!-- PASSWORD -->
-      <input
-        v-model="password"
-        type="password"
-        placeholder="Mot de passe"
-        class="w-full border p-3 rounded-lg mb-6"
-      />
+      <div class="mb-2">
+        <input
+          v-model="password"
+          type="password"
+          placeholder="••••••••"
+          class="w-full p-3 rounded-xl bg-white/10 border border-white/10 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+      </div>
 
       <!-- ERROR -->
-      <p v-if="errorMsg" class="text-red-500 text-sm mb-4 text-center">
+      <p v-if="errorMsg" class="text-red-400 text-sm mb-3 text-center">
         {{ errorMsg }}
       </p>
 
       <!-- LOADING -->
-      <p v-if="loading" class="text-blue-500 text-sm mb-4 text-center">
+      <p v-if="loading" class="text-purple-400 text-sm mb-3 text-center">
         Chargement...
       </p>
 
@@ -47,33 +57,31 @@
       <button
         @click="login"
         :disabled="loading"
-        class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg mb-3 disabled:opacity-50"
+        class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 py-3 rounded-xl font-semibold mb-3 hover:opacity-90 transition disabled:opacity-50"
       >
-        Se connecter
+        🔑 Se connecter
       </button>
 
       <!-- REGISTER -->
       <button
         @click="register"
         :disabled="loading"
-        class="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-lg disabled:opacity-50"
+        class="w-full bg-white/10 py-3 rounded-xl font-semibold hover:bg-white/20 transition disabled:opacity-50"
       >
         S'inscrire
       </button>
 
+      <!-- RETOUR -->
+      <button
+        @click="goToPlans"
+        class="mt-4 w-full text-sm text-gray-400 hover:text-white transition"
+      >
+        ← Retour au choix du plan
+      </button>
+
     </div>
-
-    <!-- 🔙 RETOUR -->
-    <button
-      @click="goToPlans"
-      class="mt-4 w-full max-w-md bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-medium transition"
-    >
-      ← Retour vers choix du plan
-    </button>
-
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
