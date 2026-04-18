@@ -36,7 +36,86 @@ const paymentSuccess = ref(false)
 const showConfigEditor = ref(false)
 const configEditorTarget = ref("stripe")
 const configEditorContent = ref("")
-const showExportModal = ref(false)
+const showExportModal  = ref(false)
+
+// ── Import / Export thème ──────────────────────────────────
+const showThemeModal   = ref(false)
+const themeImportError = ref("")
+const themeScope       = ref("site")   // "site" | "page"
+
+// Appliquer un thème JSON sur tout le site ou la page courante
+const applyTheme = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  themeImportError.value = ""
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result)
+
+      if (themeScope.value === "site") {
+        // ── Import sur tout le site ────────────────────────
+        if (data.pages && Array.isArray(data.pages)) {
+          // Thème complet : pages + sections
+          site.value = { pages: data.pages }
+          notify("✅ Thème appliqué sur tout le site !", "success")
+          showThemeModal.value = false
+        } else if (data.sections && Array.isArray(data.sections)) {
+          // Seulement des sections → appliquer à toutes les pages
+          site.value.pages.forEach(p => {
+            p.sections = data.sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
+          })
+          notify("✅ Sections du thème appliquées à toutes les pages !", "success")
+          showThemeModal.value = false
+        } else if (data.style) {
+          // Thème de style uniquement → appliquer le style à toutes les pages
+          site.value.pages.forEach(p => { p.style = { ...p.style, ...data.style } })
+          notify("✅ Style du thème appliqué à tout le site !", "success")
+          showThemeModal.value = false
+        } else {
+          themeImportError.value = "Format invalide. Attendu : { pages: [...] } ou { sections: [...] } ou { style: {...} }"
+        }
+      } else {
+        // ── Import sur la page courante seulement ──────────
+        const page = currentPage.value
+        if (!page) { themeImportError.value = "Aucune page active."; return }
+
+        if (data.pages && Array.isArray(data.pages) && data.pages[0]?.sections) {
+          page.sections = data.pages[0].sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
+          notify(`✅ Thème appliqué sur « ${page.name} » !`, "success")
+          showThemeModal.value = false
+        } else if (data.sections && Array.isArray(data.sections)) {
+          page.sections = data.sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
+          notify(`✅ Sections du thème appliquées sur « ${page.name} » !`, "success")
+          showThemeModal.value = false
+        } else if (data.style) {
+          page.style = { ...page.style, ...data.style }
+          notify(`✅ Style appliqué sur « ${page.name} » !`, "success")
+          showThemeModal.value = false
+        } else {
+          themeImportError.value = "Format invalide. Attendu : { sections: [...] } ou { style: {...} }"
+        }
+      }
+    } catch(err) {
+      themeImportError.value = "Fichier JSON invalide : " + err.message
+    }
+    event.target.value = ""   // reset pour permettre re-sélection
+  }
+  reader.readAsText(file)
+}
+
+// Exporter le site courant comme fichier thème JSON
+const exportTheme = () => {
+  const themeData = JSON.stringify(site.value, null, 2)
+  const blob = new Blob([themeData], { type: "application/json" })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
+  a.download = `theme-${siteName.value || "site"}-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  notify("✅ Thème exporté !", "success")
+}
 
 // ===== I18N =====
 const currentLang = ref("fr")
@@ -648,7 +727,8 @@ const sectionTypes = computed(() => [
   { key: "video",    label: t.value.videoLabel,   icon: "▶️", desc: t.value.sVideo },
   { key: "products", label: t.value.productsLabel.split(" ")[0], icon: "🛍️", desc: t.value.sProducts },
   { key: "features", label: "Features",    icon: "✦",   desc: t.value.sFeatures },
-  { key: "payment",  label: t.value.publish==="نشر"?"دفع":"Paiement", icon: "💳", desc: t.value.sPayment },
+  // Section Paiement masquée — Stripe Connect intégré pour les Pro
+  // { key: "payment",  label: t.value.publish==="نشر"?"دفع":"Paiement", icon: "💳", desc: t.value.sPayment },
   { key: "form",     label: t.value.contactLabel.split(" ")[0], icon: "✉️", desc: t.value.sForm },
   { key: "divider",  label: t.value.publish==="نشر"?"فاصل":"Séparateur", icon: "—", desc: t.value.sDivider },
 ])
@@ -1538,9 +1618,12 @@ const setPageStyle = (type, value) => {
       <select class="lang-select" v-model="currentLang">
         <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
       </select>
-      <button class="btn-action icon-btn" @click="openConfigEditor('stripe')" :title="t.configureStripe">💳</button>
-      <button class="btn-action icon-btn" @click="openConfigEditor('paypal')" :title="t.configurePaypal">🅿</button>
+      <!-- Boutons Stripe/PayPal masqués : les plans Pro utilisent Stripe Connect -->
+      <!-- <button class="btn-action icon-btn" @click="openConfigEditor('stripe')" :title="t.configureStripe">💳</button> -->
+      <!-- <button class="btn-action icon-btn" @click="openConfigEditor('paypal')" :title="t.configurePaypal">🅿</button> -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
+      <button class="btn-action icon-btn theme-import-btn" @click="showThemeModal=true" title="Importer un thème">🎨</button>
+      <button class="btn-action icon-btn theme-export-btn" @click="exportTheme" title="Exporter le thème">📤</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -1844,6 +1927,56 @@ const setPageStyle = (type, value) => {
     </main>
   </div>
 </div>
+
+  <!-- ── MODAL IMPORT THÈME ──────────────────────────────── -->
+  <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false; themeImportError=''">
+    <div class="modal-box theme-modal">
+      <button class="modal-close" @click="showThemeModal=false; themeImportError=''">✕</button>
+      <h3 class="theme-modal-title">🎨 Importer un thème</h3>
+      <p class="theme-modal-sub">Chargez un fichier <strong>.json</strong> exporté depuis SaasBuilder</p>
+
+      <!-- Portée -->
+      <div class="theme-scope-row">
+        <button :class="['theme-scope-btn', themeScope==='site' && 'active']" @click="themeScope='site'">
+          🌐 Tout le site
+        </button>
+        <button :class="['theme-scope-btn', themeScope==='page' && 'active']" @click="themeScope='page'">
+          📄 {{ currentPage?.name || 'Page courante' }}
+        </button>
+      </div>
+      <p class="theme-scope-hint">
+        <span v-if="themeScope==='site'">⚠ Remplace toutes les pages du site actuel</span>
+        <span v-else>Importe uniquement dans la page « {{ currentPage?.name }} »</span>
+      </p>
+
+      <!-- Formats supportés -->
+      <div class="theme-formats">
+        <div class="theme-format-badge">📦 <code>{ pages: [...] }</code> — site complet</div>
+        <div class="theme-format-badge">🗂 <code>{ sections: [...] }</code> — sections</div>
+        <div class="theme-format-badge">🎨 <code>{ style: {...} }</code> — style uniquement</div>
+      </div>
+
+      <!-- Zone de sélection fichier -->
+      <label class="theme-drop-zone" for="theme-file-input">
+        <span class="theme-drop-icon">📁</span>
+        <span>Cliquez pour choisir un fichier <strong>.json</strong></span>
+        <input
+          id="theme-file-input"
+          type="file"
+          accept=".json,application/json"
+          style="display:none"
+          @change="applyTheme"
+        />
+      </label>
+
+      <div v-if="themeImportError" class="theme-error">⚠ {{ themeImportError }}</div>
+
+      <div class="theme-modal-footer">
+        <small>Pour exporter votre thème actuel : bouton <strong>📤</strong> dans la barre d'outils</small>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <style>
@@ -2181,4 +2314,30 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions{display:flex;gap:10px}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
+
+/* ── Thème Import/Export ─────────────────────────────────── */
+.theme-import-btn { background: linear-gradient(135deg, #a78bfa, #6c63ff); color: #fff; }
+.theme-import-btn:hover { background: linear-gradient(135deg, #6c63ff, #4f46e5); }
+.theme-export-btn { background: linear-gradient(135deg, #34d399, #059669); color: #fff; }
+.theme-export-btn:hover { background: linear-gradient(135deg, #059669, #047857); }
+
+.theme-modal { max-width: 480px; width: 92%; }
+.theme-modal-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.theme-modal-sub { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+
+.theme-scope-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.theme-scope-btn { flex: 1; padding: 9px 0; border-radius: 8px; border: 2px solid var(--border2); background: transparent; color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: .2s; font-family: 'DM Sans', sans-serif; }
+.theme-scope-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.theme-scope-hint { font-size: 12px; color: var(--text3); margin-bottom: 14px; padding: 8px 12px; background: rgba(108,99,255,.07); border-radius: 8px; border-left: 3px solid var(--accent); }
+
+.theme-formats { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.theme-format-badge { font-size: 12px; color: var(--text2); padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; display: flex; align-items: center; gap: 8px; }
+.theme-format-badge code { font-family: monospace; color: var(--accent); font-size: 11px; }
+
+.theme-drop-zone { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 16px; border: 2px dashed var(--border2); border-radius: 12px; cursor: pointer; transition: .2s; color: var(--text2); text-align: center; margin-bottom: 12px; }
+.theme-drop-zone:hover { border-color: var(--accent); background: rgba(108,99,255,.05); color: var(--accent); }
+.theme-drop-icon { font-size: 30px; }
+
+.theme-error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #ef4444; margin-bottom: 12px; }
+.theme-modal-footer { font-size: 11px; color: var(--text3); text-align: center; padding-top: 8px; border-top: 1px solid var(--border); }
 </style>
