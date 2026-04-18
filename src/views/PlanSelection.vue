@@ -1,7 +1,8 @@
 <!-- ============================================================
-  PlanSelection.vue — VERSION DESIGN AMÉLIORÉ
-  ✔ Image réduite à 300px
-  ✔ Style coloré moderne
+  PlanSelection.vue — IMAGE APP FULL WIDTH
+  ✔ Image locale (appImage)
+  ✔ Pleine largeur (w-full)
+  ✔ Hauteur 300px
   ✔ Fonctionnalités intactes
 ============================================================ -->
 <template>
@@ -14,11 +15,11 @@
       <div class="absolute top-0 left-0 w-72 h-72 bg-green-200 rounded-full blur-3xl opacity-30"></div>
       <div class="absolute bottom-0 right-0 w-72 h-72 bg-blue-200 rounded-full blur-3xl opacity-30"></div>
 
-      <!-- IMAGE (300px) -->
+      <!-- IMAGE APP (FULL WIDTH / 300px height) -->
       <img
-        src="https://images.unsplash.com/photo-1498579809087-ef1e558fd1da?auto=format&fit=crop&w=800&q=80"
-        class="w-[300px] mb-6 rounded-2xl shadow-lg relative z-10"
-        alt="store"
+        :src="appImage"
+        class="w-full h-[300px] object-cover mb-6 rounded-xl shadow relative z-10"
+        alt="Aperçu de l'application"
       />
 
       <!-- CONTENU -->
@@ -133,6 +134,9 @@
 <script setup>
 import { ref } from "vue"
 import { useRouter } from "vue-router"
+
+// ✅ IMPORT IMAGE
+import appImage from "@/assets/app-preview.png"
 
 const router = useRouter()
 const plansRef = ref(null)
