@@ -1,16 +1,19 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
-import VoiceAssistantClient from "../components/VoiceAssistantClient.vue"
 import { db, auth } from "../firebase.js"
-import { doc, getDoc, setDoc, addDoc, deleteDoc, collection } from "firebase/firestore"
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { doc, getDoc, setDoc } from "firebase/firestore"
+import { onAuthStateChanged } from "firebase/auth"
 import { stripeConfig, loadStripeSDK } from "./stripe.js"
 import { paypalConfig, loadPaypalSDK } from "./paypal.js"
 
-// Site vide par défaut — sera remplacé par les données Firestore au login
-// ou restera vide pour la première inscription
 const site = ref({
-  pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }]
+  pages: [{
+    id: 1, name: "Accueil", style: {},
+    sections: [
+      { id: 1, type: "hero", content: "Créez votre site web\nen quelques minutes.", subtitle: "Une plateforme puissante, simple et élégante.", cta: "Commencer", style: {} },
+      { id: 2, type: "text", content: "Bienvenue sur notre plateforme.", style: {} }
+    ]
+  }]
 })
 
 const mode = ref("edit")
@@ -18,12 +21,7 @@ const currentPageIndex = ref(0)
 const activeSectionIndex = ref(null)
 const isSaved = ref(true)
 const isSaving = ref(false)
-const currentUser   = ref(null)
-const userRole      = ref("")      // "owner" | "customer" | ""
-const userOrders    = ref([])
-const loadingOrders = ref(false)
-const isOwner  = computed(() => userRole.value === "owner" || userRole.value === "")
-const isClient = computed(() => userRole.value === "customer")
+const currentUser = ref(null)
 const showPageMenu = ref(false)
 const sidebarTab = ref("sections")
 const showNotif = ref(false)
@@ -38,73 +36,7 @@ const paymentSuccess = ref(false)
 const showConfigEditor = ref(false)
 const configEditorTarget = ref("stripe")
 const configEditorContent = ref("")
-const showExportModal  = ref(false)
-const showThemeImport  = ref(false)
-const themeImportError = ref("")
-const themeImportFile  = ref(null)
-const themeScope       = ref("site")   // "site" | "page"
-
-// ── Import de thème externe ────────────────────────────────
-// Format attendu : JSON exporté depuis SaasBuilder
-// { pages: [...] }  → importer tout le site
-// { sections: [...] } → importer dans la page courante
-const importTheme = (event) => {
-  const file = event.target.files?.[0]
-  if (!file) return
-  themeImportError.value = ""
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result)
-
-      if (themeScope.value === "site" && data.pages && Array.isArray(data.pages)) {
-        // Importer tout le site
-        site.value = { pages: data.pages }
-        notify("✅ Thème appliqué sur tout le site !", "success")
-        showThemeImport.value = false
-
-      } else if (data.sections && Array.isArray(data.sections)) {
-        // Importer uniquement les sections dans la page courante
-        const page = currentPage.value
-        if (page) {
-          page.sections = data.sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
-          notify("✅ Thème appliqué sur la page courante !", "success")
-        }
-        showThemeImport.value = false
-
-      } else if (data.pages && Array.isArray(data.pages) && themeScope.value === "page") {
-        // Importer les sections de la première page du thème dans la page courante
-        const page = currentPage.value
-        if (page && data.pages[0]?.sections) {
-          page.sections = data.pages[0].sections.map(s => ({ ...s, id: Date.now() + Math.random() }))
-          notify("✅ Sections du thème importées dans la page courante !", "success")
-        }
-        showThemeImport.value = false
-
-      } else {
-        themeImportError.value = "Format invalide. Le fichier doit contenir { pages: [...] } ou { sections: [...] }"
-      }
-    } catch(err) {
-      themeImportError.value = "Fichier JSON invalide : " + err.message
-    }
-  }
-  reader.readAsText(file)
-  // Reset input pour permettre re-sélection du même fichier
-  event.target.value = ""
-}
-
-// Exporter le site actuel comme thème JSON téléchargeable
-const exportTheme = () => {
-  const json = JSON.stringify(site.value, null, 2)
-  const blob = new Blob([json], { type: "application/json" })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement("a")
-  a.href     = url
-  a.download = `theme-${siteName.value || "saasbuilder"}-${Date.now()}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  notify("✅ Thème exporté !", "success")
-}
+const showExportModal = ref(false)
 
 // ===== I18N =====
 const currentLang = ref("fr")
@@ -461,114 +393,21 @@ const cartCount = computed(() => {
 const cartCurrency = computed(() => cart.value[0]?.currency || '€')
 
 const checkoutCart = () => {
-  // Passer à l'étape checkout dans la même modale panier
-  cartStep.value    = "checkout"
-  cartPayError.value = ""
-}
-
-const backToCart = () => { cartStep.value = "cart" }
-
-// Payer depuis le panier (Stripe Checkout → backend)
-const payCart = async () => {
-  cartPayError.value = ""
-  // Vérifier que le client est connecté avant de payer
-  if (!currentUser.value) {
-    cartPayError.value = "Connectez-vous pour finaliser votre commande."
-    // Fermer le panier et rediriger vers l'auth
-    setTimeout(() => {
-      showCart.value = false
-      cartStep.value = "cart"
-      window.location.hash = "#/auth"
-    }, 1200)
-    return
+  showCart.value = false
+  // Ouvrir la modale de paiement avec les totaux du panier
+  paymentModalSection.value = {
+    title: t.value.cartCheckout || 'Finaliser la commande',
+    description: `${cartCount.value} article(s)`,
+    amount: cartTotal.value,
+    currency: cartCurrency.value,
   }
-  if (!cartCustomerName.value.trim())    { cartPayError.value = "Nom obligatoire.";    return }
-  if (!cartCustomerEmail.value.trim())   { cartPayError.value = "Email obligatoire.";  return }
-  if (!cartCustomerAddress.value.trim()) { cartPayError.value = "Adresse obligatoire."; return }
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cartCustomerEmail.value)
-  if (!emailOk) { cartPayError.value = "Email invalide."; return }
-
-  const cfg = liveStripeConfig.value
-  if (!cfg.backendUrl || cfg.backendUrl.includes("votre-backend")) {
-    notify("⚠️ Configurez votre backendUrl dans stripe.js", "error"); return
-  }
-
-  paymentProcessing.value = true
-  try {
-    const adresseLivraison = `${cartCustomerAddress.value}, ${cartCustomerZip.value} ${cartCustomerCity.value}, ${cartCustomerCountry.value}`.trim()
-
-    // Sauvegarder en localStorage avant le redirect Stripe
-    const pendingOrder = {
-      items:            cart.value.map(i => ({
-        id: i.id, name: i.name, price: i.price,
-        currency: i.currency || "€", qty: i.qty, image: i.image || "",
-      })),
-      total:            cartTotal.value,
-      currency:         cartCurrency.value || "€",
-      itemCount:        cartCount.value,
-      customerName:     cartCustomerName.value.trim(),
-      customerEmail:    cartCustomerEmail.value.trim().toLowerCase(),
-      customerAddress:  adresseLivraison,
-      ownerUid:         currentUser.value?.uid,
-      siteSlug:         currentUser.value?.uid,
-      provider:         "stripe",
-      createdAt:        new Date().toISOString(),
-    }
-    localStorage.setItem("pendingStripeOrder", JSON.stringify(pendingOrder))
-    localStorage.setItem("stripeOwnerUid",     currentUser.value?.uid || "")
-
-    // Appel backend Stripe
-    const res = await fetch(cfg.backendUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount:   Math.round(parseFloat(cartTotal.value) * 100),
-        currency: cfg.currency || "eur",
-        description: `Commande — ${cartCount.value} article(s)`,
-        items:    cart.value.map(i => ({
-          nom:         i.name,
-          prix:        parseFloat(i.price),
-          quantity:    i.qty,
-          description: i.description || "",
-          image:       i.image || "",
-        })),
-        email:            cartCustomerEmail.value.trim(),
-        clientId:         currentUser.value?.uid || "guest",
-        storeName:        cfg.storeName || siteName.value,
-        adresseLivraison,
-        customerName:     cartCustomerName.value.trim(),
-        successUrl:       `https://musrh.github.io/SaasBuilder/`,
-        cancelUrl:        `https://musrh.github.io/SaasBuilder/`,
-      }),
-    })
-
-    if (!res.ok) throw new Error("Erreur serveur " + res.status)
-    const data = await res.json()
-    if (!data.url) throw new Error(data.error || "Pas d'URL Stripe reçue")
-
-    // Fermer et rediriger
-    showCart.value = false
-    window.location.href = data.url
-
-  } catch(e) {
-    cartPayError.value = e.message
-    notify("Erreur paiement : " + e.message, "error")
-  } finally {
-    paymentProcessing.value = false
-  }
+  paymentProvider.value = 'stripe'
+  paymentSuccess.value = false
+  paymentProcessing.value = false
+  showPaymentModal.value = true
 }
 
 const emptyCart = () => { cart.value = [] }
-
-// ===== INFOS CLIENT PANIER =====
-const cartCustomerName    = ref("")
-const cartCustomerEmail   = ref("")
-const cartCustomerAddress = ref("")   // adresse de livraison
-const cartCustomerCity    = ref("")
-const cartCustomerZip     = ref("")
-const cartCustomerCountry = ref("France")
-const cartStep            = ref("cart")  // "cart" | "checkout" | "success"
-const cartPayError        = ref("")
 
 // ===== SITE NAME =====
 const siteName = ref("WellShoppings")
@@ -585,8 +424,6 @@ const uploadLogo = (e) => {
 // ===== PUBLISH =====
 const showPublishModal = ref(false)
 const showPublicPreview = ref(false)
-const showMobileSidebar = ref(false)  // sidebar visible sur mobile
-const showUserProfile   = ref(false)  // popup profil utilisateur
 const publishAddress = ref("")
 const publishDomain = ref("")
 const publishStatus = ref("") // '' | 'published'
@@ -654,42 +491,6 @@ const publishSite = async () => {
     localStorage.setItem("siteDataPro", JSON.stringify(site.value))
     isSaved.value = true
 
-    // 4. Synchroniser les produits du site vers prodinfos (pour l'assistant vocal)
-    try {
-      const { getDocs: gd2, query: q2, where: w2, deleteDoc: del2, doc: d2 }
-        = await import("firebase/firestore")
-
-      // Supprimer les anciens prodinfos de ce store
-      const oldSnap = await gd2(q2(
-        collection(db, "prodinfos"), w2("storeUid", "==", uid)))
-      for (const oldDoc of oldSnap.docs) {
-        await del2(d2(db, "prodinfos", oldDoc.id))
-      }
-
-      // Écrire les produits actuels du site
-      for (const page of site.value.pages || []) {
-        for (const section of page.sections || []) {
-          if (section.type === "products" && Array.isArray(section.items)) {
-            for (const p of section.items) {
-              await addDoc(collection(db, "prodinfos"), {
-                name:        p.name        || "",
-                price:       parseFloat(p.price) || 0,
-                description: p.description || "",
-                badge:       p.badge       || "",
-                currency:    p.currency    || "€",
-                image:       p.image       || "",
-                storeUid:    uid,
-                syncedAt:    new Date().toISOString(),
-              })
-            }
-          }
-        }
-      }
-      console.log("✅ prodinfos synchronisés avec siteData")
-    } catch(eSyncProd) {
-      console.warn("Sync prodinfos:", eSyncProd.message)
-    }
-
     publishInfo.value = { slug, urlUid, urlSlug, domain, uid }
     publishStatus.value = "published"
 
@@ -755,52 +556,6 @@ const copyDnsRecords = () => {
 const currentPage = computed(() => site.value.pages[currentPageIndex.value] || site.value.pages[0])
 const activeSection = computed(() => currentPage.value?.sections?.[activeSectionIndex.value])
 
-// ===== FORMULAIRE CONTACT =====
-const contactForm = ref({ name: "", email: "", message: "" })
-const contactSending = ref(false)
-const contactSent    = ref(false)
-const contactError   = ref("")
-
-const sendContact = async (sectionStyle) => {
-  if (!contactForm.value.name || !contactForm.value.email || !contactForm.value.message) {
-    contactError.value = "Veuillez remplir tous les champs."; return
-  }
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactForm.value.email)
-  if (!emailValid) { contactError.value = "Email invalide."; return }
-
-  contactSending.value = true
-  contactError.value   = ""
-  try {
-    // uid du propriétaire du store :
-    //   - si connecté (builder) → currentUser.uid
-    //   - si aperçu public → publishInfo.uid
-    const uid = currentUser.value?.uid || publishInfo.value?.uid
-    if (!uid) {
-      contactError.value = "Impossible d'identifier le store. Réessayez."
-      return
-    }
-    const contactData = {
-      name:      contactForm.value.name.trim(),
-      email:     contactForm.value.email.trim().toLowerCase(),
-      message:   contactForm.value.message.trim(),
-      createdAt: new Date().toISOString(),
-      storeUid:  uid,
-      status:    "nouveau",
-    }
-    // Écrire dans users/{uid}/contacts → règle Firestore : allow create: if true
-    await addDoc(collection(db, "users", uid, "contacts"), contactData)
-    contactSent.value   = true
-    contactForm.value   = { name: "", email: "", message: "" }
-    notify("✓ Message envoyé avec succès !")
-    setTimeout(() => { contactSent.value = false }, 4000)
-  } catch(e) {
-    contactError.value = "Erreur d'envoi. Réessayez."
-    console.error("Contact form error:", e)
-  } finally {
-    contactSending.value = false
-  }
-}
-
 onMounted(() => {
   // Restaurer depuis localStorage immédiatement (avant Firestore)
   const sn = localStorage.getItem("siteName")
@@ -808,106 +563,24 @@ onMounted(() => {
   if (sn) siteName.value = sn
   if (sl) siteLogo.value = sl
   onAuthStateChanged(auth, async (user) => {
-    if (!user) { userRole.value = ""; userOrders.value = []; return }
+    if (!user) return
     currentUser.value = user
     await loadSavedConfigs()
-    // Détecter propriétaire vs client
-    try {
-      const ownerSnap = await getDoc(doc(db, "users", user.uid))
-      if (ownerSnap.exists()) {
-        userRole.value = "owner"
-      } else {
-        const custSnap = await getDoc(doc(db, "customers", user.uid))
-        userRole.value = custSnap.exists() ? "customer" : "owner"
-        if (userRole.value === "customer") {
-          // Charger commandes du client
-          const storeUid = custSnap.data()?.storeUid || ""
-          if (storeUid) {
-            try {
-              const { query: q, where, getDocs: gd } = await import("firebase/firestore")
-              const results = []
-              const dedup = (d) => { if (!results.find(r => r.id === d.id)) results.push({ id: d.id, ...d.data() }) }
-              const uid   = user.uid
-              const email = (user.email || "").toLowerCase()
-
-              // SANS orderBy → pas d'index composite requis, tri côté client
-
-              // Source 1 : orders par clientId
-              try {
-                const s1 = await gd(q(collection(db, "orders"), where("clientId", "==", uid)))
-                s1.docs.forEach(dedup)
-              } catch(e) { console.error("orders/clientId:", e.message) }
-
-              // Source 2 : orders par customerEmail
-              if (email) {
-                try {
-                  const s2 = await gd(q(collection(db, "orders"), where("customerEmail", "==", email)))
-                  s2.docs.forEach(dedup)
-                } catch(e) { console.error("orders/email:", e.message) }
-              }
-
-              // Source 3 : cmdclients par clientUid
-              try {
-                const s3 = await gd(q(collection(db, "cmdclients"), where("clientUid", "==", uid)))
-                s3.docs.forEach(dedup)
-              } catch(e) { console.error("cmdclients/uid:", e.message) }
-
-              // Source 4 : cmdclients par clientEmail
-              if (email) {
-                try {
-                  const s4 = await gd(q(collection(db, "cmdclients"), where("clientEmail", "==", email)))
-                  s4.docs.forEach(dedup)
-                } catch(e) { console.error("cmdclients/email:", e.message) }
-              }
-
-              // Tri côté client
-              results.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
-              userOrders.value = results
-            } catch(e) { console.warn("orders:", e.message) }
-          }
-        }
-      }
-    } catch(e) { userRole.value = "owner" }
-
     try {
       const docRef = doc(db, "users", user.uid)
       const snap = await getDoc(docRef)
       if (snap.exists()) {
         const d = snap.data()
-        if (d.siteName) siteName.value = d.siteName
-        if (d.siteLogo) siteLogo.value = d.siteLogo
-
-        if (d.siteData) {
-          // Utilisateur existant : charger son site sauvegardé
-          site.value = d.siteData
-        } else {
-          // Première inscription : site VIDE (ne pas charger localStorage)
-          // L'utilisateur part d'une page blanche
-          site.value = {
-            pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }]
-          }
-          localStorage.removeItem("siteDataPro")  // Effacer tout résidu
-        }
-
-        // ── Recharger le slug publié ──────────────────────
-        if (d.publishedSlug) {
-          publishAddress.value = d.publishedSlug
-          publishStatus.value  = "published"
-          const base = "https://musrh.github.io/SaasBuilder"
-          publishInfo.value = {
-            slug:    d.publishedSlug,
-            uid:     user.uid,
-            urlSlug: `${base}/#/site/${d.publishedSlug}`,
-            urlUid:  `${base}/#/site/${user.uid}`,
-            domain:  d.customDomain || null,
-          }
+        if (d.siteData)   site.value     = d.siteData
+        if (d.siteName)   siteName.value = d.siteName
+        if (d.siteLogo)   siteLogo.value = d.siteLogo
+        if (!d.siteData) {
+          const saved = localStorage.getItem("siteDataPro")
+          if (saved) site.value = JSON.parse(saved)
         }
       } else {
-        // Nouveau compte : document users/ inexistant → site VIDE
-        site.value = {
-          pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }]
-        }
-        localStorage.removeItem("siteDataPro")
+        const saved = localStorage.getItem("siteDataPro")
+        if (saved) site.value = JSON.parse(saved)
       }
     } catch (e) {
       console.error("Erreur chargement Firestore :", e)
@@ -930,124 +603,6 @@ watch([() => showPaymentModal.value, () => paymentProvider.value], ([modalOpen, 
     setTimeout(() => initStripeElements(), 150)
   }
 })
-
-const signedOut      = ref(false)   // afficher écran déconnexion
-const soMode         = ref("login") // "login" | "register" | "forgot"
-const soEmail        = ref("")
-const soPassword     = ref("")
-const soConfirm      = ref("")
-const soDisplayName  = ref("")
-const soError        = ref("")
-const soSuccess      = ref("")
-const soLoading      = ref(false)
-
-// Messages d'erreur Firebase → français
-const authErrMsg = (code) => ({
-  "auth/user-not-found":       "Aucun compte avec cet email.",
-  "auth/wrong-password":       "Mot de passe incorrect.",
-  "auth/invalid-email":        "Format d'email invalide.",
-  "auth/email-already-in-use": "Un compte existe déjà avec cet email.",
-  "auth/weak-password":        "Mot de passe trop court (min. 6 caractères).",
-  "auth/too-many-requests":    "Trop de tentatives. Réessayez plus tard.",
-  "auth/invalid-credential":   "Email ou mot de passe incorrect.",
-}[code] || "Erreur : " + code)
-
-// Connexion
-const soLogin = async () => {
-  soError.value = ""; soSuccess.value = ""
-  if (!soEmail.value.trim() || !soPassword.value) {
-    soError.value = "Email et mot de passe requis."; return
-  }
-  soLoading.value = true
-  try {
-    await signInWithEmailAndPassword(auth, soEmail.value.trim(), soPassword.value)
-    signedOut.value = false
-    soEmail.value = ""; soPassword.value = ""
-  } catch(e) { soError.value = authErrMsg(e.code) }
-  finally { soLoading.value = false }
-}
-
-// Inscription nouveau client du store
-const soRegister = async () => {
-  soError.value = ""; soSuccess.value = ""
-  if (!soDisplayName.value.trim()) { soError.value = "Votre nom est requis."; return }
-  if (!soEmail.value.trim())       { soError.value = "Email requis."; return }
-  if (soPassword.value.length < 6) { soError.value = "Mot de passe : min. 6 caractères."; return }
-  if (soPassword.value !== soConfirm.value) { soError.value = "Les mots de passe ne correspondent pas."; return }
-  soLoading.value = true
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, soEmail.value.trim(), soPassword.value)
-    await updateProfile(cred.user, { displayName: soDisplayName.value.trim() })
-    // storeUid = UID du propriétaire du store
-    // On le lit depuis publishInfo (déjà chargé) ou currentUser si c'est le builder
-    const storeUid = publishInfo.value?.uid || currentUser.value?.uid || ""
-    // Écrire dans customers/{clientUid} — règle Firestore : allow create: if request.auth != null
-    await setDoc(
-      doc(db, "customers", cred.user.uid),
-      {
-        uid:         cred.user.uid,
-        email:       soEmail.value.trim().toLowerCase(),
-        displayName: soDisplayName.value.trim(),
-        storeUid,
-        role:        "customer",
-        createdAt:   new Date().toISOString(),
-      },
-      { merge: true }
-    )
-    soSuccess.value = "Compte créé avec succès ! Bienvenue 🎉"
-    signedOut.value = false
-    soEmail.value = ""; soPassword.value = ""; soConfirm.value = ""; soDisplayName.value = ""
-    soMode.value = "login"
-  } catch(e) { soError.value = authErrMsg(e.code) }
-  finally { soLoading.value = false }
-}
-
-// Récupération mot de passe
-const soForgot = async () => {
-  soError.value = ""; soSuccess.value = ""
-  if (!soEmail.value.trim()) { soError.value = "Entrez votre email d'abord."; return }
-  soLoading.value = true
-  try {
-    await sendPasswordResetEmail(auth, soEmail.value.trim())
-    soSuccess.value = "Email de réinitialisation envoyé ! Vérifiez votre boîte mail."
-  } catch(e) { soError.value = authErrMsg(e.code) }
-  finally { soLoading.value = false }
-}
-
-// Connexion Google
-const soGoogleLogin = async () => {
-  soError.value = ""; soLoading.value = true
-  try {
-    const provider = new GoogleAuthProvider()
-    const result   = await signInWithPopup(auth, provider)
-    const storeUid = publishInfo.value?.uid || currentUser.value?.uid || ""
-    await setDoc(
-      doc(db, "customers", result.user.uid),
-      {
-        uid:         result.user.uid,
-        email:       result.user.email,
-        displayName: result.user.displayName || "",
-        photoURL:    result.user.photoURL    || "",
-        storeUid,
-        role:        "customer",
-        createdAt:   new Date().toISOString(),
-      },
-      { merge: true }
-    )
-    signedOut.value = false
-  } catch(e) { soError.value = authErrMsg(e.code) }
-  finally { soLoading.value = false }
-}
-
-const handleSignOut = async () => {
-  try {
-    showUserProfile.value = false
-    await signOut(auth)
-    signedOut.value = true
-  } catch(e) {
-    notify("Erreur déconnexion", "error")
-  }
-}
 
 const notify = (msg, type = "success") => {
   notifMsg.value = msg; notifType.value = type; showNotif.value = true
@@ -1093,8 +648,7 @@ const sectionTypes = computed(() => [
   { key: "video",    label: t.value.videoLabel,   icon: "▶️", desc: t.value.sVideo },
   { key: "products", label: t.value.productsLabel.split(" ")[0], icon: "🛍️", desc: t.value.sProducts },
   { key: "features", label: "Features",    icon: "✦",   desc: t.value.sFeatures },
-  // Section Paiement masquée : les Pro utilisent Stripe Connect, les Free simulent les ventes
-  // { key: "payment",  label: t.value.publish==="نشر"?"دفع":"Paiement", icon: "💳", desc: t.value.sPayment },
+  { key: "payment",  label: t.value.publish==="نشر"?"دفع":"Paiement", icon: "💳", desc: t.value.sPayment },
   { key: "form",     label: t.value.contactLabel.split(" ")[0], icon: "✉️", desc: t.value.sForm },
   { key: "divider",  label: t.value.publish==="نشر"?"فاصل":"Séparateur", icon: "—", desc: t.value.sDivider },
 ])
@@ -1349,15 +903,6 @@ const livePaypalConfig = ref({
   brandName: "",
 })
 
-// Config Paddle
-const livePaddleConfig = ref({
-  vendorId: "",
-  productId: "",
-  environment: "sandbox",
-  currency: "EUR",
-  successCallback: "",
-})
-
 // Charger la config paiement du store depuis Firestore
 const loadSavedConfigs = async () => {
   if (!currentUser.value) return
@@ -1373,64 +918,98 @@ const loadSavedConfigs = async () => {
       if (d.storePaymentConfig?.paypal) {
         livePaypalConfig.value = { ...livePaypalConfig.value, ...d.storePaymentConfig.paypal }
       }
-      if (d.storePaymentConfig?.paddle) {
-        livePaddleConfig.value = { ...livePaddleConfig.value, ...d.storePaymentConfig.paddle }
-      }
     }
   } catch(e) { console.warn("Config load error:", e) }
 }
 
 const openConfigEditor = (target) => {
   configEditorTarget.value = target
-  showConfigEditor.value   = true
+  // Auto-générer les URLs selon le slug publié du store
+  const uid  = currentUser.value?.uid || ""
+  const slug = publishAddress.value?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || uid
+  const base = "https://musrh.github.io/SaasBuilder/#"
+
+  if (target === "stripe") {
+    const cfg = liveStripeConfig.value
+    // Si pas d'URLs configurées, générer automatiquement
+    // Stripe supprime tout après # → URL racine simple
+    // La détection du retour Stripe se fait dans main.js de SaasBuilder
+    const origin = "https://musrh.github.io/SaasBuilder"
+    const successUrl = cfg.successUrl || `${origin}/`
+    const cancelUrl  = cfg.cancelUrl  || `${origin}/`
+    configEditorContent.value =
+`// ============================================================
+//  Config Stripe de VOTRE STORE
+//  Ces paramètres permettent à vos CLIENTS de vous payer.
+//  Différent de stripe.js (qui sert pour les plans Sassbuilder)
+// ============================================================
+{
+  "publishableKey": "${cfg.publishableKey || "pk_test_VOTRE_CLE_PUBLIQUE"}",
+  "backendUrl": "${cfg.backendUrl || "https://votre-backend.com/create-payment-intent"}",
+  "currency": "${cfg.currency || "eur"}",
+  "storeName": "${cfg.storeName || siteName.value}",
+  "successUrl": "${successUrl}",
+  "cancelUrl": "${cancelUrl}",
+  "mode": "${cfg.mode || "test"}"
+}`
+  } else {
+    const cfg = livePaypalConfig.value
+    const origin2 = "https://musrh.github.io/SaasBuilder"
+    const successUrl = cfg.successUrl || `${origin2}/`
+    configEditorContent.value =
+`// ============================================================
+//  Config PayPal de VOTRE STORE
+//  Vos clients vous paient via votre propre compte PayPal.
+// ============================================================
+{
+  "clientId": "${cfg.clientId || "VOTRE_CLIENT_ID_PAYPAL"}",
+  "mode": "${cfg.mode || "sandbox"}",
+  "currency": "${cfg.currency || "EUR"}",
+  "locale": "${cfg.locale || "fr_FR"}",
+  "createOrderUrl": "${cfg.createOrderUrl || "https://votre-backend.com/paypal/create-order"}",
+  "captureOrderUrl": "${cfg.captureOrderUrl || "https://votre-backend.com/paypal/capture-order"}",
+  "successUrl": "${successUrl}",
+  "brandName": "${cfg.brandName || siteName.value}"
+}`
+  }
+  showConfigEditor.value = true
 }
 
 const saveConfigFile = async () => {
   if (!currentUser.value) { notify("Connectez-vous d'abord.", "error"); return }
   try {
-    // Les champs sont déjà liés via v-model sur liveStripeConfig / livePaypalConfig / livePaddleConfig
-    // On sauvegarde directement les refs dans Firestore — pas de parsing JSON nécessaire
-    const storePaymentConfig = {
-      stripe: {
-        publishableKey:    liveStripeConfig.value.publishableKey    || "",
-        backendUrl:        liveStripeConfig.value.backendUrl        || "",
-        currency:          liveStripeConfig.value.currency          || "eur",
-        storeName:         liveStripeConfig.value.storeName         || siteName.value,
-        mode:              liveStripeConfig.value.mode              || "test",
-        successUrl:        liveStripeConfig.value.successUrl        || "",
-        cancelUrl:         liveStripeConfig.value.cancelUrl         || "",
-        shippingCountries: liveStripeConfig.value.shippingCountries || [],
-      },
-      paypal: {
-        clientId:        livePaypalConfig.value.clientId        || "",
-        mode:            livePaypalConfig.value.mode            || "sandbox",
-        currency:        livePaypalConfig.value.currency        || "EUR",
-        locale:          livePaypalConfig.value.locale          || "fr_FR",
-        createOrderUrl:  livePaypalConfig.value.createOrderUrl  || "",
-        captureOrderUrl: livePaypalConfig.value.captureOrderUrl || "",
-        successUrl:      livePaypalConfig.value.successUrl      || "",
-        brandName:       livePaypalConfig.value.brandName       || siteName.value,
-      },
-      paddle: {
-        vendorId:        livePaddleConfig.value.vendorId        || "",
-        productId:       livePaddleConfig.value.productId       || "",
-        environment:     livePaddleConfig.value.environment     || "sandbox",
-        currency:        livePaddleConfig.value.currency        || "EUR",
-        successCallback: livePaddleConfig.value.successCallback || "",
-      },
+    // Parser le JSON depuis le textarea
+    const txt = configEditorContent.value
+      .replace(/\/\/.*$/gm, "")      // supprimer commentaires
+      .replace(/\/\*[\s\S]*?\*\//g, "") // commentaires bloc
+      .trim()
+    // Extraire le JSON entre { }
+    const jsonMatch = txt.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error("Format invalide — doit contenir { ... }")
+    const parsed = JSON.parse(jsonMatch[0])
+
+    if (configEditorTarget.value === "stripe") {
+      liveStripeConfig.value = { ...liveStripeConfig.value, ...parsed }
+    } else {
+      livePaypalConfig.value = { ...livePaypalConfig.value, ...parsed }
     }
 
+    // Sauvegarder dans Firestore users/{uid}/storePaymentConfig
+    const storePaymentConfig = {
+      stripe: { ...liveStripeConfig.value },
+      paypal: { ...livePaypalConfig.value },
+    }
     await setDoc(
       doc(db, "users", currentUser.value.uid),
       { storePaymentConfig },
       { merge: true }
     )
 
-    notify("✓ Config paiement sauvegardée dans Firestore")
+    notify(`✓ Config ${configEditorTarget.value} sauvegardée dans Firestore`)
     showConfigEditor.value = false
   } catch(e) {
-    notify("Erreur sauvegarde : " + e.message, "error")
-    console.error("saveConfigFile error:", e)
+    notify("Erreur : " + e.message, "error")
+    console.error(e)
   }
 }
 
@@ -1533,144 +1112,53 @@ const setPageStyle = (type, value) => {
     <div v-if="showNotif" class="notif" :class="notifType">{{ notifMsg }}</div>
   </Transition>
 
-  <!-- CART MODAL — Panier + Livraison + Paiement -->
+  <!-- CART MODAL -->
   <Transition name="modal">
-    <div v-if="showCart" class="modal-overlay cart-overlay" @click.self="showCart=false; cartStep='cart'" :dir="isRtl?'rtl':'ltr'">
+    <div v-if="showCart" class="modal-overlay" @click.self="showCart=false" :dir="isRtl?'rtl':'ltr'">
       <div class="modal-box cart-modal">
-
-        <!-- HEADER -->
-        <div class="cart-modal-header">
-          <button v-if="cartStep==='checkout'" class="cart-back-btn" @click="backToCart">← Retour</button>
-          <div class="cart-header-title">
-            <span>{{ cartStep==='cart' ? '🛒' : cartStep==='checkout' ? '📋' : '✅' }}</span>
-            <div>
-              <h2>{{ cartStep==='cart' ? t.cartTitle : cartStep==='checkout' ? 'Livraison & Paiement' : 'Commande confirmée !' }}</h2>
-              <p v-if="cartStep==='cart' && cart.length > 0" class="cart-header-sub">{{ cartCount }} article{{ cartCount > 1 ? 's' : '' }}</p>
-            </div>
-          </div>
-          <button class="modal-close" @click="showCart=false; cartStep='cart'">✕</button>
+        <button class="modal-close" @click="showCart=false">✕</button>
+        <div class="modal-header">
+          <span class="modal-icon">🛒</span>
+          <h2>{{ t.cartTitle }}</h2>
         </div>
 
-        <!-- ÉTAPE 1 : PANIER -->
-        <template v-if="cartStep==='cart'">
-          <div v-if="cart.length === 0" class="cart-empty">
-            <span>🛍️</span>
-            <p>{{ t.cartEmpty }}</p>
+        <div v-if="cart.length === 0" class="cart-empty">
+          <span>🛍️</span>
+          <p>{{ t.cartEmpty }}</p>
+        </div>
+
+        <div v-else class="cart-items">
+          <div v-for="item in cart" :key="item.id" class="cart-item">
+            <div class="cart-item-img">
+              <img v-if="item.image" :src="item.image" :alt="item.name"/>
+              <span v-else>🛍️</span>
+            </div>
+            <div class="cart-item-info">
+              <div class="cart-item-name">{{ item.name }}</div>
+              <div class="cart-item-price">{{ item.price }}{{ item.currency }}</div>
+            </div>
+            <div class="cart-item-qty">
+              <button class="qty-btn" @click="updateQty(item.id, -1)">−</button>
+              <span class="qty-val">{{ item.qty }}</span>
+              <button class="qty-btn" @click="updateQty(item.id, 1)">+</button>
+            </div>
+            <div class="cart-item-subtotal">{{ (parseFloat(item.price)*item.qty).toFixed(2) }}{{ item.currency }}</div>
+            <button class="cart-item-del" @click="removeFromCart(item.id)">✕</button>
           </div>
+        </div>
 
-          <div v-else class="cart-items">
-            <div v-for="item in cart" :key="item.id" class="cart-item">
-              <div class="cart-item-img">
-                <img v-if="item.image" :src="item.image" :alt="item.name"/>
-                <span v-else>🛍️</span>
-              </div>
-              <div class="cart-item-info">
-                <div class="cart-item-name">{{ item.name }}</div>
-                <div class="cart-item-price">{{ item.price }}{{ item.currency }}</div>
-              </div>
-              <div class="cart-item-qty">
-                <button class="qty-btn" @click="updateQty(item.id, -1)">−</button>
-                <span class="qty-val">{{ item.qty }}</span>
-                <button class="qty-btn" @click="updateQty(item.id, 1)">+</button>
-              </div>
-              <div class="cart-item-subtotal">{{ (parseFloat(item.price)*item.qty).toFixed(2) }}{{ item.currency }}</div>
-              <button class="cart-item-del" @click="removeFromCart(item.id)">✕</button>
-            </div>
+        <div v-if="cart.length > 0" class="cart-footer">
+          <div class="cart-total-row">
+            <span class="cart-total-label">{{ t.cartTotal }}</span>
+            <span class="cart-total-amount">{{ cartTotal }}{{ cartCurrency }}</span>
           </div>
-
-          <div v-if="cart.length > 0" class="cart-footer">
-            <div class="cart-total-row">
-              <span class="cart-total-label">{{ t.cartTotal }}</span>
-              <span class="cart-total-amount">{{ cartTotal }}{{ cartCurrency }}</span>
-            </div>
-            <div class="cart-actions">
-              <button class="btn-action" @click="showCart=false">{{ t.cartContinue }}</button>
-              <button class="pay-submit stripe-submit cart-checkout-btn" @click="checkoutCart">
-                📋 Livraison & Paiement →
-              </button>
-            </div>
+          <div class="cart-actions">
+            <button class="btn-action" @click="showCart=false">{{ t.cartContinue }}</button>
+            <button class="pay-submit stripe-submit cart-checkout-btn" @click="checkoutCart">
+              💳 {{ t.cartCheckout }}
+            </button>
           </div>
-        </template>
-
-        <!-- ÉTAPE 2 : INFOS LIVRAISON + PAIEMENT -->
-        <template v-else-if="cartStep==='checkout'">
-
-          <!-- Résumé commande -->
-          <div class="checkout-summary">
-            <div v-for="item in cart" :key="item.id" class="checkout-item">
-              <div class="checkout-item-img">
-                <img v-if="item.image" :src="item.image" :alt="item.name"/>
-                <span v-else>🛍️</span>
-              </div>
-              <span class="checkout-item-name">{{ item.name }} ×{{ item.qty }}</span>
-              <span class="checkout-item-price">{{ (parseFloat(item.price)*item.qty).toFixed(2) }}{{ item.currency }}</span>
-            </div>
-            <div class="checkout-total">
-              <span>Total</span>
-              <strong>{{ cartTotal }}{{ cartCurrency }}</strong>
-            </div>
-          </div>
-
-          <!-- Infos client -->
-          <div class="checkout-fields">
-            <div class="checkout-section-title">👤 Informations client</div>
-            <div class="checkout-row">
-              <div class="checkout-field">
-                <label>Nom complet *</label>
-                <input v-model="cartCustomerName" placeholder="Jean Dupont" class="checkout-input"/>
-              </div>
-              <div class="checkout-field">
-                <label>Email *</label>
-                <input v-model="cartCustomerEmail" placeholder="jean@email.com" type="email" class="checkout-input"/>
-              </div>
-            </div>
-
-            <div class="checkout-section-title" style="margin-top:14px">📦 Adresse de livraison</div>
-            <div class="checkout-field">
-              <label>Adresse *</label>
-              <input v-model="cartCustomerAddress" placeholder="123 rue de la Paix" class="checkout-input"/>
-            </div>
-            <div class="checkout-row">
-              <div class="checkout-field">
-                <label>Code postal</label>
-                <input v-model="cartCustomerZip" placeholder="75001" class="checkout-input"/>
-              </div>
-              <div class="checkout-field">
-                <label>Ville</label>
-                <input v-model="cartCustomerCity" placeholder="Paris" class="checkout-input"/>
-              </div>
-            </div>
-            <div class="checkout-field">
-              <label>Pays</label>
-              <select v-model="cartCustomerCountry" class="checkout-input checkout-select">
-                <option>France</option>
-                <option>Maroc</option>
-                <option>Belgique</option>
-                <option>Suisse</option>
-                <option>Canada</option>
-                <option>Algérie</option>
-                <option>Tunisie</option>
-                <option>Sénégal</option>
-                <option>Côte d'Ivoire</option>
-              </select>
-            </div>
-          </div>
-
-          <p v-if="cartPayError" class="cart-pay-error">⚠ {{ cartPayError }}</p>
-
-          <button
-            class="pay-submit stripe-submit cart-pay-final"
-            @click="payCart"
-            :disabled="paymentProcessing"
-          >
-            <span v-if="paymentProcessing" class="spinner"/>
-            <span v-else>💳</span>
-            {{ paymentProcessing ? "Redirection Stripe..." : `Payer ${cartTotal}${cartCurrency}` }}
-          </button>
-
-          <p class="cart-secure-note">🔒 Paiement sécurisé via Stripe</p>
-        </template>
-
+        </div>
       </div>
     </div>
   </Transition>
@@ -1732,173 +1220,23 @@ const setPageStyle = (type, value) => {
     </div>
   </Transition>
 
-  <!-- CONFIG PAIEMENT MODAL — Stripe / PayPal / Paddle -->
+  <!-- CONFIG EDITOR MODAL -->
   <Transition name="modal">
     <div v-if="showConfigEditor" class="modal-overlay" @click.self="showConfigEditor=false">
-      <div class="modal-box config-modal pay-config-modal">
+      <div class="modal-box config-modal">
         <button class="modal-close" @click="showConfigEditor=false">✕</button>
-
         <div class="modal-header">
-          <span class="modal-icon">⚙️</span>
-          <h2>Configuration Paiement</h2>
-          <p class="modal-desc">Configurez vos prestataires de paiement. Sauvegardé dans Firestore.</p>
+          <span class="modal-icon">{{ configEditorTarget==='stripe'?'💳':'🅿' }}</span>
+          <h2>Config {{ configEditorTarget==='stripe'?'Stripe':'PayPal' }} de votre store</h2>
+          <p class="modal-desc">
+            Configurez vos clés pour recevoir les paiements de <strong>vos clients</strong>.
+            Sauvegardé dans Firestore — actif immédiatement.
+          </p>
         </div>
-
-        <!-- Onglets prestataires -->
-        <div class="pay-tabs">
-          <button :class="['pay-tab-btn', { active: configEditorTarget==='stripe' }]"  @click="configEditorTarget='stripe'">💳 Stripe</button>
-          <button :class="['pay-tab-btn', { active: configEditorTarget==='paypal' }]"  @click="configEditorTarget='paypal'">🅿 PayPal</button>
-          <button :class="['pay-tab-btn', { active: configEditorTarget==='paddle' }]"  @click="configEditorTarget='paddle'">🏓 Paddle</button>
-        </div>
-
-        <!-- ── STRIPE ────────────────────────────────────── -->
-        <div v-if="configEditorTarget==='stripe'" class="pay-form-fields">
-          <div class="pcf-section-title">🔑 Clés API Stripe</div>
-          <div class="pcf-field">
-            <label>Publishable Key <span class="pcf-required">*</span></label>
-            <input v-model="liveStripeConfig.publishableKey" placeholder="pk_test_..." class="pcf-input" spellcheck="false"/>
-            <span class="pcf-hint">Clé publique depuis stripe.com → Developers → API Keys</span>
-          </div>
-          <div class="pcf-field">
-            <label>Backend URL <span class="pcf-required">*</span></label>
-            <input v-model="liveStripeConfig.backendUrl" placeholder="https://votre-backend.com/create-stripe-session" class="pcf-input" spellcheck="false"/>
-            <span class="pcf-hint">Endpoint de votre serveur qui crée la session Stripe</span>
-          </div>
-          <div class="pcf-row">
-            <div class="pcf-field">
-              <label>Devise</label>
-              <select v-model="liveStripeConfig.currency" class="pcf-input pcf-select">
-                <option value="eur">EUR €</option>
-                <option value="usd">USD $</option>
-                <option value="gbp">GBP £</option>
-                <option value="mad">MAD</option>
-                <option value="cad">CAD</option>
-              </select>
-            </div>
-            <div class="pcf-field">
-              <label>Mode</label>
-              <select v-model="liveStripeConfig.mode" class="pcf-input pcf-select">
-                <option value="test">Test</option>
-                <option value="live">Live</option>
-              </select>
-            </div>
-          </div>
-          <div class="pcf-field">
-            <label>Nom du store</label>
-            <input v-model="liveStripeConfig.storeName" :placeholder="siteName" class="pcf-input"/>
-          </div>
-          <div class="pcf-section-title" style="margin-top:14px">📦 Livraison (affiché au client)</div>
-          <div class="pcf-field">
-            <label>Pays de livraison disponibles</label>
-            <div class="pcf-checkbox-group">
-              <label v-for="pays in ['FR','MA','BE','CH','CA','DZ','TN','SN','CI']" :key="pays" class="pcf-checkbox">
-                <input type="checkbox" :value="pays" v-model="liveStripeConfig.shippingCountries"/> {{ pays }}
-              </label>
-            </div>
-            <span class="pcf-hint">Les clients pourront saisir leur adresse lors du paiement</span>
-          </div>
-          <div class="pcf-section-title" style="margin-top:14px">🔗 URLs de retour (auto-générées)</div>
-          <div class="pcf-field">
-            <label>URL Succès</label>
-            <input v-model="liveStripeConfig.successUrl" placeholder="Auto (recommandé : laisser vide)" class="pcf-input pcf-url" spellcheck="false"/>
-          </div>
-          <div class="pcf-field">
-            <label>URL Annulation</label>
-            <input v-model="liveStripeConfig.cancelUrl" placeholder="Auto (recommandé : laisser vide)" class="pcf-input pcf-url" spellcheck="false"/>
-          </div>
-        </div>
-
-        <!-- ── PAYPAL ─────────────────────────────────────── -->
-        <div v-else-if="configEditorTarget==='paypal'" class="pay-form-fields">
-          <div class="pcf-section-title">🔑 Clés API PayPal</div>
-          <div class="pcf-field">
-            <label>Client ID <span class="pcf-required">*</span></label>
-            <input v-model="livePaypalConfig.clientId" placeholder="AXxxxxxxxxxxxxxxx..." class="pcf-input" spellcheck="false"/>
-            <span class="pcf-hint">Depuis developer.paypal.com → Apps & Credentials</span>
-          </div>
-          <div class="pcf-row">
-            <div class="pcf-field">
-              <label>Mode</label>
-              <select v-model="livePaypalConfig.mode" class="pcf-input pcf-select">
-                <option value="sandbox">Sandbox (test)</option>
-                <option value="live">Live</option>
-              </select>
-            </div>
-            <div class="pcf-field">
-              <label>Devise</label>
-              <select v-model="livePaypalConfig.currency" class="pcf-input pcf-select">
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-                <option value="GBP">GBP</option>
-                <option value="CAD">CAD</option>
-              </select>
-            </div>
-          </div>
-          <div class="pcf-field">
-            <label>Nom de la marque</label>
-            <input v-model="livePaypalConfig.brandName" :placeholder="siteName" class="pcf-input"/>
-          </div>
-          <div class="pcf-section-title" style="margin-top:14px">🔗 Endpoints backend</div>
-          <div class="pcf-field">
-            <label>Create Order URL</label>
-            <input v-model="livePaypalConfig.createOrderUrl" placeholder="https://votre-backend.com/paypal/create-order" class="pcf-input pcf-url" spellcheck="false"/>
-          </div>
-          <div class="pcf-field">
-            <label>Capture Order URL</label>
-            <input v-model="livePaypalConfig.captureOrderUrl" placeholder="https://votre-backend.com/paypal/capture-order" class="pcf-input pcf-url" spellcheck="false"/>
-          </div>
-          <div class="pcf-field">
-            <label>URL Succès</label>
-            <input v-model="livePaypalConfig.successUrl" placeholder="Auto (laisser vide)" class="pcf-input pcf-url" spellcheck="false"/>
-          </div>
-        </div>
-
-        <!-- ── PADDLE ─────────────────────────────────────── -->
-        <div v-else-if="configEditorTarget==='paddle'" class="pay-form-fields">
-          <div class="pcf-section-title">🏓 Configuration Paddle</div>
-          <div class="pcf-info-box">
-            Paddle est un Merchant of Record — il gère la TVA et la compliance automatiquement.
-            Créez votre compte sur <a href="https://paddle.com" target="_blank" class="pcf-link">paddle.com</a>
-          </div>
-          <div class="pcf-field">
-            <label>Vendor ID <span class="pcf-required">*</span></label>
-            <input v-model="livePaddleConfig.vendorId" placeholder="123456" class="pcf-input"/>
-            <span class="pcf-hint">Depuis Paddle Dashboard → Developer Tools → Authentication</span>
-          </div>
-          <div class="pcf-field">
-            <label>Product / Price ID <span class="pcf-required">*</span></label>
-            <input v-model="livePaddleConfig.productId" placeholder="pri_xxxxxxxx" class="pcf-input"/>
-            <span class="pcf-hint">ID du produit ou du prix dans Paddle Catalog</span>
-          </div>
-          <div class="pcf-row">
-            <div class="pcf-field">
-              <label>Environnement</label>
-              <select v-model="livePaddleConfig.environment" class="pcf-input pcf-select">
-                <option value="sandbox">Sandbox (test)</option>
-                <option value="production">Production</option>
-              </select>
-            </div>
-            <div class="pcf-field">
-              <label>Devise</label>
-              <select v-model="livePaddleConfig.currency" class="pcf-input pcf-select">
-                <option value="EUR">EUR</option>
-                <option value="USD">USD</option>
-                <option value="GBP">GBP</option>
-              </select>
-            </div>
-          </div>
-          <div class="pcf-field">
-            <label>Success Callback URL</label>
-            <input v-model="livePaddleConfig.successCallback" placeholder="https://votre-site.com/merci" class="pcf-input pcf-url" spellcheck="false"/>
-          </div>
-        </div>
-
-        <!-- Actions -->
+        <textarea v-model="configEditorContent" class="config-editor-textarea" spellcheck="false"/>
         <div class="config-modal-actions">
           <button class="btn-action" @click="showConfigEditor=false">Annuler</button>
-          <button class="btn-action primary" @click="saveConfigFile">
-            💾 Sauvegarder dans Firestore
-          </button>
+          <button class="btn-action primary" @click="saveConfigFile">💾 Sauvegarder dans Firestore</button>
         </div>
       </div>
     </div>
@@ -2083,62 +1421,26 @@ const setPageStyle = (type, value) => {
 
   <!-- PUBLIC PREVIEW (plein écran, sans barre d'outils) -->
   <Transition name="modal">
-    <div v-if="showPublicPreview" class="public-preview-overlay" :dir="isRtl?'rtl':'ltr'">
-
-      <!-- Bandeau "Aperçu" discret en haut -->
-      <div class="pv-topband">
-        <span class="pv-topband-label">👁 Mode aperçu</span>
-        <button class="pv-topband-close" @click="showPublicPreview=false">✕ Fermer</button>
-      </div>
-
-      <!-- ── NAVIGATION DU STORE ───────────────────────── -->
-      <nav class="pv-nav">
-
-        <!-- Logo + Nom du site -->
-        <div class="pv-brand">
-          <img v-if="siteLogo" :src="siteLogo" class="pv-logo" alt="logo"/>
-          <span v-else class="pv-logo-placeholder">◈</span>
-          <span class="pv-site-name">{{ siteName }}</span>
+    <div v-if="showPublicPreview" class="public-preview-overlay">
+      <button class="pub-preview-close" @click="showPublicPreview=false">✕ Fermer l'aperçu</button>
+      <!-- Navigation du site -->
+      <nav class="pub-preview-nav">
+        <div class="pub-preview-brand-wrap">
+          <img v-if="siteLogo" :src="siteLogo" class="pub-preview-logo" alt="logo"/>
+          <span v-else class="pub-preview-brand-icon">◈</span>
+          <span class="pub-preview-brand-name">{{ siteName }}</span>
         </div>
-
-        <!-- Menu pages (visible et clair) -->
-        <div class="pv-menu">
+        <div class="pub-preview-tabs">
           <button
-            v-for="(p,i) in site.pages"
-            :key="p.id"
-            class="pv-menu-item"
-            :class="{ active: currentPageIndex===i }"
+            v-for="(p,i) in site.pages" :key="p.id"
+            class="pub-preview-tab"
+            :class="{active: currentPageIndex===i}"
             @click="currentPageIndex=i"
           >{{ p.name }}</button>
         </div>
-
-        <!-- Droite : Sélecteur de langue + Panier -->
-        <div class="pv-nav-right">
-          <!-- Sélecteur de langue -->
-          <select class="pv-lang-select" v-model="currentLang">
-            <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
-          </select>
-
-          <!-- Connexion / Déconnexion dans l'aperçu -->
-          <div v-if="currentUser" class="pv-user-btn" @click="showUserProfile=true; showPublicPreview=false" title="Mon profil">
-            <div class="pv-user-avatar">
-              <img v-if="currentUser.photoURL" :src="currentUser.photoURL" class="pv-user-avatar-img"/>
-              <span v-else>{{ (currentUser.email||"?")[0].toUpperCase() }}</span>
-            </div>
-            <span class="pv-user-name">{{ currentUser.displayName || currentUser.email?.split("@")[0] }}</span>
-          </div>
-          <button v-else class="pv-login-btn" @click="showPublicPreview=false; signedOut=true; soMode='login'">
-            🔑 Se connecter
-          </button>
-
-          <!-- Panier — toujours visible (même vide) -->
-          <button class="pv-cart-btn" @click="showCart=true; cartStep='cart'">
-            <span class="pv-cart-icon">🛒</span>
-            <span v-if="cartCount > 0" class="pv-cart-badge">{{ cartCount }}</span>
-            <span class="pv-cart-label">{{ t.cartTitle }}</span>
-          </button>
-        </div>
-
+        <button v-if="cartCount>0" class="pub-preview-cart" @click="showCart=true">
+          🛒 <span class="cart-badge">{{ cartCount }}</span>
+        </button>
       </nav>
       <!-- Contenu du site -->
       <div class="pub-preview-content" :style="currentPage?.style">
@@ -2199,15 +1501,10 @@ const setPageStyle = (type, value) => {
           </div>
           <div v-else-if="s.type==='form'" class="prev-form" :style="s.style">
             <h3>{{ t.prevContactTitle }}</h3>
-            <input v-model="contactForm.name"    :placeholder="t.prevNamePh"  class="prev-form-field"/>
-            <input v-model="contactForm.email"   :placeholder="t.prevEmailPh" class="prev-form-field" type="email"/>
-            <textarea v-model="contactForm.message" :placeholder="t.prevMsgPh" class="prev-form-field prev-form-ta"></textarea>
-            <p v-if="contactError" class="prev-form-error">{{ contactError }}</p>
-            <div v-if="contactSent" class="prev-form-success">✓ Message envoyé !</div>
-            <button class="prev-form-btn" @click="sendContact(s.style)" :disabled="contactSending">
-              <span v-if="contactSending">Envoi...</span>
-              <span v-else>{{ t.prevSendBtn }}</span>
-            </button>
+            <input :placeholder="t.prevNamePh" class="prev-form-field"/>
+            <input :placeholder="t.prevEmailPh" class="prev-form-field"/>
+            <textarea :placeholder="t.prevMsgPh" class="prev-form-field prev-form-ta"></textarea>
+            <button class="prev-form-btn">{{ t.prevSendBtn }}</button>
           </div>
           <div v-else-if="s.type==='divider'" class="prev-divider" :style="s.style"><hr class="prev-divider-line"/></div>
         </div>
@@ -2235,58 +1532,27 @@ const setPageStyle = (type, value) => {
       <button class="page-tab add-tab" @click="addPage">+</button>
     </nav>
     <div class="topbar-actions" :dir="isRtl?'rtl':'ltr'">
-      <!-- Bouton sidebar mobile (uniquement si connecté) -->
-      <button v-if="currentUser" class="sidebar-toggle-btn" @click="showMobileSidebar=!showMobileSidebar">
-        {{ showMobileSidebar ? '✕' : '☰' }}
-      </button>
-      <button v-if="currentUser && cartCount>0" class="btn-action cart-btn" @click="showCart=true">
+      <button class="btn-action cart-btn" @click="showCart=true" v-if="cartCount>0">
         🛒 <span class="cart-badge">{{ cartCount }}</span>
       </button>
-
-      <!-- ① UTILISATEUR CONNECTÉ -->
-      <div v-if="currentUser" class="topbar-user" @click="showUserProfile=!showUserProfile">
-        <div class="topbar-user-avatar" title="Mon profil">
-          <img v-if="currentUser.photoURL" :src="currentUser.photoURL" class="topbar-avatar-img" alt="avatar"/>
-          <span v-else class="topbar-avatar-initials">
-            {{ (currentUser.displayName || currentUser.email || "?")[0].toUpperCase() }}
-          </span>
-        </div>
-        <div class="topbar-user-info">
-          <span class="topbar-user-name">{{ currentUser.displayName || currentUser.email?.split("@")[0] }}</span>
-          <span class="topbar-user-email">{{ currentUser.email }}</span>
-        </div>
+      <select class="lang-select" v-model="currentLang">
+        <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
+      </select>
+      <button class="btn-action icon-btn" @click="openConfigEditor('stripe')" :title="t.configureStripe">💳</button>
+      <button class="btn-action icon-btn" @click="openConfigEditor('paypal')" :title="t.configurePaypal">🅿</button>
+      <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
+      <div class="pub-btn-group">
+        <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
+        <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
       </div>
-
-      <!-- ② BOUTON CONNEXION si non connecté (minimal) -->
-      <button v-if="!currentUser" class="btn-action topbar-login-btn" @click="signedOut=true; soMode='login'">
-        🔑 Se connecter
+      <span class="save-status" :class="{saved:isSaved}">{{ isSaved ? t.saved : t.unsaved }}</span>
+      <button class="btn-action" @click="saveSite" :disabled="isSaving||!currentUser" :class="{saving:isSaving}">
+        <span v-if="isSaving" class="spinner"/>
+        <span>{{ isSaving ? t.saving : !currentUser ? t.notConnected : t.save }}</span>
       </button>
-
-      <!-- ③ Le reste — visible SEULEMENT si connecté -->
-      <template v-if="currentUser">
-        <select class="lang-select" v-model="currentLang">
-          <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
-        </select>
-        <template v-if="isOwner">
-          <button class="btn-action icon-btn" @click="openConfigEditor('stripe')" :title="t.configureStripe">💳</button>
-          <button class="btn-action icon-btn" @click="openConfigEditor('paypal')" :title="t.configurePaypal">🅿</button>
-          <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
-          <button class="btn-action icon-btn tb-btn-theme" @click="showThemeImport=true" title="Importer un thème">🎨</button>
-          <button class="btn-action icon-btn tb-btn-export" @click="exportTheme" title="Exporter le thème">📤</button>
-          <div class="pub-btn-group">
-            <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
-            <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
-          </div>
-        </template>
-        <span class="save-status" :class="{saved:isSaved}">{{ isSaved ? t.saved : t.unsaved }}</span>
-        <button class="btn-action" @click="saveSite" :disabled="isSaving" :class="{saving:isSaving}">
-          <span v-if="isSaving" class="spinner"/>
-          <span>{{ isSaving ? t.saving : t.save }}</span>
-        </button>
-        <button class="btn-action primary" @click="mode=mode==='preview'?'edit':'preview'">
-          {{ mode==='preview' ? t.edit : t.preview }}
-        </button>
-      </template>
+      <button class="btn-action primary" @click="mode=mode==='preview'?'edit':'preview'">
+        {{ mode==='preview' ? t.edit : t.preview }}
+      </button>
     </div>
   </header>
 
@@ -2294,7 +1560,7 @@ const setPageStyle = (type, value) => {
   <div class="workspace">
 
     <!-- SIDEBAR -->
-    <aside v-if="mode==='edit'" class="sidebar" :class="{'sidebar-open': showMobileSidebar}" :dir="isRtl?'rtl':'ltr'" @click.self="showMobileSidebar=false">
+    <aside v-if="mode==='edit'" class="sidebar" :dir="isRtl?'rtl':'ltr'">
       <div class="sidebar-tabs">
         <button :class="{active:sidebarTab==='sections'}" @click="sidebarTab='sections'">{{ t.sections }}</button>
         <button :class="{active:sidebarTab==='style'}" @click="sidebarTab='style'">{{ t.style }}</button>
@@ -2427,27 +1693,11 @@ const setPageStyle = (type, value) => {
               <div class="products-grid-edit">
                 <div v-for="(p,pi) in s.items" :key="p.id" class="product-card-edit">
                   <button class="product-del" @click.stop="removeProduct(s,pi)">✕</button>
-                  <!-- Image produit : Upload OU Caméra -->
-                  <div class="product-img-area">
-                    <label class="product-img-upload" title="Choisir une image">
-                      <input type="file" accept="image/*" @change="uploadProductImage($event,p)" hidden/>
-                      <img v-if="p.image" :src="p.image" class="product-img"/>
-                      <div v-else class="product-img-ph">🛍️<span>Photo</span></div>
-                    </label>
-                    <div class="product-img-actions">
-                      <label class="product-img-btn upload-btn" title="Importer fichier">
-                        <input type="file" accept="image/*" @change="uploadProductImage($event,p)" hidden/>
-                        📁
-                      </label>
-                      <label class="product-img-btn camera-btn" title="Prendre une photo">
-                        <input type="file" accept="image/*" capture="environment" @change="uploadProductImage($event,p)" hidden/>
-                        📷
-                      </label>
-                      <button v-if="p.image" class="product-img-btn remove-btn" @click.stop="p.image=''" title="Supprimer">
-                        🗑
-                      </button>
-                    </div>
-                  </div>
+                  <label class="product-img-upload">
+                    <input type="file" accept="image/*" @change="uploadProductImage($event,p)" hidden/>
+                    <img v-if="p.image" :src="p.image" class="product-img"/>
+                    <div v-else class="product-img-ph">🛍️<span>Photo</span></div>
+                  </label>
                   <div class="product-fields">
                     <input v-model="p.badge" class="product-badge-input" :placeholder="t.badgePh"/>
                     <input v-model="p.name" class="product-name-input" :placeholder="t.productNamePh"/>
@@ -2579,15 +1829,10 @@ const setPageStyle = (type, value) => {
               </div>
               <div v-else-if="s.type==='form'" class="prev-form" :style="s.style">
                 <h3>{{ t.prevContactTitle }}</h3>
-                <input v-model="contactForm.name"    :placeholder="t.prevNamePh"  class="prev-form-field"/>
-                <input v-model="contactForm.email"   :placeholder="t.prevEmailPh" class="prev-form-field" type="email"/>
-                <textarea v-model="contactForm.message" :placeholder="t.prevMsgPh" class="prev-form-field prev-form-ta"></textarea>
-                <p v-if="contactError" class="prev-form-error">{{ contactError }}</p>
-                <div v-if="contactSent" class="prev-form-success">✓ Message envoyé !</div>
-                <button class="prev-form-btn" @click="sendContact(s.style)" :disabled="contactSending">
-                  <span v-if="contactSending">Envoi...</span>
-                  <span v-else>{{ t.prevSendBtn }}</span>
-                </button>
+                <input :placeholder="t.prevNamePh" class="prev-form-field"/>
+                <input :placeholder="t.prevEmailPh" class="prev-form-field"/>
+                <textarea :placeholder="t.prevMsgPh" class="prev-form-field prev-form-ta"></textarea>
+                <button class="prev-form-btn">{{ t.prevSendBtn }}</button>
               </div>
               <div v-else-if="s.type==='divider'" class="prev-divider" :style="s.style">
                 <hr class="prev-divider-line"/>
@@ -2598,263 +1843,342 @@ const setPageStyle = (type, value) => {
       </div>
     </main>
   </div>
-  <!-- ASSISTANT VOCAL CLIENT (Groq IA) -->
-  <!-- storeUid = uid du propriétaire du store (pas forcément le user connecté) -->
-  <VoiceAssistantClient
-    v-if="currentUser"
-    :store-uid="publishInfo?.uid || currentUser?.uid || ''"
-    :store-name="siteName"
-    :store-email="currentUser?.email || ''"
-    :lang="currentLang"
-    :backend-url="'https://backend-master-production-cf50.up.railway.app'"
-  />
-
-  <!-- ── PROFIL UTILISATEUR (popup) ─────────────────────── -->
-  <Transition name="modal">
-    <div v-if="showUserProfile && currentUser" class="modal-overlay user-profile-overlay" @click.self="showUserProfile=false">
-      <div class="modal-box user-profile-modal">
-        <button class="modal-close" @click="showUserProfile=false">✕</button>
-
-        <!-- Avatar + infos -->
-        <div class="up-avatar-section">
-          <div class="up-avatar-big">
-            <img v-if="currentUser.photoURL" :src="currentUser.photoURL" class="up-avatar-img" alt="avatar"/>
-            <span v-else class="up-avatar-initials">
-              {{ (currentUser.displayName || currentUser.email || "?")[0].toUpperCase() }}
-            </span>
-          </div>
-          <div class="up-user-details">
-            <div class="up-user-name">{{ currentUser.displayName || "Utilisateur" }}</div>
-            <div class="up-user-email">{{ currentUser.email }}</div>
-            <div class="up-user-badge">
-              <span v-if="isOwner"  class="up-badge-pro">✦ Propriétaire du store</span>
-              <span v-else class="up-badge-customer">🛍 Client du store</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Infos propriétaire -->
-        <div v-if="isOwner" class="up-info-grid">
-          <div class="up-info-item">
-            <span class="up-info-label">UID Firebase</span>
-            <code class="up-info-value">{{ currentUser.uid?.slice(0,16) }}...</code>
-          </div>
-          <div class="up-info-item">
-            <span class="up-info-label">Email vérifié</span>
-            <span class="up-info-value" :class="currentUser.emailVerified ? 'up-verified' : 'up-unverified'">
-              {{ currentUser.emailVerified ? "✓ Oui" : "✗ Non" }}
-            </span>
-          </div>
-          <div class="up-info-item">
-            <span class="up-info-label">Site publié</span>
-            <span class="up-info-value">{{ publishAddress || "Non publié" }}</span>
-          </div>
-          <div class="up-info-item">
-            <span class="up-info-label">Plan</span>
-            <span class="up-info-value up-badge-pro">Pro</span>
-          </div>
-        </div>
-
-        <!-- Commandes du client -->
-        <div v-if="isClient" class="up-orders-section">
-          <div class="up-orders-title">
-            📦 Mes commandes
-            <span v-if="loadingOrders" class="up-orders-loading">...</span>
-            <span v-else class="up-orders-count">{{ userOrders.length }}</span>
-          </div>
-          <div v-if="!userOrders.length && !loadingOrders" class="up-orders-empty">Aucune commande.</div>
-          <div v-else class="up-orders-list">
-            <div v-for="order in userOrders.slice(0,5)" :key="order.id" class="up-order-item">
-              <div class="up-order-left">
-                <span class="up-order-id">#{{ order.id?.slice(0,8).toUpperCase() }}</span>
-                <span class="up-order-date">{{ (order.createdAt||'').slice(0,10) }}</span>
-              </div>
-              <div class="up-order-right">
-                <span class="up-order-total">{{ order.total }}{{ order.currency }}</span>
-                <span class="up-order-status" :class="'status-'+order.status">
-                  {{ {paid:'Payée',pending:'En attente',shipped:'Expédiée',delivered:'Livrée',cancelled:'Annulée'}[order.status]||order.status }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="up-actions">
-          <button class="up-btn-signout" @click="handleSignOut">
-            ⏻ Se déconnecter
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
-  <!-- ── ÉCRAN DÉCONNEXION + RECONNEXION ─────────────────── -->
-  <Transition name="modal">
-    <div v-if="signedOut" class="signout-overlay">
-      <div class="signout-card">
-        <!-- Message déconnexion -->
-        <div class="signout-icon">👋</div>
-        <h2 class="signout-title">Vous êtes déconnecté</h2>
-        <p class="signout-sub">Reconnectez-vous pour accéder à votre store.</p>
-
-        <!-- Onglets Connexion / Inscription -->
-        <div class="so-tabs">
-          <button :class="['so-tab', { active: soMode==='login' }]"    @click="soMode='login';    soError=''; soSuccess=''">Connexion</button>
-          <button :class="['so-tab', { active: soMode==='register' }]" @click="soMode='register'; soError=''; soSuccess=''">Inscription</button>
-        </div>
-
-        <!-- Messages -->
-        <p v-if="soError"   class="so-error">⚠ {{ soError }}</p>
-        <p v-if="soSuccess" class="so-success">✓ {{ soSuccess }}</p>
-
-        <!-- ── CONNEXION ──────────────────── -->
-        <div v-if="soMode==='login'" class="so-form">
-          <div class="so-field">
-            <label>Email</label>
-            <input v-model="soEmail" type="email" placeholder="votre@email.com"
-                   class="so-input" @keydown.enter="soLogin"/>
-          </div>
-          <div class="so-field">
-            <label>Mot de passe</label>
-            <input v-model="soPassword" type="password" placeholder="••••••••"
-                   class="so-input" @keydown.enter="soLogin"/>
-          </div>
-          <button class="so-forgot-btn" @click="soMode='forgot'; soError=''; soSuccess=''">
-            Mot de passe oublié ?
-          </button>
-          <button class="so-submit" @click="soLogin" :disabled="soLoading">
-            <span v-if="soLoading" class="so-spinner"></span>
-            <span v-else>🔑 Se connecter</span>
-          </button>
-          <div class="so-separator"><span>ou</span></div>
-          <button class="so-google" @click="soGoogleLogin" :disabled="soLoading">
-            <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-            Continuer avec Google
-          </button>
-        </div>
-
-        <!-- ── INSCRIPTION ────────────────── -->
-        <div v-else-if="soMode==='register'" class="so-form">
-          <div class="so-field">
-            <label>Nom complet *</label>
-            <input v-model="soDisplayName" type="text" placeholder="Jean Dupont"
-                   class="so-input"/>
-          </div>
-          <div class="so-field">
-            <label>Email *</label>
-            <input v-model="soEmail" type="email" placeholder="votre@email.com"
-                   class="so-input"/>
-          </div>
-          <div class="so-field">
-            <label>Mot de passe * <span class="so-hint">(min. 6 caractères)</span></label>
-            <input v-model="soPassword" type="password" placeholder="••••••••"
-                   class="so-input"/>
-          </div>
-          <div class="so-field">
-            <label>Confirmer le mot de passe *</label>
-            <input v-model="soConfirm" type="password" placeholder="••••••••"
-                   class="so-input" @keydown.enter="soRegister"/>
-          </div>
-          <button class="so-submit" @click="soRegister" :disabled="soLoading">
-            <span v-if="soLoading" class="so-spinner"></span>
-            <span v-else>✨ Créer mon compte</span>
-          </button>
-          <div class="so-separator"><span>ou</span></div>
-          <button class="so-google" @click="soGoogleLogin" :disabled="soLoading">
-            <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-            S'inscrire avec Google
-          </button>
-        </div>
-
-        <!-- ── MOT DE PASSE OUBLIÉ ─────────── -->
-        <div v-else-if="soMode==='forgot'" class="so-form">
-          <p class="so-forgot-desc">Entrez votre email pour recevoir un lien de réinitialisation.</p>
-          <div class="so-field">
-            <label>Email</label>
-            <input v-model="soEmail" type="email" placeholder="votre@email.com"
-                   class="so-input" @keydown.enter="soForgot"/>
-          </div>
-          <button class="so-submit" @click="soForgot" :disabled="soLoading">
-            <span v-if="soLoading" class="so-spinner"></span>
-            <span v-else>📧 Envoyer le lien</span>
-          </button>
-          <button class="so-back-link" @click="soMode='login'; soError=''; soSuccess=''">
-            ← Retour à la connexion
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
-  <!-- ── MODAL IMPORT THÈME ─────────────────────────────────── -->
-  <div v-if="showThemeImport" class="modal-overlay" @click.self="showThemeImport=false;themeImportError=''">
-    <div class="modal-box theme-import-box">
-      <button class="modal-close" @click="showThemeImport=false;themeImportError=''">✕</button>
-      <h3 class="theme-import-title">🎨 Importer un thème</h3>
-      <p class="theme-import-sub">Importez un fichier JSON exporté depuis SaasBuilder</p>
-
-      <!-- Portée de l'import -->
-      <div class="theme-scope-tabs">
-        <button
-          :class="['theme-scope-btn', themeScope==='site' && 'active']"
-          @click="themeScope='site'">
-          🌐 Tout le site
-        </button>
-        <button
-          :class="['theme-scope-btn', themeScope==='page' && 'active']"
-          @click="themeScope='page'">
-          📄 Page courante
-        </button>
-      </div>
-
-      <div class="theme-scope-info">
-        <span v-if="themeScope==='site'">⚠ Remplace toutes les pages et sections du site actuel</span>
-        <span v-else>Importe les sections dans la page « {{ currentPage?.name || "courante" }} » uniquement</span>
-      </div>
-
-      <!-- Zone drop/select fichier -->
-      <label class="theme-drop-zone" for="theme-file-input">
-        <span class="theme-drop-icon">📁</span>
-        <span>Cliquez ou déposez un fichier <strong>.json</strong></span>
-        <input
-          id="theme-file-input"
-          type="file"
-          accept=".json,application/json"
-          style="display:none"
-          @change="importTheme"
-        />
-      </label>
-
-      <div v-if="themeImportError" class="theme-import-error">
-        ⚠ {{ themeImportError }}
-      </div>
-
-      <div class="theme-import-footer">
-        <small>Format attendu : fichier JSON exporté via le bouton 📤 de SaasBuilder</small>
-      </div>
-    </div>
-  </div>
-
 </div>
 </template>
 
-<style scoped>
-/* ── Theme Import ─────────────────────────────── */
-.tb-btn-theme { background: linear-gradient(135deg, #a78bfa, #6c63ff); color: #fff; }
-.tb-btn-theme:hover { background: linear-gradient(135deg, #6c63ff, #4f46e5); }
-.tb-btn-export-theme { background: linear-gradient(135deg, #34d399, #059669); color: #fff; }
-.tb-btn-export-theme:hover { background: linear-gradient(135deg, #059669, #047857); }
-.theme-import-box { max-width: 460px; width: 90%; padding: 28px 24px; border-radius: 16px; }
-.theme-import-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-.theme-import-sub { font-size: 13px; opacity: .7; margin-bottom: 16px; }
-.theme-scope-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
-.theme-scope-btn { flex: 1; padding: 8px 0; border-radius: 8px; border: 2px solid var(--border, #e5e7eb); background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; transition: .2s; }
-.theme-scope-btn.active { border-color: #6c63ff; background: #6c63ff; color: #fff; }
-.theme-scope-info { font-size: 12px; opacity: .7; margin-bottom: 14px; padding: 8px 12px; background: rgba(108,99,255,.07); border-radius: 8px; border-left: 3px solid #6c63ff; }
-.theme-drop-zone { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 20px; border: 2px dashed var(--border, #e5e7eb); border-radius: 12px; cursor: pointer; transition: .2s; text-align: center; margin-bottom: 14px; }
-.theme-drop-zone:hover { border-color: #6c63ff; background: rgba(108,99,255,.05); color: #6c63ff; }
-.theme-drop-icon { font-size: 32px; }
-.theme-import-error { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #dc2626; margin-bottom: 12px; }
-.theme-import-footer { font-size: 11px; opacity: .6; text-align: center; }
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0f11;--surface:#17171a;--surface2:#1f1f23;--border:#2a2a2f;--border2:#35353c;--accent:#6c63ff;--accent2:#a78bfa;--text:#f0f0f0;--text2:#8a8a9a;--text3:#5a5a6a;--green:#22c55e;--red:#ef4444;--stripe:#635bff;--paypal:#ffc439;--radius:8px;--sidebar-w:260px;--topbar-h:56px}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
+.saas-root{min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+.notif{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 24px;border-radius:100px;font-size:14px;font-weight:500;z-index:9999;box-shadow:0 8px 24px rgba(34,197,94,.35)}
+.notif.error{background:var(--red);box-shadow:0 8px 24px rgba(239,68,68,.35)}
+.notif-enter-active,.notif-leave-active{transition:all .3s ease}
+.notif-enter-from,.notif-leave-to{opacity:0;transform:translateX(-50%) translateY(12px)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-box{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:32px;position:relative;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.modal-close{position:absolute;top:16px;right:16px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.modal-header{text-align:center;margin-bottom:24px}
+.modal-icon{font-size:36px;display:block;margin-bottom:12px}
+.modal-header h2{font-family:'Playfair Display',serif;font-size:24px;color:var(--text);margin-bottom:6px}
+.modal-desc{font-size:14px;color:var(--text2)}
+.modal-amount{font-size:42px;font-weight:700;color:var(--accent);margin-top:12px}
+.modal-enter-active,.modal-leave-active{transition:all .25s ease}
+.modal-enter-from,.modal-leave-to{opacity:0;transform:scale(.95)}
+.pay-tabs{display:flex;gap:8px;margin-bottom:20px}
+.pay-tab-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--surface2);border:2px solid var(--border2);color:var(--text2);font-size:14px;font-weight:600;padding:10px;border-radius:var(--radius);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.pay-tab-btn.active{border-color:var(--stripe);color:var(--stripe);background:rgba(99,91,255,.1)}
+.pay-tab-btn.paypal-tab.active{border-color:#b8860b;color:#b8860b;background:rgba(255,196,57,.1)}
+.pay-form{display:flex;flex-direction:column;gap:14px}
+.pay-form-row label,.pay-form-two label{display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.card-input-mock{background:var(--surface2);border:1px solid var(--border2);color:var(--text3);padding:10px 14px;border-radius:var(--radius);font-size:14px;font-family:monospace;letter-spacing:1px}
+.pay-form-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pay-note{font-size:11px;color:var(--text3);text-align:center}
+.pay-note code{background:var(--surface2);padding:2px 6px;border-radius:4px;color:var(--accent2)}
+.pay-submit{width:100%;padding:14px;border:none;border-radius:var(--radius);font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'DM Sans',sans-serif;transition:opacity .15s;margin-top:4px}
+.pay-submit:disabled{opacity:.6;cursor:not-allowed}
+.stripe-submit{background:var(--stripe);color:white}
+.paypal-submit{background:var(--paypal);color:#003087}
+.paypal-info{text-align:center;padding:16px 0}
+.paypal-logo{font-size:24px;font-weight:800;color:#003087;background:var(--paypal);display:inline-block;padding:6px 20px;border-radius:8px;margin-bottom:14px}
+.paypal-info p{font-size:14px;color:var(--text2);line-height:1.6}
+.paypal-spinner{border-top-color:#003087}
+.pay-config-links{display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+.pay-config-links button{flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);font-size:11px;padding:8px;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.pay-config-links button:hover{border-color:var(--accent);color:var(--accent)}
+.pay-success{text-align:center;padding:20px 0}
+.pay-success-icon{width:64px;height:64px;border-radius:50%;background:var(--green);color:white;font-size:28px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.pay-success h2{font-family:'Playfair Display',serif;font-size:24px;color:var(--text);margin-bottom:8px}
+.pay-success p{color:var(--text2);margin-bottom:24px}
+.config-modal{max-width:640px}
+.config-editor-textarea{width:100%;height:300px;background:#0a0a0c;border:1px solid var(--border2);color:#a78bfa;font-family:'Courier New',monospace;font-size:13px;line-height:1.6;padding:16px;border-radius:var(--radius);resize:vertical;outline:none;margin-bottom:16px}
+.config-modal-actions{display:flex;gap:10px;justify-content:flex-end}
+.export-modal{max-width:520px}
+.export-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.export-card{background:var(--surface2);border:2px solid var(--border);border-radius:12px;padding:20px;cursor:pointer;transition:all .15s;text-align:center;position:relative}
+.export-card:hover{border-color:var(--accent);background:rgba(108,99,255,.08)}
+.export-icon{font-size:32px;display:block;margin-bottom:10px}
+.export-card strong{display:block;font-size:14px;color:var(--text);margin-bottom:6px}
+.export-card p{font-size:12px;color:var(--text3);line-height:1.5}
+.export-badge{position:absolute;top:10px;right:10px;background:var(--accent);color:white;font-size:9px;font-weight:700;padding:2px 7px;border-radius:100px;text-transform:uppercase}
+.export-note{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px;color:var(--text2);line-height:1.6}
+.export-note strong{color:var(--text)}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--topbar-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;padding:0 16px}
+.topbar-brand{display:flex;align-items:center;gap:8px;min-width:var(--sidebar-w);padding-right:16px;border-right:1px solid var(--border)}
+.brand-icon{font-size:20px;color:var(--accent)}
+.brand-name{font-family:'Playfair Display',serif;font-size:17px;font-weight:600;letter-spacing:-.3px}
+.brand-name-input{background:transparent;border:none;color:var(--text);font-family:'Playfair Display',serif;font-size:17px;font-weight:600;letter-spacing:-.3px;outline:none;width:140px;min-width:80px;max-width:180px;border-bottom:1px solid transparent;transition:border-color .2s;padding:0}
+.brand-name-input:hover,.brand-name-input:focus{border-bottom-color:var(--border2)}
+.brand-name-input::placeholder{color:var(--text3)}
+.brand-badge{background:var(--accent);color:white;font-size:9px;font-weight:700;padding:2px 7px;border-radius:100px;text-transform:uppercase;letter-spacing:.5px}
+.page-tabs{flex:1;display:flex;align-items:center;gap:2px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+.page-tabs::-webkit-scrollbar{display:none}
+.page-tab{display:flex;align-items:center;gap:6px;background:transparent;border:1px solid transparent;color:var(--text2);font-size:13px;padding:5px 12px;border-radius:var(--radius);cursor:pointer;white-space:nowrap;transition:all .15s;font-family:'DM Sans',sans-serif}
+.page-tab:hover{background:var(--surface2);color:var(--text)}
+.page-tab.active{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.page-tab.add-tab{color:var(--accent);font-size:16px;padding:3px 10px}
+.tab-del{opacity:0;font-size:12px;color:var(--text3);transition:opacity .15s;margin-left:4px}
+.page-tab:hover .tab-del{opacity:1}
+.page-tab-input{background:transparent;border:none;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:1px solid var(--accent);border-radius:4px;padding:1px 4px;min-width:80px;max-width:140px}
+.topbar-actions{display:flex;align-items:center;gap:8px;padding-left:16px;border-left:1px solid var(--border)}
+.save-status{font-size:12px;color:var(--text3);white-space:nowrap}
+.save-status.saved{color:var(--green)}
+.btn-action{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:13px;font-weight:500;padding:6px 14px;border-radius:var(--radius);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.btn-action:hover{background:var(--border2)}
+.btn-action.primary{background:var(--accent);border-color:var(--accent);color:white}
+.btn-action.primary:hover{background:#7c73ff}
+.btn-action:disabled{opacity:.45;cursor:not-allowed}
+.btn-action.small{font-size:12px;padding:4px 10px}
+.btn-action.icon-btn{padding:6px 10px;font-size:16px}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lang-select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;padding:5px 8px;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif;outline:none}
+.publish-btn{background:linear-gradient(135deg,#10b981,#059669);border-color:#059669;color:white;font-weight:600}
+.publish-btn:hover{background:linear-gradient(135deg,#059669,#047857);border-color:#047857}
+.workspace{display:flex;margin-top:var(--topbar-h);min-height:calc(100vh - var(--topbar-h))}
+.sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:var(--topbar-h);height:calc(100vh - var(--topbar-h));overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-tabs button{flex:1;padding:12px;font-size:13px;font-weight:500;background:transparent;border:none;color:var(--text2);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent}
+.sidebar-tabs button.active{color:var(--text);border-bottom-color:var(--accent)}
+.sidebar-content{padding:16px;flex:1}
+.sidebar-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px}
+.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.section-card{display:flex;flex-direction:column;gap:2px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 8px;cursor:pointer;transition:all .15s;text-align:left}
+.section-card:hover{border-color:var(--accent);background:rgba(108,99,255,.08)}
+.sc-icon{font-size:16px}
+.sc-label{font-size:12px;font-weight:600;color:var(--text)}
+.sc-desc{font-size:10px;color:var(--text3);line-height:1.4}
+.prop-panel{border-top:1px solid var(--border);padding-top:16px}
+.prop-row{margin-bottom:14px}
+.prop-row label{display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:500}
+.style-btns{display:flex;gap:4px;flex-wrap:wrap}
+.style-btns button{background:var(--surface2);border:1px solid var(--border2);color:var(--text2);font-size:13px;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.style-btns button:hover{background:var(--border2);color:var(--text)}
+.style-btns button.on{background:var(--accent);border-color:var(--accent);color:white}
+.color-input{width:40px;height:30px;border:1px solid var(--border2);border-radius:4px;cursor:pointer;background:none;padding:2px}
+.prop-select{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:13px;padding:7px 10px;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif}
+.canvas{flex:1;background:#0a0a0c;padding:32px;display:flex;justify-content:center;overflow-y:auto}
+.canvas.preview{padding:0;background:white}
+.canvas-inner{width:100%;max-width:900px;min-height:600px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+.canvas.preview .canvas-inner{max-width:100%;border-radius:0;min-height:100vh;box-shadow:none}
+.empty-page{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;color:#999;text-align:center;gap:8px}
+.empty-page span{font-size:32px;opacity:.4}
+.empty-page p{font-size:14px}
+.section-block{position:relative;border:2px solid transparent;cursor:pointer;transition:border-color .15s}
+.section-block:hover{border-color:rgba(108,99,255,.3)}
+.section-block.is-active{border-color:var(--accent)!important}
+.section-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:10;opacity:0;transition:opacity .15s}
+.section-block:hover .section-actions,.section-block.is-active .section-actions{opacity:1}
+.section-actions button{background:#fff;border:1px solid #ddd;border-radius:4px;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;transition:all .15s}
+.section-actions button:hover{background:#f0f0f0}
+.section-actions button.del-btn:hover{background:#fef2f2;color:var(--red);border-color:#fecaca}
+.section-actions button:disabled{opacity:.3;cursor:default}
+.sec-type-label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}
+.sec-hero{padding:60px 40px;background:linear-gradient(135deg,#f8f7ff 0%,#ede9fe 100%);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.hero-title-input{width:100%;font-family:'Playfair Display',serif;font-size:42px;font-weight:600;color:#1a1a2e;border:none;background:transparent;resize:none;line-height:1.2;outline:none;min-height:100px}
+.hero-sub-input{width:100%;font-size:18px;color:#555;background:transparent;border:none;outline:none;border-bottom:1px dashed rgba(108,99,255,.4);padding-bottom:4px}
+.hero-cta-input{font-size:14px;background:#6c63ff;color:white;border:none;outline:none;border-radius:8px;padding:10px 24px;font-weight:600;font-family:'DM Sans',sans-serif;margin-top:8px;cursor:text}
+.sec-text{padding:32px 40px}
+.text-input{width:100%;min-height:120px;resize:vertical;border:1px dashed #d1d5db;border-radius:6px;padding:12px;font-size:16px;line-height:1.7;color:#374151;outline:none;background:#fafafa;font-family:'DM Sans',sans-serif;transition:border-color .15s}
+.text-input:focus{border-color:var(--accent);background:white}
+.sec-image{padding:20px 40px}
+.img-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed #d1d5db;border-radius:12px;padding:50px 20px;cursor:pointer;color:#9ca3af;transition:all .15s}
+.img-drop:hover{border-color:var(--accent);color:#6c63ff}
+.img-drop span:first-child{font-size:32px}
+.img-drop span:last-child{font-size:14px}
+.img-preview-wrap{position:relative}
+.img-preview{width:100%;border-radius:8px;display:block}
+.img-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;opacity:0;transition:opacity .2s}
+.img-preview-wrap:hover .img-overlay{opacity:1}
+.alt-input{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;padding:6px 12px;border-radius:6px;font-size:12px;text-align:center;outline:none;width:200px;font-family:'DM Sans',sans-serif}
+.sec-gallery{padding:20px 40px}
+.gallery-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.gallery-grid-edit{display:grid;gap:8px}
+.gallery-item{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1}
+.gallery-item img{width:100%;height:100%;object-fit:cover}
+.gallery-del{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:none;color:white;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.gallery-item:hover .gallery-del{opacity:1}
+.gallery-empty{border:2px dashed #d1d5db;border-radius:12px;padding:40px;text-align:center;color:#9ca3af;font-size:14px}
+.sec-video{padding:20px 40px}
+.video-toolbar{margin-bottom:10px}
+.video-title-input{width:100%;font-size:18px;font-weight:600;color:#1a1a2e;border:none;border-bottom:1px dashed #d1d5db;outline:none;padding-bottom:6px;margin-bottom:10px;background:transparent;font-family:'DM Sans',sans-serif}
+.video-url-input{width:100%;font-size:13px;color:#6b7280;border:1px dashed #d1d5db;border-radius:6px;outline:none;padding:8px 12px;margin-bottom:12px;background:#fafafa;font-family:'DM Sans',sans-serif}
+.video-preview{border-radius:10px;overflow:hidden}
+.video-iframe{width:100%;height:340px;border:none;display:block}
+.video-placeholder{border:2px dashed #d1d5db;border-radius:12px;padding:50px;text-align:center;color:#9ca3af;display:flex;flex-direction:column;align-items:center;gap:8px}
+.video-placeholder span:first-child{font-size:36px;opacity:.4}
+.sec-products{padding:20px 40px}
+.products-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.products-grid-edit{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.product-card-edit{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.product-del{position:absolute;top:8px;right:8px;background:white;border:1px solid #e5e7eb;color:#ef4444;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:2}
+.product-img-upload{display:block;cursor:pointer}
+.product-img{width:100%;height:120px;object-fit:cover;display:block}
+.product-img-ph{width:100%;height:120px;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:28px;color:#9ca3af;gap:4px}
+.product-img-ph span{font-size:11px}
+.product-fields{padding:10px;display:flex;flex-direction:column;gap:6px}
+.product-badge-input{font-size:10px;font-weight:700;background:#fef3c7;border:none;color:#92400e;padding:3px 8px;border-radius:100px;outline:none;width:fit-content;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px}
+.product-name-input{font-size:14px;font-weight:600;color:#111;border:none;border-bottom:1px dashed #d1d5db;outline:none;background:transparent;font-family:'DM Sans',sans-serif;padding-bottom:3px}
+.product-desc-input{font-size:12px;color:#6b7280;border:none;outline:none;background:transparent;font-family:'DM Sans',sans-serif}
+.product-price-row{display:flex;align-items:center;gap:6px;margin-top:4px}
+.product-price-input{font-size:16px;font-weight:700;color:#6c63ff;border:none;outline:none;background:transparent;width:70px;font-family:'DM Sans',sans-serif}
+.product-currency-select{font-size:13px;background:transparent;border:1px solid #e5e7eb;border-radius:4px;color:#6b7280;padding:2px 4px;cursor:pointer}
+.sec-features{padding:40px}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.feature-item{background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.feat-icon-input{font-size:24px;background:transparent;border:none;outline:none;width:40px}
+.feat-title-input{font-weight:600;font-size:15px;background:transparent;border:none;border-bottom:1px dashed #d1d5db;outline:none;color:#1a1a2e;font-family:'DM Sans',sans-serif;padding-bottom:4px}
+.feat-desc-input{font-size:13px;color:#6b7280;background:transparent;border:none;outline:none;font-family:'DM Sans',sans-serif}
+.sec-payment{padding:32px 40px;background:linear-gradient(135deg,#f8f7ff,#ede9fe)}
+.payment-edit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.pay-providers-badge{display:flex;gap:6px}
+.badge-stripe{background:var(--stripe);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px}
+.badge-paypal{background:var(--paypal);color:#003087;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px}
+.payment-edit-fields{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.payment-title-input{font-family:'Playfair Display',serif;font-size:24px;font-weight:600;color:#1a1a2e;border:none;border-bottom:1px dashed rgba(108,99,255,.4);outline:none;background:transparent;padding-bottom:6px}
+.payment-desc-input{font-size:15px;color:#6b7280;border:none;outline:none;background:transparent;border-bottom:1px dashed #e5e7eb;padding-bottom:4px;font-family:'DM Sans',sans-serif}
+.payment-price-row{display:flex;align-items:center;gap:8px}
+.payment-amount-input{font-size:36px;font-weight:700;color:#6c63ff;border:none;outline:none;background:transparent;width:120px;font-family:'DM Sans',sans-serif}
+.payment-currency-select{font-size:18px;background:transparent;border:1px solid #d1d5db;border-radius:6px;color:#6b7280;padding:4px 8px;cursor:pointer}
+.payment-preview-btns{display:flex;gap:10px;margin-bottom:16px}
+.preview-pay-btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .15s}
+.preview-pay-btn:hover{transform:translateY(-1px)}
+.stripe-preview{background:var(--stripe);color:white}
+.paypal-preview{background:var(--paypal);color:#003087}
+.payment-config-hint{font-size:12px;color:#9ca3af;display:flex;align-items:center;gap:6px}
+.payment-config-hint button{background:none;border:none;color:#6c63ff;font-size:12px;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif}
+.sec-form{padding:40px}
+.form-label-heading{font-size:18px;font-weight:600;color:#1a1a2e;margin-bottom:16px;font-family:'Playfair Display',serif}
+.form-fields{display:flex;flex-direction:column;gap:10px;max-width:480px}
+.form-field{padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#374151;background:#f9fafb;font-family:'DM Sans',sans-serif}
+.form-textarea{min-height:100px;resize:none}
+.form-submit{background:#6c63ff;color:white;border:none;border-radius:8px;padding:11px 24px;font-weight:600;font-size:14px;cursor:default;font-family:'DM Sans',sans-serif;align-self:flex-start}
+.sec-divider{padding:12px 40px}
+.divider-line{border:none;border-top:1px solid #e5e7eb}
+.preview-mode{font-family:'DM Sans',sans-serif}
+.prev-hero{padding:100px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
+.prev-hero-title{font-family:'Playfair Display',serif;font-size:52px;font-weight:600;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:16px}
+.prev-hero-sub{font-size:20px;color:#6b7280;margin-bottom:32px}
+.prev-hero-cta{background:#6c63ff;color:white;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
+.prev-hero-cta:hover{transform:translateY(-2px)}
+.prev-text{padding:48px 60px}
+.prev-text p{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
+.prev-image{padding:32px 60px}
+.prev-img{width:100%;border-radius:12px}
+.prev-img-placeholder{height:200px;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;margin:32px 60px}
+.prev-gallery{padding:32px 60px}
+.prev-gallery-grid{display:grid;gap:10px}
+.prev-gallery-item{border-radius:10px;overflow:hidden;aspect-ratio:1}
+.prev-gallery-item img{width:100%;height:100%;object-fit:cover}
+.prev-video{padding:32px 60px}
+.prev-video-title{font-family:'Playfair Display',serif;font-size:24px;color:#1a1a2e;margin-bottom:16px}
+.prev-video-wrap{border-radius:12px;overflow:hidden}
+.prev-video-iframe{width:100%;height:400px;border:none;display:block}
+.prev-products{padding:48px 60px;background:#fafafa}
+.prev-products-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.prev-product-card{background:white;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);transition:transform .2s}
+.prev-product-card:hover{transform:translateY(-4px)}
+.prev-product-img-wrap{position:relative}
+.prev-product-img{width:100%;height:180px;object-fit:cover;display:block}
+.prev-product-img-ph{width:100%;height:180px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:40px}
+.prev-product-badge{position:absolute;top:10px;left:10px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.5px}
+.prev-product-body{padding:16px}
+.prev-product-name{font-size:15px;font-weight:600;color:#111;margin-bottom:6px}
+.prev-product-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:14px}
+.prev-product-footer{display:flex;align-items:center;justify-content:space-between}
+.prev-product-price{font-size:18px;font-weight:700;color:#6c63ff}
+.prev-product-btn{background:#6c63ff;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.prev-features{padding:60px;background:#fafafa}
+.prev-features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:840px;margin:0 auto}
+.prev-feature-card{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:28px 24px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+.prev-feat-icon{font-size:32px;display:block;margin-bottom:12px}
+.prev-feature-card strong{font-size:16px;color:#111;display:block;margin-bottom:6px}
+.prev-feature-card p{font-size:14px;color:#6b7280;line-height:1.5}
+.prev-payment{padding:80px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
+.prev-payment-title{font-family:'Playfair Display',serif;font-size:36px;color:#1a1a2e;margin-bottom:10px}
+.prev-payment-desc{font-size:16px;color:#6b7280;margin-bottom:24px}
+.prev-payment-amount{font-size:64px;font-weight:700;color:#6c63ff;margin-bottom:36px}
+.prev-payment-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.prev-pay-btn{padding:14px 32px;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
+.prev-pay-btn:hover{transform:translateY(-2px)}
+.prev-pay-btn.stripe-btn{background:var(--stripe);color:white}
+.prev-pay-btn.paypal-btn{background:var(--paypal);color:#003087}
+.prev-form{padding:60px;background:#f8f7ff;display:flex;flex-direction:column;align-items:center}
+.prev-form h3{font-family:'Playfair Display',serif;font-size:30px;color:#1a1a2e;margin-bottom:24px}
+.prev-form-field{width:100%;max-width:500px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:10px;font-size:15px;margin-bottom:12px;font-family:'DM Sans',sans-serif;background:white;color:#374151}
+.prev-form-ta{min-height:120px;resize:none}
+.prev-form-btn{background:#6c63ff;color:white;border:none;border-radius:10px;padding:13px 28px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.prev-divider{padding:8px 60px}
+.prev-divider-line{border:none;border-top:1px solid #e5e7eb}
+.logo-area{display:flex;align-items:center;cursor:pointer;border-radius:6px;overflow:hidden;width:32px;height:32px;flex-shrink:0}
+.site-logo-img{width:32px;height:32px;object-fit:contain;border-radius:6px}
+.publish-modal{max-width:560px}
+.publish-form{display:flex;flex-direction:column;gap:16px}
+.pub-field label{display:block;font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.pub-url-wrap{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);overflow:hidden}
+.pub-url-prefix{font-size:11px;color:var(--text3);padding:10px 8px;white-space:nowrap;border-right:1px solid var(--border2)}
+.pub-input{flex:1;background:transparent;border:none;color:var(--text);font-size:13px;padding:10px 12px;outline:none;font-family:'DM Sans',sans-serif}
+.pub-preview-url{font-size:12px;color:#10b981;margin-top:6px;font-weight:500;word-break:break-all}
+.pub-success-badge{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:12px 16px;text-align:center;font-weight:600;margin-bottom:16px}
+.pub-url-card{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:14px}
+.pub-url-card label{display:block;font-size:10px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.pub-live-url{color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;word-break:break-all;display:block}
+.pub-live-url:hover{text-decoration:underline}
+.pub-live-url--uid{font-size:11px;color:var(--text3);font-family:monospace}
+.pub-equiv-note{font-size:11px;color:var(--green);margin-top:6px;font-weight:500}
+.dns-section{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px}
+.dns-title{font-family:'Playfair Display',serif;font-size:15px;color:var(--text);margin-bottom:6px}
+.dns-desc{font-size:12px;color:var(--text2);margin-bottom:10px}
+.dns-table{display:flex;flex-direction:column;gap:4px}
+.dns-row{display:grid;grid-template-columns:80px 60px 1fr;gap:8px;font-size:12px;padding:6px 8px;border-radius:4px}
+.dns-head{font-weight:700;color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.5px;background:var(--surface);border-radius:4px}
+.dns-row:not(.dns-head){background:rgba(108,99,255,.06);color:var(--text)}
+.dns-type{color:var(--accent2);font-weight:700;font-family:monospace}
+.dns-val{font-family:monospace;font-size:11px;color:var(--text2);word-break:break-all}
+.pub-firestore-info{display:flex;align-items:flex-start;gap:10px;background:rgba(255,140,0,.06);border:1px solid rgba(255,140,0,.2);border-radius:8px;padding:12px;margin-top:12px}
+.pub-fi-icon{font-size:18px;flex-shrink:0}
+.pub-fi-title{font-size:10px;font-weight:700;color:#f97316;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.pub-fi-detail{font-size:11px;color:var(--text2);font-family:monospace;line-height:1.6}
+.pub-fi-detail code{background:var(--surface);padding:1px 5px;border-radius:3px;color:#fb923c}
+.pub-note{font-size:12px;color:var(--text3);text-align:center;line-height:1.6}
+.pub-note strong{color:var(--text2)}
+.dns-input-modal{max-width:520px}
+.dns-input-form{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.dns-input-row label{display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.dns-input-field{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:13px;padding:10px 14px;border-radius:var(--radius);outline:none;font-family:'DM Sans',sans-serif;transition:border-color .15s}
+.dns-input-field:focus{border-color:var(--accent)}
+.dns-input-field::placeholder{color:var(--text3)}
+.dns-instructions{background:rgba(108,99,255,.06);border:1px solid rgba(108,99,255,.15);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.dns-inst-title{font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.dns-inst-step{font-size:12px;color:var(--text2);line-height:1.5}
+
+/* CART */
+.cart-btn{position:relative;background:var(--surface2);border:1px solid var(--border2);padding:6px 12px;gap:6px}
+.cart-badge{background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:100px;min-width:18px;text-align:center;display:inline-block}
+.cart-modal{max-width:540px}
+.cart-empty{text-align:center;padding:40px 20px;color:var(--text3);display:flex;flex-direction:column;align-items:center;gap:12px}
+.cart-empty span{font-size:40px;opacity:.5}
+.cart-empty p{font-size:15px}
+.cart-items{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;max-height:380px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.cart-item{display:grid;grid-template-columns:48px 1fr auto auto 24px;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.cart-item-img{width:48px;height:48px;border-radius:8px;overflow:hidden;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.cart-item-img img{width:100%;height:100%;object-fit:cover}
+.cart-item-info{min-width:0}
+.cart-item-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cart-item-price{font-size:12px;color:var(--text3)}
+.cart-item-qty{display:flex;align-items:center;gap:6px}
+.qty-btn{background:var(--surface);border:1px solid var(--border2);color:var(--text);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.qty-btn:hover{background:var(--border2)}
+.qty-val{font-size:13px;font-weight:600;color:var(--text);min-width:20px;text-align:center}
+.cart-item-subtotal{font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap}
+.cart-item-del{background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all .15s}
+.cart-item-del:hover{background:rgba(239,68,68,.15);color:var(--red)}
+.cart-footer{border-top:1px solid var(--border);padding-top:16px}
+.cart-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.cart-total-label{font-size:14px;color:var(--text2);font-weight:500}
+.cart-total-amount{font-size:24px;font-weight:700;color:var(--accent)}
+.cart-actions{display:flex;gap:10px}
+.cart-actions .btn-action{flex:1;justify-content:center}
+.cart-checkout-btn{flex:2;margin-top:0}
 </style>
