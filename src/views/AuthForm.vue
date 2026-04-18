@@ -224,5 +224,12 @@ const register = async () => {
   } finally {
     loading.value = false
   }
+
+// RETOUR PLAN
+// =====================
+const goToPlans = () => {
+  router.push("/")
+}
+  
 }
 </script>
