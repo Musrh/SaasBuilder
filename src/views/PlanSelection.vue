@@ -25,12 +25,11 @@
         </p>
 
         <!-- 🔥 Déjà un compte -->
-        
         <div class="box">
           <p class="text-sm text-blue-200 mb-2">
             Tu as déjà un compte ?
-         
           </p>
+
           <button
             @click="goToLogin"
             class="bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-lg font-medium transition"
@@ -38,14 +37,18 @@
             Se connecter
           </button>
         </div>
-        <div>
-        <button
-          @click="scrollToPlans"
-          class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
-        >
-          Voir les offres ↓
-        </button>
-      
+
+        <!-- bouton offres -->
+        <div class="mt-6">
+          <button
+            @click="scrollToPlans"
+            class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
+          >
+            Voir les offres ↓
+          </button>
+        </div>
+
+      </div>
     </section>
 
     <!-- PLANS -->
@@ -121,7 +124,6 @@ const selectPlan = (plan) => {
   })
 }
 
-// 🔥 CORRECTION : ouvre Connection.vue
 const goToLogin = () => {
   router.push("/connection")
 }
