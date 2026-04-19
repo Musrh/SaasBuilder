@@ -713,7 +713,6 @@ onMounted(() => {
       }
     })
   })
-})
 
 watch(site, () => { isSaved.value = false }, { deep: true })
 watch(currentTheme, (v) => { localStorage.setItem("currentTheme", JSON.stringify(v)) }, { deep: true })
