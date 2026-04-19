@@ -114,19 +114,20 @@
         <router-link to="/privacy-policy" class="hover:underline">
           Privacy Policy
         </router-link>
+        <p>
 
         <router-link to="/remboursement" class="hover:underline">
           Remboursement
         </router-link>
-
+<p>
         <router-link to="/confidentialite" class="hover:underline">
           Confidentialité
         </router-link>
-
+<p>
         <router-link to="/mentions" class="hover:underline">
           Mentions légales
         </router-link>
-
+<p>
         <router-link to="/conditions" class="hover:underline">
           Conditions
         </router-link>
