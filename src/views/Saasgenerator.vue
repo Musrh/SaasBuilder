@@ -957,8 +957,8 @@ const applyThemeObj = (th) => {
   r.style.setProperty("--theme-nav-bg",      th.navBg         || "#ffffff")
   r.style.setProperty("--theme-nav-border",  th.navBorder     || "#e5e7eb")
 
-notify("✅ Thème \"" + th.name + "\" appliqué !", "success")
-  
+
+  notify(`✅ Thème "${th.name}" appliqué !`, "success")
 
 const importThemeFile = (event) => {
   const file = event.target.files?.[0]
