@@ -771,9 +771,11 @@ const payWithStripe = async () => {
     localStorage.setItem("stripeSiteSlug",  props.uid)
 
     // ── URLs retour (Stripe supprime tout après #)
+    // Stripe supprime tout après # → pointer vers la racine
+    // main.js détecte pendingStripeOrder et redirige vers /payment-success
     const origin     = "https://musrh.github.io/SaasBuilder"
     const successUrl = cfg?.successUrl || `${origin}/`
-    const cancelUrl  = cfg?.cancelUrl  || `${origin}/`
+    const cancelUrl  = cfg?.cancelUrl  || `${origin}/#/site/${props.uid}`
 
     // ── Backend selon le plan du store (isPro = computed)
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
