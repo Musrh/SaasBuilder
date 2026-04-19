@@ -6,13 +6,26 @@ import { onAuthStateChanged } from "firebase/auth"
 import { stripeConfig, loadStripeSDK } from "./stripe.js"
 import { paypalConfig, loadPaypalSDK } from "./paypal.js"
 
+// ===== THEMES INTÉGRÉS =====
+  const builtinThemes = [
+    { name: "Violet Pro",      accent: "#6c63ff", accentHover: "#4f46e5", bg: "#ffffff", bgAlt: "#fafafa", bgHero: "linear-gradient(135deg,#f8f7ff,#ede9fe)", text: "#1a1a2e", textSub: "#6b7280", btnRadius: "10px",  btnPadding: "14px 32px", cardRadius: "16px", cardShadow: "0 2px 12px rgba(0,0,0,.06)", heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#ffffff", navBorder: "#e5e7eb" },
+    { name: "Minimaliste",     accent: "#111827", accentHover: "#374151", bg: "#ffffff", bgAlt: "#f9fafb", bgHero: "#f3f4f6",                                   text: "#111827", textSub: "#6b7280", btnRadius: "4px",   btnPadding: "12px 28px", cardRadius: "8px",  cardShadow: "none",                          heroFont: "'DM Sans',sans-serif",      bodyFont: "'DM Sans',sans-serif", navBg: "#ffffff", navBorder: "#e5e7eb" },
+    { name: "Sunset Orange",   accent: "#f97316", accentHover: "#ea580c", bg: "#fffbf7", bgAlt: "#fff7ed", bgHero: "linear-gradient(135deg,#fff7ed,#ffedd5)",   text: "#1c1917", textSub: "#78716c", btnRadius: "100px",btnPadding: "13px 30px", cardRadius: "12px", cardShadow: "0 4px 16px rgba(249,115,22,.12)",heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#fffbf7", navBorder: "#fed7aa" },
+    { name: "Émeraude",        accent: "#10b981", accentHover: "#059669", bg: "#f0fdf4", bgAlt: "#dcfce7", bgHero: "linear-gradient(135deg,#d1fae5,#a7f3d0)",   text: "#064e3b", textSub: "#047857", btnRadius: "8px",  btnPadding: "13px 28px", cardRadius: "12px", cardShadow: "0 4px 16px rgba(16,185,129,.1)", heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#f0fdf4", navBorder: "#a7f3d0" },
+    { name: "Nuit Sombre",     accent: "#a78bfa", accentHover: "#8b5cf6", bg: "#0f0f11", bgAlt: "#17171a", bgHero: "linear-gradient(135deg,#1a1a2e,#16213e)",   text: "#f0f0f0", textSub: "#8a8a9a", btnRadius: "8px",  btnPadding: "13px 28px", cardRadius: "12px", cardShadow: "0 4px 24px rgba(0,0,0,.4)",      heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#17171a", navBorder: "#2a2a2f" },
+  ]
+  const currentTheme     = ref(builtinThemes[0])
+  const importedThemes   = ref([])
+  const showThemeModal   = ref(false)
+  const themeApplyTarget = ref("site")
+  const selectedPagesForTheme = ref([])
+  const pendingTheme     = ref(null)
+
+  
 const site = ref({
   pages: [{
     id: 1, name: "Accueil", style: {},
-    sections: [
-      { id: 1, type: "hero", content: "Créez votre site web\nen quelques minutes.", subtitle: "Une plateforme puissante, simple et élégante.", cta: "Commencer", style: {} },
-      { id: 2, type: "text", content: "Bienvenue sur notre plateforme.", style: {} }
-    ]
+    sections: []
   }]
 })
 
@@ -127,6 +140,12 @@ const translations = {
     fontDefault: "Par défaut", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "2 colonnes", colOption3: "3 colonnes", colOption4: "4 colonnes",
+    themeBtn: "🎨 Thèmes", themeTitle: "Thèmes & Apparence",
+      themeBuiltin: "Thèmes intégrés", themeImported: "Thèmes importés",
+      themeImport: "Importer un thème (.json)", themeApply: "Appliquer",
+      themeApplySite: "Tout le site", themeApplyPage: "Page courante", themeApplyPages: "Pages choisies",
+      themePreview: "Aperçu", themeRemovePage: "Retirer le thème de la page",
+      themeNone: "Aucun thème importé", themeFormatHint: "Format JSON avec accent, bg, text...",
   },
   en: {
     save: "Save", saving: "Saving...", notConnected: "Not connected",
@@ -202,6 +221,12 @@ const translations = {
     fontDefault: "Default", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "2 columns", colOption3: "3 columns", colOption4: "4 columns",
+    themeBtn: "🎨 Themes", themeTitle: "Themes & Appearance",
+      themeBuiltin: "Built-in themes", themeImported: "Imported themes",
+      themeImport: "Import a theme (.json)", themeApply: "Apply",
+      themeApplySite: "Whole site", themeApplyPage: "Current page", themeApplyPages: "Chosen pages",
+      themePreview: "Preview", themeRemovePage: "Remove page theme",
+      themeNone: "No imported themes", themeFormatHint: "JSON with accent, bg, text...",
   },
   es: {
     save: "Guardar", saving: "Guardando...", notConnected: "No conectado",
@@ -277,6 +302,12 @@ const translations = {
     fontDefault: "Por defecto", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "2 columnas", colOption3: "3 columnas", colOption4: "4 columnas",
+    themeBtn: "🎨 Temas", themeTitle: "Temas & Apariencia",
+      themeBuiltin: "Temas integrados", themeImported: "Temas importados",
+      themeImport: "Importar un tema (.json)", themeApply: "Aplicar",
+      themeApplySite: "Todo el sitio", themeApplyPage: "Página actual", themeApplyPages: "Páginas elegidas",
+      themePreview: "Vista previa", themeRemovePage: "Quitar tema de página",
+      themeNone: "Sin temas importados", themeFormatHint: "JSON con accent, bg, text...",
   },
   ar: {
     save: "حفظ", saving: "جارٍ الحفظ...", notConnected: "غير متصل",
@@ -352,6 +383,12 @@ const translations = {
     fontDefault: "افتراضي", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "عمودان", colOption3: "3 أعمدة", colOption4: "4 أعمدة",
+    themeBtn: "🎨 الثيمات", themeTitle: "الثيمات والمظهر",
+      themeBuiltin: "الثيمات المدمجة", themeImported: "الثيمات المستوردة",
+      themeImport: "استيراد ثيم (.json)", themeApply: "تطبيق",
+      themeApplySite: "كل الموقع", themeApplyPage: "الصفحة الحالية", themeApplyPages: "صفحات مختارة",
+      themePreview: "معاينة", themeRemovePage: "إزالة ثيم الصفحة",
+      themeNone: "لا ثيمات مستوردة", themeFormatHint: "JSON يحتوي accent, bg, text...",
   }
 }
 
@@ -421,6 +458,72 @@ const uploadLogo = (e) => {
   reader.readAsDataURL(file)
 }
 
+
+  // ===== THEME IMPORT & APPLICATION =====
+  const importThemeFile = (e) => {
+    const file = e.target.files[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const theme = JSON.parse(ev.target.result)
+        if (!theme.accent && !theme.bg) { notify("Format invalide : le thème doit contenir au moins 'accent' ou 'bg'", "error"); return }
+        if (!theme.name) theme.name = file.name.replace(/\.json$/i, '')
+        importedThemes.value.push(theme)
+        pendingTheme.value = theme
+        themeApplyTarget.value = "site"
+        selectedPagesForTheme.value = []
+        showThemeModal.value = true
+        notify('Thème "' + theme.name + '" importé ✓')
+      } catch(err) { notify("Fichier JSON invalide : " + err.message, "error") }
+    }
+    reader.readAsText(file)
+    e.target.value = ""
+  }
+
+  const openThemeModal = (theme) => {
+    pendingTheme.value = theme
+    themeApplyTarget.value = "site"
+    selectedPagesForTheme.value = []
+    showThemeModal.value = true
+  }
+
+  const applyTheme = () => {
+    const theme = pendingTheme.value; if (!theme) return
+    if (themeApplyTarget.value === "site") {
+      currentTheme.value = theme
+      site.value.pages.forEach(p => { if (p.theme) delete p.theme })
+      notify('Thème "' + theme.name + '" appliqué au site entier ✓')
+    } else if (themeApplyTarget.value === "page") {
+      currentPage.value.theme = { ...theme }
+      notify('Thème "' + theme.name + '" appliqué à la page "' + currentPage.value.name + '" ✓')
+    } else if (themeApplyTarget.value === "pages") {
+      selectedPagesForTheme.value.forEach(idx => {
+        if (site.value.pages[idx]) site.value.pages[idx].theme = { ...theme }
+      })
+      notify('Thème appliqué à ' + selectedPagesForTheme.value.length + ' page(s) ✓')
+    }
+    showThemeModal.value = false
+    pendingTheme.value = null
+    selectedPagesForTheme.value = []
+  }
+
+  const removePageTheme = (idx) => {
+    if (site.value.pages[idx] && site.value.pages[idx].theme) {
+      const p = site.value.pages[idx]
+      const newP = { ...p }; delete newP.theme
+      site.value.pages[idx] = newP
+      notify('Thème de page retiré ✓')
+    }
+  }
+
+  const togglePageSelection = (idx) => {
+    const arr = selectedPagesForTheme.value
+    const pos = arr.indexOf(idx)
+    if (pos === -1) arr.push(idx)
+    else arr.splice(pos, 1)
+  }
+
+  
 // ===== PUBLISH =====
 const showPublishModal = ref(false)
 const showPublicPreview = ref(false)
@@ -557,41 +660,63 @@ const currentPage = computed(() => site.value.pages[currentPageIndex.value] || s
 const activeSection = computed(() => currentPage.value?.sections?.[activeSectionIndex.value])
 
 onMounted(() => {
-  // Restaurer depuis localStorage immédiatement (avant Firestore)
-  const sn = localStorage.getItem("siteName")
-  const sl = localStorage.getItem("siteLogo")
-  if (sn) siteName.value = sn
-  if (sl) siteLogo.value = sl
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) return
-    currentUser.value = user
-    await loadSavedConfigs()
-    try {
-      const docRef = doc(db, "users", user.uid)
-      const snap = await getDoc(docRef)
-      if (snap.exists()) {
-        const d = snap.data()
-        if (d.siteData)   site.value     = d.siteData
-        if (d.siteName)   siteName.value = d.siteName
-        if (d.siteLogo)   siteLogo.value = d.siteLogo
-        if (!d.siteData) {
+    // Restaurer depuis localStorage immédiatement (avant Firestore)
+    const sn = localStorage.getItem("siteName")
+    const sl = localStorage.getItem("siteLogo")
+    if (sn) siteName.value = sn
+    if (sl) siteLogo.value = sl
+    // Restaurer le thème sauvegardé localement
+    const savedTheme = localStorage.getItem("currentTheme")
+    if (savedTheme) { try { currentTheme.value = JSON.parse(savedTheme) } catch(e) {} }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return
+      currentUser.value = user
+      await loadSavedConfigs()
+      try {
+        const docRef = doc(db, "users", user.uid)
+        const snap = await getDoc(docRef)
+        if (snap.exists()) {
+          const d = snap.data()
+          // Compte existant : charger le dernier site sauvegardé
+          if (d.siteData) {
+            site.value = d.siteData
+          } else {
+            // Pas de siteData Firestore → essayer localStorage
+            const saved = localStorage.getItem("siteDataPro")
+            if (saved) {
+              site.value = JSON.parse(saved)
+            } else {
+              // Nouveau compte : zone principale vide
+              site.value = { pages: [{ id: Date.now(), name: "Accueil", style: {}, sections: [] }] }
+            }
+          }
+          if (d.siteName) siteName.value = d.siteName
+          if (d.siteLogo) siteLogo.value = d.siteLogo
+          // Charger le thème global sauvegardé depuis Firestore
+          if (d.currentTheme) currentTheme.value = d.currentTheme
+          if (d.importedThemes) importedThemes.value = d.importedThemes
+        } else {
+          // Document utilisateur inexistant → tout nouveau compte
           const saved = localStorage.getItem("siteDataPro")
-          if (saved) site.value = JSON.parse(saved)
+          if (saved) {
+            site.value = JSON.parse(saved)
+          } else {
+            site.value = { pages: [{ id: Date.now(), name: "Accueil", style: {}, sections: [] }] }
+          }
         }
-      } else {
+      } catch (e) {
+        console.error("Erreur chargement Firestore :", e)
+        notify(t.value.loadError, "error")
         const saved = localStorage.getItem("siteDataPro")
         if (saved) site.value = JSON.parse(saved)
       }
-    } catch (e) {
-      console.error("Erreur chargement Firestore :", e)
-      notify(t.value.loadError, "error")
-      const saved = localStorage.getItem("siteDataPro")
-      if (saved) site.value = JSON.parse(saved)
-    }
+    })
   })
 })
 
 watch(site, () => { isSaved.value = false }, { deep: true })
+watch(currentTheme, (v) => { localStorage.setItem("currentTheme", JSON.stringify(v)) }, { deep: true })
 watch(siteName, (v) => { localStorage.setItem("siteName", v) })
 watch(siteLogo, (v) => { localStorage.setItem("siteLogo", v) })
 watch(currentPageIndex, () => { activeSectionIndex.value = null })
@@ -615,7 +740,7 @@ const saveSite = async () => {
   isSaving.value = true
   try {
     const docRef = doc(db, "users", currentUser.value.uid)
-    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value }, { merge: true })
+    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value, currentTheme: currentTheme.value, importedThemes: importedThemes.value }, { merge: true })
     localStorage.setItem("siteDataPro", JSON.stringify(site.value))
     isSaved.value = true
     notify(t.value.saved)
@@ -1115,7 +1240,8 @@ const buildSectionHtml = (s) => {
 }
 
 const generateHtml = (pageIndex = 0) => {
-  const th = currentTheme.value || builtinThemes[0]
+  const currentPageData = pages[pageIndex] || pages[0]
+    const th = currentPageData.theme || currentTheme.value || builtinThemes[0]
   const accent     = th.accent     || '#6c63ff'
   const accentH    = th.accentHover|| '#4f46e5'
   const bg         = th.bg         || '#ffffff'
@@ -1145,7 +1271,6 @@ const generateHtml = (pageIndex = 0) => {
     ? `<img src="logo.png" alt="${name}" class="nav-logo"/>`
     : `<span class="brand">${name}</span>`
 
-  const currentPageData = pages[pageIndex] || pages[0]
   const pageStyle = currentPageData.style
     ? Object.entries(currentPageData.style).map(([k,v]) => `${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`).join(';')
     : ''
@@ -1980,6 +2105,11 @@ const setPageStyle = (type, value) => {
         <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
       </select>
       <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
+      <label class="btn-action icon-btn" :title="t.themeBtn || '🎨 Thèmes'" style="cursor:pointer">
+          <input type="file" accept=".json" @change="importThemeFile" hidden/>
+          🎨
+        </label>
+        <button class="btn-action icon-btn" @click="openThemeModal(currentTheme)" :title="t.themeBtn || '🎨 Thèmes'">{{ currentTheme.name || 'Thème' }}</button>
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
@@ -2283,6 +2413,111 @@ const setPageStyle = (type, value) => {
       </div>
     </main>
   </div>
+
+    <!-- THEME MODAL -->
+    <Transition name="modal">
+      <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false" :dir="isRtl?'rtl':'ltr'">
+        <div class="modal-box theme-modal">
+          <button class="modal-close" @click="showThemeModal=false">✕</button>
+          <div class="modal-header">
+            <span class="modal-icon">🎨</span>
+            <h2>{{ t.themeTitle || 'Thèmes & Apparence' }}</h2>
+            <p class="modal-desc">{{ t.themeFormatHint || 'Choisissez ou importez un thème JSON' }}</p>
+          </div>
+
+          <!-- Thèmes intégrés -->
+          <p class="theme-section-label">{{ t.themeBuiltin || 'Thèmes intégrés' }}</p>
+          <div class="theme-grid">
+            <div
+              v-for="th in builtinThemes" :key="th.name"
+              class="theme-card"
+              :class="{ 'theme-card-active': pendingTheme && pendingTheme.name === th.name }"
+              @click="pendingTheme = th"
+            >
+              <div class="theme-swatch" :style="{ background: th.bgHero || th.bg, border: '3px solid ' + th.accent }">
+                <span class="theme-swatch-dot" :style="{ background: th.accent }"></span>
+                <span class="theme-swatch-dot" :style="{ background: th.text }"></span>
+              </div>
+              <span class="theme-name">{{ th.name }}</span>
+            </div>
+          </div>
+
+          <!-- Thèmes importés -->
+          <div v-if="importedThemes.length > 0">
+            <p class="theme-section-label" style="margin-top:16px">{{ t.themeImported || 'Thèmes importés' }}</p>
+            <div class="theme-grid">
+              <div
+                v-for="th in importedThemes" :key="th.name"
+                class="theme-card"
+                :class="{ 'theme-card-active': pendingTheme && pendingTheme.name === th.name }"
+                @click="pendingTheme = th"
+              >
+                <div class="theme-swatch" :style="{ background: th.bgHero || th.bg || '#f0f0f0', border: '3px solid ' + (th.accent || '#888') }">
+                  <span class="theme-swatch-dot" :style="{ background: th.accent || '#888' }"></span>
+                  <span class="theme-swatch-dot" :style="{ background: th.text || '#333' }"></span>
+                </div>
+                <span class="theme-name">{{ th.name }}</span>
+              </div>
+            </div>
+          </div>
+          <p v-else class="theme-none-msg">{{ t.themeNone || 'Aucun thème importé' }} —
+            <label style="color:var(--accent);cursor:pointer;text-decoration:underline">
+              <input type="file" accept=".json" @change="importThemeFile" hidden/>
+              {{ t.themeImport || 'Importer un thème (.json)' }}
+            </label>
+          </p>
+
+          <!-- Cible d'application -->
+          <div v-if="pendingTheme" class="theme-apply-section">
+            <p class="theme-section-label" style="margin-top:16px">{{ t.themeApply || 'Appliquer à' }}</p>
+            <div class="theme-target-row">
+              <label class="theme-target-option">
+                <input type="radio" v-model="themeApplyTarget" value="site"/> {{ t.themeApplySite || 'Tout le site' }}
+              </label>
+              <label class="theme-target-option">
+                <input type="radio" v-model="themeApplyTarget" value="page"/> {{ t.themeApplyPage || 'Page courante' }}
+              </label>
+              <label class="theme-target-option">
+                <input type="radio" v-model="themeApplyTarget" value="pages"/> {{ t.themeApplyPages || 'Pages choisies' }}
+              </label>
+            </div>
+            <!-- Sélection de pages -->
+            <div v-if="themeApplyTarget === 'pages'" class="theme-pages-select">
+              <label
+                v-for="(p, idx) in site.pages" :key="p.id"
+                class="theme-page-opt"
+                :class="{ 'theme-page-opt-on': selectedPagesForTheme.includes(idx) }"
+                @click="togglePageSelection(idx)"
+              >{{ p.name }}</label>
+            </div>
+          </div>
+
+          <!-- Thèmes par page existants -->
+          <div v-if="site.pages.some(p => p.theme)" style="margin-top:16px">
+            <p class="theme-section-label">Thèmes par page actifs</p>
+            <div v-for="(p, idx) in site.pages" :key="p.id">
+              <div v-if="p.theme" class="page-theme-row">
+                <span>{{ p.name }}</span>
+                <span class="page-theme-name">{{ p.theme.name || 'Thème personnalisé' }}</span>
+                <button class="btn-action small" @click="removePageTheme(idx)">{{ t.themeRemovePage || 'Retirer' }}</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-modal-actions" style="margin-top:20px">
+            <button class="btn-action" @click="showThemeModal=false">{{ t.cancel || 'Annuler' }}</button>
+            <label class="btn-action" style="cursor:pointer">
+              <input type="file" accept=".json" @change="importThemeFile" hidden/>
+              📥 {{ t.themeImport || 'Importer' }}
+            </label>
+            <button v-if="pendingTheme" class="btn-action primary" @click="applyTheme">
+              🎨 {{ t.themeApply || 'Appliquer' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  
 </div>
 </template>
 
@@ -2621,4 +2856,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions{display:flex;gap:10px}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
+
+  /* ===== THEME MODAL ===== */
+  .theme-modal{max-width:580px}
+  .theme-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px}
+  .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;margin-bottom:4px}
+  .theme-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border:2px solid var(--border2);border-radius:10px;cursor:pointer;transition:all .15s;background:var(--surface2)}
+  .theme-card:hover{border-color:var(--accent);background:rgba(108,99,255,.08)}
+  .theme-card-active{border-color:var(--accent)!important;background:rgba(108,99,255,.12)!important}
+  .theme-swatch{width:56px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0}
+  .theme-swatch-dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+  .theme-name{font-size:11px;font-weight:600;color:var(--text);text-align:center;line-height:1.3}
+  .theme-apply-section{background:rgba(108,99,255,.06);border:1px solid rgba(108,99,255,.15);border-radius:10px;padding:14px}
+  .theme-target-row{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .theme-target-option{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
+  .theme-target-option input{accent-color:var(--accent)}
+  .theme-pages-select{display:flex;flex-wrap:wrap;gap:8px}
+  .theme-page-opt{background:var(--surface2);border:2px solid var(--border2);color:var(--text2);font-size:12px;font-weight:500;padding:5px 12px;border-radius:100px;cursor:pointer;transition:all .15s;user-select:none;font-family:'DM Sans',sans-serif}
+  .theme-page-opt:hover{border-color:var(--accent);color:var(--accent)}
+  .theme-page-opt-on{border-color:var(--accent)!important;background:rgba(108,99,255,.15)!important;color:var(--accent)!important}
+  .theme-none-msg{font-size:13px;color:var(--text3);margin-top:8px;line-height:1.6}
+  .page-theme-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px;color:var(--text)}
+  .page-theme-name{background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;flex:1}
+  
 </style>
