@@ -6,27 +6,10 @@ import { onAuthStateChanged } from "firebase/auth"
 import { stripeConfig, loadStripeSDK } from "./stripe.js"
 import { paypalConfig, loadPaypalSDK } from "./paypal.js"
 
-// ===== THEMES INTÉGRÉS =====
-  const builtinThemes = [
-    { name: "Violet Pro",      accent: "#6c63ff", accentHover: "#4f46e5", bg: "#ffffff", bgAlt: "#fafafa", bgHero: "linear-gradient(135deg,#f8f7ff,#ede9fe)", text: "#1a1a2e", textSub: "#6b7280", btnRadius: "10px",  btnPadding: "14px 32px", cardRadius: "16px", cardShadow: "0 2px 12px rgba(0,0,0,.06)", heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#ffffff", navBorder: "#e5e7eb" },
-    { name: "Minimaliste",     accent: "#111827", accentHover: "#374151", bg: "#ffffff", bgAlt: "#f9fafb", bgHero: "#f3f4f6",                                   text: "#111827", textSub: "#6b7280", btnRadius: "4px",   btnPadding: "12px 28px", cardRadius: "8px",  cardShadow: "none",                          heroFont: "'DM Sans',sans-serif",      bodyFont: "'DM Sans',sans-serif", navBg: "#ffffff", navBorder: "#e5e7eb" },
-    { name: "Sunset Orange",   accent: "#f97316", accentHover: "#ea580c", bg: "#fffbf7", bgAlt: "#fff7ed", bgHero: "linear-gradient(135deg,#fff7ed,#ffedd5)",   text: "#1c1917", textSub: "#78716c", btnRadius: "100px",btnPadding: "13px 30px", cardRadius: "12px", cardShadow: "0 4px 16px rgba(249,115,22,.12)",heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#fffbf7", navBorder: "#fed7aa" },
-    { name: "Émeraude",        accent: "#10b981", accentHover: "#059669", bg: "#f0fdf4", bgAlt: "#dcfce7", bgHero: "linear-gradient(135deg,#d1fae5,#a7f3d0)",   text: "#064e3b", textSub: "#047857", btnRadius: "8px",  btnPadding: "13px 28px", cardRadius: "12px", cardShadow: "0 4px 16px rgba(16,185,129,.1)", heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#f0fdf4", navBorder: "#a7f3d0" },
-    { name: "Nuit Sombre",     accent: "#a78bfa", accentHover: "#8b5cf6", bg: "#0f0f11", bgAlt: "#17171a", bgHero: "linear-gradient(135deg,#1a1a2e,#16213e)",   text: "#f0f0f0", textSub: "#8a8a9a", btnRadius: "8px",  btnPadding: "13px 28px", cardRadius: "12px", cardShadow: "0 4px 24px rgba(0,0,0,.4)",      heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif", navBg: "#17171a", navBorder: "#2a2a2f" },
-  ]
-  const currentTheme     = ref(builtinThemes[0])
-  const importedThemes   = ref([])
-  const showThemeModal   = ref(false)
-  const themeApplyTarget = ref("site")
-  const selectedPagesForTheme = ref([])
-  const pendingTheme     = ref(null)
-
-  
+// Site vide par défaut — remplacé par Firestore à la connexion
+// Un nouveau propriétaire part d'une page blanche, sans héritage
 const site = ref({
-  pages: [{
-    id: 1, name: "Accueil", style: {},
-    sections: []
-  }]
+  pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }]
 })
 
 const mode = ref("edit")
@@ -140,12 +123,6 @@ const translations = {
     fontDefault: "Par défaut", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "2 colonnes", colOption3: "3 colonnes", colOption4: "4 colonnes",
-    themeBtn: "🎨 Thèmes", themeTitle: "Thèmes & Apparence",
-      themeBuiltin: "Thèmes intégrés", themeImported: "Thèmes importés",
-      themeImport: "Importer un thème (.json)", themeApply: "Appliquer",
-      themeApplySite: "Tout le site", themeApplyPage: "Page courante", themeApplyPages: "Pages choisies",
-      themePreview: "Aperçu", themeRemovePage: "Retirer le thème de la page",
-      themeNone: "Aucun thème importé", themeFormatHint: "Format JSON avec accent, bg, text...",
   },
   en: {
     save: "Save", saving: "Saving...", notConnected: "Not connected",
@@ -221,12 +198,6 @@ const translations = {
     fontDefault: "Default", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "2 columns", colOption3: "3 columns", colOption4: "4 columns",
-    themeBtn: "🎨 Themes", themeTitle: "Themes & Appearance",
-      themeBuiltin: "Built-in themes", themeImported: "Imported themes",
-      themeImport: "Import a theme (.json)", themeApply: "Apply",
-      themeApplySite: "Whole site", themeApplyPage: "Current page", themeApplyPages: "Chosen pages",
-      themePreview: "Preview", themeRemovePage: "Remove page theme",
-      themeNone: "No imported themes", themeFormatHint: "JSON with accent, bg, text...",
   },
   es: {
     save: "Guardar", saving: "Guardando...", notConnected: "No conectado",
@@ -302,12 +273,6 @@ const translations = {
     fontDefault: "Por defecto", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "2 columnas", colOption3: "3 columnas", colOption4: "4 columnas",
-    themeBtn: "🎨 Temas", themeTitle: "Temas & Apariencia",
-      themeBuiltin: "Temas integrados", themeImported: "Temas importados",
-      themeImport: "Importar un tema (.json)", themeApply: "Aplicar",
-      themeApplySite: "Todo el sitio", themeApplyPage: "Página actual", themeApplyPages: "Páginas elegidas",
-      themePreview: "Vista previa", themeRemovePage: "Quitar tema de página",
-      themeNone: "Sin temas importados", themeFormatHint: "JSON con accent, bg, text...",
   },
   ar: {
     save: "حفظ", saving: "جارٍ الحفظ...", notConnected: "غير متصل",
@@ -383,12 +348,6 @@ const translations = {
     fontDefault: "افتراضي", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "عمودان", colOption3: "3 أعمدة", colOption4: "4 أعمدة",
-    themeBtn: "🎨 الثيمات", themeTitle: "الثيمات والمظهر",
-      themeBuiltin: "الثيمات المدمجة", themeImported: "الثيمات المستوردة",
-      themeImport: "استيراد ثيم (.json)", themeApply: "تطبيق",
-      themeApplySite: "كل الموقع", themeApplyPage: "الصفحة الحالية", themeApplyPages: "صفحات مختارة",
-      themePreview: "معاينة", themeRemovePage: "إزالة ثيم الصفحة",
-      themeNone: "لا ثيمات مستوردة", themeFormatHint: "JSON يحتوي accent, bg, text...",
   }
 }
 
@@ -458,72 +417,6 @@ const uploadLogo = (e) => {
   reader.readAsDataURL(file)
 }
 
-
-  // ===== THEME IMPORT & APPLICATION =====
-  const importThemeFile = (e) => {
-    const file = e.target.files[0]; if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      try {
-        const theme = JSON.parse(ev.target.result)
-        if (!theme.accent && !theme.bg) { notify("Format invalide : le thème doit contenir au moins 'accent' ou 'bg'", "error"); return }
-        if (!theme.name) theme.name = file.name.replace(/\.json$/i, '')
-        importedThemes.value.push(theme)
-        pendingTheme.value = theme
-        themeApplyTarget.value = "site"
-        selectedPagesForTheme.value = []
-        showThemeModal.value = true
-        notify('Thème "' + theme.name + '" importé ✓')
-      } catch(err) { notify("Fichier JSON invalide : " + err.message, "error") }
-    }
-    reader.readAsText(file)
-    e.target.value = ""
-  }
-
-  const openThemeModal = (theme) => {
-    pendingTheme.value = theme
-    themeApplyTarget.value = "site"
-    selectedPagesForTheme.value = []
-    showThemeModal.value = true
-  }
-
-  const applyTheme = () => {
-    const theme = pendingTheme.value; if (!theme) return
-    if (themeApplyTarget.value === "site") {
-      currentTheme.value = theme
-      site.value.pages.forEach(p => { if (p.theme) delete p.theme })
-      notify('Thème "' + theme.name + '" appliqué au site entier ✓')
-    } else if (themeApplyTarget.value === "page") {
-      currentPage.value.theme = { ...theme }
-      notify('Thème "' + theme.name + '" appliqué à la page "' + currentPage.value.name + '" ✓')
-    } else if (themeApplyTarget.value === "pages") {
-      selectedPagesForTheme.value.forEach(idx => {
-        if (site.value.pages[idx]) site.value.pages[idx].theme = { ...theme }
-      })
-      notify('Thème appliqué à ' + selectedPagesForTheme.value.length + ' page(s) ✓')
-    }
-    showThemeModal.value = false
-    pendingTheme.value = null
-    selectedPagesForTheme.value = []
-  }
-
-  const removePageTheme = (idx) => {
-    if (site.value.pages[idx] && site.value.pages[idx].theme) {
-      const p = site.value.pages[idx]
-      const newP = { ...p }; delete newP.theme
-      site.value.pages[idx] = newP
-      notify('Thème de page retiré ✓')
-    }
-  }
-
-  const togglePageSelection = (idx) => {
-    const arr = selectedPagesForTheme.value
-    const pos = arr.indexOf(idx)
-    if (pos === -1) arr.push(idx)
-    else arr.splice(pos, 1)
-  }
-
-  
 // ===== PUBLISH =====
 const showPublishModal = ref(false)
 const showPublicPreview = ref(false)
@@ -659,64 +552,488 @@ const copyDnsRecords = () => {
 const currentPage = computed(() => site.value.pages[currentPageIndex.value] || site.value.pages[0])
 const activeSection = computed(() => currentPage.value?.sections?.[activeSectionIndex.value])
 
-onMounted(() => {
-    // Restaurer depuis localStorage immédiatement (avant Firestore)
-    const sn = localStorage.getItem("siteName")
-    const sl = localStorage.getItem("siteLogo")
-    if (sn) siteName.value = sn
-    if (sl) siteLogo.value = sl
-    // Restaurer le thème sauvegardé localement
-    const savedTheme = localStorage.getItem("currentTheme")
-    if (savedTheme) { try { currentTheme.value = JSON.parse(savedTheme) } catch(e) {} }
+// ── Génération HTML par section ──────────────────────────────
+const buildSectionHtml = (s) => {
+  const inlineSt = s.style
+    ? ' style="' + Object.entries(s.style).map(([k,v]) => k.replace(/([A-Z])/g,'-$1').toLowerCase()+':'+v).join(';') + '"'
+    : ''
+  if (s.type==='hero') return `
+    <section class="hero"${inlineSt}>
+      <h1>${(s.content||'').replace(/\n/g,'<br/>')}</h1>
+      ${s.subtitle?`<p class="hero-sub">${s.subtitle}</p>`:''}
+      ${s.cta?`<button class="cta-btn" onclick="return false">${s.cta}</button>`:''}
+    </section>`
+  if (s.type==='text') return `
+    <section class="sec-text"${inlineSt}><p>${(s.content||'').replace(/\n/g,'<br/>')}</p></section>`
+  if (s.type==='image') return s.url?`
+    <section class="sec-image"${inlineSt}><img src="${s.url}" alt="${s.alt||''}" loading="lazy"/></section>`:''
+  if (s.type==='gallery') {
+    const imgs=(s.images||[]).map(i=>`<div class="gal-item"><img src="${i.url}" alt="${i.alt||''}"/></div>`).join('')
+    return `<section class="gallery"${inlineSt}><div class="gallery-grid" style="grid-template-columns:repeat(${s.columns||3},1fr)">${imgs}</div></section>`
+  }
+  if (s.type==='video'&&s.url) {
+    const embed=s.url.includes('youtu')
+      ?s.url.replace('watch?v=','embed/').replace('youtu.be/','www.youtube.com/embed/')
+      :s.url.replace('vimeo.com/','player.vimeo.com/video/')
+    return `<section class="sec-video"${inlineSt}>
+      ${s.title?`<h3 class="video-title">${s.title}</h3>`:''}
+      <div class="video-wrap"><iframe src="${embed}" allowfullscreen loading="lazy"></iframe></div>
+    </section>`
+  }
+  if (s.type==='products') {
+    const cards=(s.items||[]).map(p=>`
+      <div class="product-card">
+        <div class="product-img-wrap">
+          ${p.image?`<img src="${p.image}" alt="${p.name}" loading="lazy"/>`:'<div class="product-img-ph">🛍️</div>'}
+          ${p.badge?`<span class="product-badge">${p.badge}</span>`:''}
+        </div>
+        <div class="product-body">
+          <div class="product-name">${p.name||''}</div>
+          <div class="product-desc">${p.description||''}</div>
+          <div class="product-footer">
+            <span class="product-price">${p.price||''}${p.currency||'€'}</span>
+            <button class="product-btn" onclick='addToCart(${JSON.stringify({name:p.name,price:p.price,currency:p.currency||"€",image:p.image||""})})'>🛒 Acheter</button>
+          </div>
+        </div>
+      </div>`).join('')
+    return `<section class="sec-products"${inlineSt}><div class="products-grid">${cards}</div></section>`
+  }
+  if (s.type==='features') {
+    const feats=(s.items||[]).map(f=>`
+      <div class="feature-card"><span class="feat-icon">${f.icon||'⚡'}</span>
+      <strong>${f.title||''}</strong><p>${f.desc||''}</p></div>`).join('')
+    return `<section class="sec-features"${inlineSt}><div class="features-grid">${feats}</div></section>`
+  }
+  if (s.type==='form') return `
+    <section class="sec-form"${inlineSt}>
+      <h3>Contactez-nous</h3>
+      <form onsubmit="handleForm(event)">
+        <input type="text" placeholder="Votre nom" required/>
+        <input type="email" placeholder="Votre email" required/>
+        <textarea placeholder="Votre message" rows="4"></textarea>
+        <button type="submit">Envoyer</button>
+      </form>
+    </section>`
+  if (s.type==='divider') return `<div class="sec-divider"${inlineSt}><hr/></div>`
+  return ''
+}
 
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) return
-      currentUser.value = user
-      await loadSavedConfigs()
-      try {
-        const docRef = doc(db, "users", user.uid)
-        const snap = await getDoc(docRef)
-        if (snap.exists()) {
-          const d = snap.data()
-          // Compte existant : charger le dernier site sauvegardé
-          if (d.siteData) {
-            site.value = d.siteData
-          } else {
-            // Pas de siteData Firestore → essayer localStorage
-            const saved = localStorage.getItem("siteDataPro")
-            if (saved) {
-              site.value = JSON.parse(saved)
-            } else {
-              // Nouveau compte : zone principale vide
-              site.value = { pages: [{ id: Date.now(), name: "Accueil", style: {}, sections: [] }] }
-            }
-          }
-          if (d.siteName) siteName.value = d.siteName
-          if (d.siteLogo) siteLogo.value = d.siteLogo
-          // Charger le thème global sauvegardé depuis Firestore
-          if (d.currentTheme) currentTheme.value = d.currentTheme
-          if (d.importedThemes) importedThemes.value = d.importedThemes
-        } else {
-          // Document utilisateur inexistant → tout nouveau compte
-          const saved = localStorage.getItem("siteDataPro")
-          if (saved) {
-            site.value = JSON.parse(saved)
-          } else {
-            site.value = { pages: [{ id: Date.now(), name: "Accueil", style: {}, sections: [] }] }
-          }
-        }
-      } catch (e) {
-        console.error("Erreur chargement Firestore :", e)
-        notify(t.value.loadError, "error")
-        const saved = localStorage.getItem("siteDataPro")
-        if (saved) site.value = JSON.parse(saved)
-      }
+// ── Génération HTML d'une page complète ──────────────────────
+const generatePageHtml = (pageIndex, allPages, theme, logoData) => {
+  const th          = theme || {}
+  const accent      = th.accent      || '#6c63ff'
+  const accentH     = th.accentHover || '#4f46e5'
+  const bg          = th.bg          || '#ffffff'
+  const bgAlt       = th.bgAlt       || '#fafafa'
+  const bgHero      = th.bgHero      || 'linear-gradient(135deg,#f8f7ff,#ede9fe)'
+  const textColor   = th.text        || '#1a1a2e'
+  const textSub     = th.textSub     || '#6b7280'
+  const btnRadius   = th.btnRadius   || '10px'
+  const btnPad      = th.btnPadding  || '14px 32px'
+  const cardRadius  = th.cardRadius  || '16px'
+  const cardShadow  = th.cardShadow  || '0 2px 12px rgba(0,0,0,.06)'
+  const heroFont    = th.heroFont    || "'Playfair Display',serif"
+  const bodyFont    = th.bodyFont    || "'DM Sans',sans-serif"
+  const navBg       = th.navBg       || '#ffffff'
+  const navBorder   = th.navBorder   || '#e5e7eb'
+
+  const page        = allPages[pageIndex]
+  const name        = siteName.value || 'Mon Site'
+  const isMulti     = allPages.length > 1
+
+  const navLinks    = allPages.map((p, i) => {
+    const href = i === 0 ? 'index.html' : `page-${i+1}.html`
+    return `<a href="${href}" class="${i===pageIndex?'active':''}">${p.name}</a>`
+  }).join('')
+
+  const logoHtml    = logoData
+    ? `<img src="logo.png" alt="${name}" class="nav-logo"/>`
+    : `<span class="brand">${name}</span>`
+
+  const pageStyle   = page.style
+    ? Object.entries(page.style).map(([k,v]) => k.replace(/([A-Z])/g,'-$1').toLowerCase()+':'+v).join(';')
+    : ''
+
+  const sectionsHtml = (page.sections || []).map(buildSectionHtml).join('\n')
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="description" content="${name}"/>
+<title>${page.name} — ${name}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
+<style>:root{
+  --accent:${accent};--accent-h:${accentH};
+  --bg:${bg};--bg-alt:${bgAlt};--bg-hero:${bgHero};
+  --text:${textColor};--text-sub:${textSub};
+  --btn-radius:${btnRadius};--btn-pad:${btnPad};
+  --card-radius:${cardRadius};--card-shadow:${cardShadow};
+  --hero-font:${heroFont};--body-font:${bodyFont};
+  --nav-bg:${navBg};--nav-border:${navBorder};
+}
+/* ── Bouton thème + modal ────────────────────────────────── */
+.btn-theme-pick{background:linear-gradient(135deg,#a78bfa,#6c63ff);color:#fff}
+.btn-theme-pick:hover{background:linear-gradient(135deg,#6c63ff,#4f46e5)}
+.theme-pick-modal{max-width:500px;width:93%;max-height:88vh;overflow-y:auto}
+.tpm-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px}
+.tpm-sub{font-size:13px;color:var(--text2);margin-bottom:14px}
+.tpm-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;display:block}
+.tpm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:6px}
+.tpm-card{background:var(--surface2);border:2px solid var(--border);border-radius:12px;padding:10px;cursor:pointer;text-align:left;transition:.2s;display:flex;flex-direction:column;gap:6px;position:relative}
+.tpm-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tpm-card.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.18)}
+.tpm-preview{border-radius:7px;overflow:hidden;height:60px;border:1px solid var(--border)}
+.tpm-prev-bg{height:100%;display:flex;flex-direction:column;gap:3px;padding:4px}
+.tpm-prev-nav{height:12px;border-radius:3px;flex-shrink:0}
+.tpm-prev-hero{flex:1;border-radius:3px}
+.tpm-prev-btn{height:10px;width:36%;border-radius:4px;margin-top:2px}
+.tpm-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tpm-dot{width:9px;height:9px;border-radius:50%;position:absolute;top:9px;right:9px}
+.tpm-hint{font-size:11px;color:var(--text2);margin-bottom:10px;padding:9px 11px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent);line-height:1.6}
+.tpm-hint code{font-family:monospace;color:var(--accent2,#10b981);font-size:10px}
+.tpm-drop-zone{display:flex;align-items:center;justify-content:center;padding:18px;border:2px dashed var(--border2);border-radius:10px;cursor:pointer;transition:.2s;color:var(--text2);text-align:center;margin-bottom:10px;font-size:13px}
+.tpm-drop-zone:hover{border-color:var(--accent);background:rgba(108,99,255,.05);color:var(--accent)}
+.tpm-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:9px 13px;font-size:12px;color:#ef4444;margin-bottom:10px}
+.tpm-export-row{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--text2)}
+.tpm-export-btn{background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+.tpm-export-btn:hover{background:var(--accent);color:white;border-color:var(--accent)}
+/* Export cards */
+.export-card-star{border-color:var(--accent)!important;background:rgba(108,99,255,.05)!important}
+.export-badge-star{background:var(--accent)!important;color:#fff!important}
+
+</style>
+</head>
+<body>
+<nav>
+  ${logoHtml}
+  ${isMulti ? `<div class="nav-links">${navLinks}</div>` : `<div class="nav-links"></div>`}
+  <button id="cart-fab" class="cart-fab" onclick="toggleCart()" style="display:none">🛒 <span id="cart-count">0</span></button>
+</nav>
+<main${pageStyle ? ` style="${pageStyle}"` : ''}>${sectionsHtml}</main>
+<div id="cart-overlay" class="cart-overlay" style="display:none">
+  <div class="cart-box">
+    <div class="cart-header"><h3>🛒 Panier</h3><button onclick="closeCart()">✕</button></div>
+    <div id="cart-items" class="cart-items"></div>
+    <div class="cart-footer">
+      <div class="cart-total">Total : <strong id="cart-total-val">0.00€</strong></div>
+      <button class="cart-checkout-btn" onclick="checkout()">Passer la commande</button>
+    </div>
+  </div>
+</div>
+<footer class="site-footer"><p>© ${new Date().getFullYear()} ${name} — Créé avec SaasBuilder</p></footer>
+<script>
+const cart=JSON.parse(localStorage.getItem('_cart')||'[]')
+function saveCart(){localStorage.setItem('_cart',JSON.stringify(cart))}
+function renderCart(){
+  const count=cart.reduce((s,i)=>s+i.qty,0)
+  const total=cart.reduce((s,i)=>s+parseFloat(i.price||0)*i.qty,0)
+  document.getElementById('cart-count').textContent=count
+  document.getElementById('cart-fab').style.display=count>0?'flex':'none'
+  document.getElementById('cart-total-val').textContent=total.toFixed(2)+'€'
+  document.getElementById('cart-items').innerHTML=cart.map((it,i)=>\`
+    <div class="cart-item">
+      \${it.image?\`<img src="\${it.image}" alt="\${it.name}"/>\`:'<div class="cart-item-ph">🛍️</div>'}
+      <div class="cart-item-info"><b>\${it.name}</b><span>\${it.price}\${it.currency||'€'}</span></div>
+      <div class="cart-item-qty">
+        <button onclick="qtyChange(\${i},-1)">−</button><span>\${it.qty}</span><button onclick="qtyChange(\${i},1)">+</button>
+      </div>
+      <button onclick="removeItem(\${i})">🗑</button>
+    </div>\`).join('')
+}
+function addToCart(data){
+  const d=typeof data==='string'?JSON.parse(data):data
+  const ex=cart.find(x=>x.name===d.name);if(ex)ex.qty++;else cart.push({...d,qty:1})
+  saveCart();renderCart();openCart()
+}
+function qtyChange(i,d){cart[i].qty=Math.max(1,cart[i].qty+d);saveCart();renderCart()}
+function removeItem(i){cart.splice(i,1);saveCart();renderCart()}
+function toggleCart(){document.getElementById('cart-overlay').style.display=document.getElementById('cart-overlay').style.display==='flex'?'none':'flex'}
+function openCart(){document.getElementById('cart-overlay').style.display='flex'}
+function closeCart(){document.getElementById('cart-overlay').style.display='none'}
+function checkout(){alert('Intégrez votre solution de paiement (Stripe, PayPal...) ici.')}
+function handleForm(e){e.preventDefault();alert('Message envoyé ! Configurez un endpoint email.');return false}
+renderCart()
+<\/script>
+</body>
+</html>`
+}
+
+// ── CSS commun du site exporté ────────────────────────────────
+const generateCSS = () => `/* SaasBuilder — style.css */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body-font,'DM Sans',sans-serif);color:var(--text,#1a1a2e);background:var(--bg,#fff)}
+nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7eb);padding:0 20px;height:58px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.brand{font-family:var(--hero-font);font-size:17px;color:var(--text);font-weight:700;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.nav-logo{height:34px;max-width:130px;object-fit:contain;border-radius:6px;margin-right:auto}
+.nav-links{display:flex;gap:4px;flex:1;justify-content:center;overflow-x:auto;scrollbar-width:none}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-links a{text-decoration:none;color:var(--text-sub);font-size:14px;font-weight:500;padding:6px 14px;border-radius:8px;white-space:nowrap;transition:.15s}
+.nav-links a:hover,.nav-links a.active{background:var(--accent);color:#fff}
+.hero{padding:clamp(60px,10vw,110px) clamp(20px,6vw,80px);background:var(--bg-hero);text-align:center}
+.hero h1{font-family:var(--hero-font);font-size:clamp(28px,5vw,54px);color:var(--text);line-height:1.15;white-space:pre-line;margin-bottom:16px}
+.hero-sub{font-size:clamp(14px,2.5vw,20px);color:var(--text-sub);margin-bottom:28px;max-width:580px;margin-left:auto;margin-right:auto}
+.cta-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius,10px);padding:var(--btn-pad,14px 32px);font-size:clamp(13px,2vw,16px);font-weight:600;cursor:pointer;transition:all .2s}
+.cta-btn:hover{background:var(--accent-h);transform:translateY(-2px)}
+.sec-text{padding:clamp(28px,5vw,56px) clamp(16px,6vw,80px)}.sec-text p{font-size:clamp(14px,2vw,17px);line-height:1.8;max-width:760px}
+.sec-image{padding:clamp(16px,3vw,36px) clamp(16px,6vw,80px)}.sec-image img{width:100%;border-radius:12px;display:block}
+.gallery{padding:clamp(20px,4vw,48px) clamp(16px,5vw,60px)}.gallery-grid{display:grid;gap:10px}.gal-item img{width:100%;border-radius:8px;object-fit:cover;aspect-ratio:1;display:block}
+.sec-video{padding:clamp(20px,4vw,40px) clamp(16px,5vw,60px)}.video-title{font-family:var(--hero-font);font-size:clamp(16px,3vw,24px);margin-bottom:14px;text-align:center}
+.video-wrap iframe{width:100%;height:clamp(200px,50vw,460px);border-radius:12px;border:none;display:block}
+.sec-products{padding:clamp(24px,4vw,56px) clamp(16px,5vw,60px);background:var(--bg-alt)}
+.products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px}
+.product-card{background:var(--bg);border:1px solid var(--nav-border);border-radius:var(--card-radius,16px);overflow:hidden;box-shadow:var(--card-shadow);transition:transform .2s}
+.product-card:hover{transform:translateY(-3px)}
+.product-img-wrap{position:relative}.product-img-wrap img{width:100%;height:180px;object-fit:cover;display:block}
+.product-img-ph{width:100%;height:180px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:40px}
+.product-badge{position:absolute;top:10px;left:10px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;text-transform:uppercase}
+.product-body{padding:14px}.product-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:5px}
+.product-desc{font-size:12px;color:var(--text-sub);line-height:1.5;margin-bottom:12px}
+.product-footer{display:flex;align-items:center;justify-content:space-between}
+.product-price{font-size:17px;font-weight:700;color:var(--accent)}
+.product-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.product-btn:hover{background:var(--accent-h)}
+.sec-features{padding:clamp(36px,6vw,70px) clamp(16px,5vw,60px);background:var(--bg-alt)}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:22px;max-width:940px;margin:0 auto}
+.feature-card{background:var(--bg);border:1px solid var(--nav-border);border-radius:14px;padding:24px;text-align:center}
+.feat-icon{font-size:30px;display:block;margin-bottom:10px}.feature-card strong{font-size:15px;color:var(--text);display:block;margin-bottom:5px}.feature-card p{font-size:13px;color:var(--text-sub);line-height:1.5}
+.sec-form{padding:clamp(36px,6vw,70px) clamp(16px,5vw,60px);background:var(--bg-alt);display:flex;flex-direction:column;align-items:center}
+.sec-form h3{font-family:var(--hero-font);font-size:clamp(20px,4vw,28px);color:var(--text);margin-bottom:20px}
+.sec-form form{display:flex;flex-direction:column;gap:10px;width:100%;max-width:480px}
+.sec-form input,.sec-form textarea{padding:11px 14px;border:1px solid var(--nav-border);border-radius:10px;font-size:14px;font-family:var(--body-font);background:var(--bg);color:var(--text);outline:none}
+.sec-form input:focus,.sec-form textarea:focus{border-color:var(--accent)}
+.sec-form button{background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius);padding:var(--btn-pad);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--body-font)}
+.sec-form button:hover{background:var(--accent-h)}
+.sec-divider{padding:8px 60px}.sec-divider hr{border:none;border-top:1px solid var(--nav-border)}
+.cart-fab{position:fixed;bottom:22px;right:22px;z-index:200;background:var(--accent);color:#fff;border:none;border-radius:100px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:7px}
+.cart-fab:hover{background:var(--accent-h)}
+.cart-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:600px){.cart-overlay{align-items:center}}
+.cart-box{background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
+@media(min-width:600px){.cart-box{border-radius:16px;max-height:560px}}
+.cart-header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--nav-border)}
+.cart-header h3{font-size:16px;font-weight:700}.cart-header button{background:none;border:none;font-size:20px;cursor:pointer}
+.cart-items{overflow-y:auto;flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.cart-item{display:flex;align-items:center;gap:10px;padding:8px;background:var(--bg-alt);border-radius:8px}
+.cart-item img,.cart-item-ph{width:42px;height:42px;border-radius:7px;object-fit:cover;flex-shrink:0;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:18px}
+.cart-item-info{flex:1;min-width:0}.cart-item-info b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cart-item-info span{font-size:11px;color:var(--text-sub)}
+.cart-item-qty{display:flex;align-items:center;gap:5px}.cart-item-qty button{background:var(--bg);border:1px solid var(--nav-border);width:22px;height:22px;border-radius:5px;cursor:pointer}
+.cart-item-qty span{font-size:13px;font-weight:600;min-width:18px;text-align:center}
+.cart-footer{padding:14px 18px;border-top:1px solid var(--nav-border)}
+.cart-total{font-size:13px;color:var(--text-sub);margin-bottom:10px}.cart-total strong{font-size:18px;color:var(--accent)}
+.cart-checkout-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius);padding:13px;font-size:15px;font-weight:700;cursor:pointer}
+.cart-checkout-btn:hover{background:var(--accent-h)}
+.site-footer{text-align:center;padding:20px;font-size:12px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt)}
+@media(max-width:600px){nav{padding:0 12px;height:50px}.nav-links a{font-size:12px;padding:5px 8px}.hero{padding:44px 14px}.sec-products,.sec-features,.sec-form,.sec-text,.sec-image,.gallery,.sec-video{padding-left:12px;padding-right:12px}.products-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}.features-grid{grid-template-columns:1fr}}
+`
+
+// ── README hébergement ────────────────────────────────────────
+const generateReadme = () => {
+  const n = siteName.value || 'mon-site'
+  return `# ${n} — Guide d'hébergement
+Généré par SaasBuilder le ${new Date().toLocaleDateString('fr-FR')}.
+
+## Fichiers inclus
+- index.html         — Page principale
+- page-N.html        — Pages supplémentaires
+- style.css          — CSS + variables du thème
+- logo.png           — Logo (si uploadé)
+
+## Options d'hébergement
+
+### Netlify (recommandé — gratuit)
+1. https://netlify.com → Drag & drop du dossier dist/
+2. Live en 30 secondes, domaine custom disponible
+
+### GitHub Pages (gratuit)
+1. Créez un repo public
+2. Uploadez tous les fichiers
+3. Settings → Pages → Branch: main
+
+### Vercel (gratuit)
+\`vercel --name ${n.toLowerCase().replace(/\s+/g,'-')}\`
+
+### FTP classique (OVH, Hostinger, Infomaniak...)
+Uploadez dans public_html/
+
+## Personnaliser le thème
+Dans style.css, modifiez :root { }
+--accent      → Couleur principale
+--bg          → Fond
+--btn-radius  → Arrondi des boutons
+`
+}
+
+// ── Export dist.zip (multi-pages + CSS + logo + README) ───────
+const exportDist = async () => {
+  try {
+    if (!window.JSZip) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+        s.onload = resolve
+        s.onerror = () => reject(new Error('Impossible de charger JSZip'))
+        document.head.appendChild(s)
+      })
+    }
+    const zip   = new window.JSZip()
+    const pages = site.value.pages || []
+    const th    = currentTheme?.value || null
+    const logo  = siteLogo.value
+
+    // Une page HTML par page du site
+    pages.forEach((p, i) => {
+      const filename = i === 0 ? 'index.html' : `page-${i+1}.html`
+      zip.file(filename, generatePageHtml(i, pages, th, logo))
     })
+
+    // CSS commun
+    zip.file('style.css', generateCSS())
+
+    // Logo en base64
+    if (logo && logo.startsWith('data:image')) {
+      zip.file('logo.png', logo.split(',')[1], { base64: true })
+    }
+
+    // README
+    zip.file('README.md', generateReadme())
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${(siteName.value||'mon-site').toLowerCase().replace(/\s+/g,'-')}-dist.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+    notify('✅ dist.zip téléchargé !', 'success')
+    showExportModal.value = false
+  } catch(err) {
+    notify('❌ Export échoué : ' + err.message, 'error')
+  }
+}
+
+const exportSite = () => {
+  const html = generatePageHtml(0, site.value.pages, currentTheme?.value || null, siteLogo.value)
+  const blob = new Blob([html], { type: 'text/html' })
+  const a    = document.createElement('a')
+  a.href     = URL.createObjectURL(blob)
+  a.download = `${(siteName.value||'site').toLowerCase().replace(/\s+/g,'-')}.html`
+  a.click()
+  notify(t.value.exportSuccess)
+  showExportModal.value = false
+}
+
+// ── Import thème JSON externe ─────────────────────────────────
+const showThemeModal   = ref(false)
+const themeImportError = ref("")
+const currentTheme     = ref(null)
+
+const builtinThemes = [
+  { name:"Violet Élégant", accent:"#6c63ff", accentHover:"#4f46e5", bg:"#ffffff", bgAlt:"#fafafa", bgHero:"linear-gradient(135deg,#f8f7ff,#ede9fe)", text:"#1a1a2e", textSub:"#6b7280", btnRadius:"10px", btnPadding:"14px 32px", cardRadius:"16px", cardShadow:"0 2px 12px rgba(0,0,0,.06)", heroFont:"'Playfair Display',serif", bodyFont:"'DM Sans',sans-serif", navBg:"#ffffff", navBorder:"#e5e7eb" },
+  { name:"Noir Moderne",   accent:"#f59e0b", accentHover:"#d97706", bg:"#0f0f0f", bgAlt:"#1a1a1a", bgHero:"linear-gradient(135deg,#1a1a1a,#0f0f0f)", text:"#f9fafb", textSub:"#9ca3af", btnRadius:"4px", btnPadding:"14px 32px", cardRadius:"8px", cardShadow:"0 2px 20px rgba(0,0,0,.5)", heroFont:"'DM Sans',sans-serif", bodyFont:"'DM Sans',sans-serif", navBg:"#0f0f0f", navBorder:"#2a2a2a" },
+  { name:"Rose Boutique",  accent:"#ec4899", accentHover:"#db2777", bg:"#fff5f7", bgAlt:"#fce7f3", bgHero:"linear-gradient(135deg,#fff5f7,#fce7f3)", text:"#1f2937", textSub:"#6b7280", btnRadius:"100px", btnPadding:"12px 30px", cardRadius:"20px", cardShadow:"0 4px 20px rgba(236,72,153,.12)", heroFont:"'Playfair Display',serif", bodyFont:"'DM Sans',sans-serif", navBg:"#ffffff", navBorder:"#fce7f3" },
+  { name:"Vert Nature",    accent:"#059669", accentHover:"#047857", bg:"#f0fdf4", bgAlt:"#dcfce7", bgHero:"linear-gradient(135deg,#f0fdf4,#dcfce7)", text:"#14532d", textSub:"#4b7563", btnRadius:"8px", btnPadding:"13px 28px", cardRadius:"12px", cardShadow:"0 2px 12px rgba(5,150,105,.1)", heroFont:"'Playfair Display',serif", bodyFont:"'DM Sans',sans-serif", navBg:"#ffffff", navBorder:"#bbf7d0" },
+]
+
+const applyThemeObj = (th) => {
+  currentTheme.value = th
+  const r = document.documentElement
+  r.style.setProperty("--theme-accent",      th.accent        || "#6c63ff")
+  r.style.setProperty("--theme-accent-hover",th.accentHover   || "#4f46e5")
+  r.style.setProperty("--theme-bg",          th.bg            || "#ffffff")
+  r.style.setProperty("--theme-bg-alt",      th.bgAlt         || "#fafafa")
+  r.style.setProperty("--theme-bg-hero",     th.bgHero        || "linear-gradient(135deg,#f8f7ff,#ede9fe)")
+  r.style.setProperty("--theme-text",        th.text          || "#1a1a2e")
+  r.style.setProperty("--theme-text-sub",    th.textSub       || "#6b7280")
+  r.style.setProperty("--theme-btn-radius",  th.btnRadius     || "10px")
+  r.style.setProperty("--theme-btn-padding", th.btnPadding    || "14px 32px")
+  r.style.setProperty("--theme-card-radius", th.cardRadius    || "16px")
+  r.style.setProperty("--theme-card-shadow", th.cardShadow    || "0 2px 12px rgba(0,0,0,.06)")
+  r.style.setProperty("--theme-hero-font",   th.heroFont      || "'Playfair Display',serif")
+  r.style.setProperty("--theme-body-font",   th.bodyFont      || "'DM Sans',sans-serif")
+  r.style.setProperty("--theme-nav-bg",      th.navBg         || "#ffffff")
+  r.style.setProperty("--theme-nav-border",  th.navBorder     || "#e5e7eb")
+  notify(\`✅ Thème "\${th.name}" appliqué !\`, "success")
+  showThemeModal.value = false
+}
+
+const importThemeFile = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  themeImportError.value = ""
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result)
+      if (!data.accent && !data.bg && !data.text) {
+        themeImportError.value = "Format invalide. Attendu : { name, accent, bg, text, ... }"
+        return
+      }
+      applyThemeObj({ name: data.name || "Thème importé", ...data })
+    } catch(err) {
+      themeImportError.value = "Fichier JSON invalide : " + err.message
+    }
+    event.target.value = ""
+  }
+  reader.readAsText(file)
+}
+
+const exportCurrentTheme = () => {
+  const th   = currentTheme.value || builtinThemes[0]
+  const blob = new Blob([JSON.stringify(th, null, 2)], { type: "application/json" })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
+  a.download = `theme-${(th.name||"theme").replace(/\s+/g,"-").toLowerCase()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  notify("✅ Thème exporté !", "success")
+}
+
+onMounted(() => {
+  // Restaurer depuis localStorage immédiatement (avant Firestore)
+  const sn = localStorage.getItem("siteName")
+  const sl = localStorage.getItem("siteLogo")
+  if (sn) siteName.value = sn
+  if (sl) siteLogo.value = sl
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return
+    currentUser.value = user
+    await loadSavedConfigs()
+    try {
+      const docRef = doc(db, "users", user.uid)
+      const snap = await getDoc(docRef)
+      if (snap.exists()) {
+        const d = snap.data()
+        if (d.siteName) siteName.value = d.siteName
+        if (d.siteLogo) siteLogo.value = d.siteLogo
+
+        if (d.siteData) {
+          // Utilisateur existant → charger son site sauvegardé
+          site.value = d.siteData
+        } else {
+          // Nouvelle inscription → site VIDE, pas d'héritage localStorage
+          site.value = { pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }] }
+          localStorage.removeItem("siteDataPro")
+        }
+      } else {
+        // Compte sans document Firestore → site VIDE
+        site.value = { pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }] }
+        localStorage.removeItem("siteDataPro")
+      }
+    } catch (e) {
+      console.error("Erreur chargement Firestore :", e)
+      notify(t.value.loadError, "error")
+      const saved = localStorage.getItem("siteDataPro")
+      if (saved) site.value = JSON.parse(saved)
+    }
   })
 })
 
 watch(site, () => { isSaved.value = false }, { deep: true })
-watch(currentTheme, (v) => { localStorage.setItem("currentTheme", JSON.stringify(v)) }, { deep: true })
 watch(siteName, (v) => { localStorage.setItem("siteName", v) })
 watch(siteLogo, (v) => { localStorage.setItem("siteLogo", v) })
 watch(currentPageIndex, () => { activeSectionIndex.value = null })
@@ -740,7 +1057,7 @@ const saveSite = async () => {
   isSaving.value = true
   try {
     const docRef = doc(db, "users", currentUser.value.uid)
-    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value, currentTheme: currentTheme.value, importedThemes: importedThemes.value }, { merge: true })
+    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value }, { merge: true })
     localStorage.setItem("siteDataPro", JSON.stringify(site.value))
     isSaved.value = true
     notify(t.value.saved)
@@ -1240,8 +1557,7 @@ const buildSectionHtml = (s) => {
 }
 
 const generateHtml = (pageIndex = 0) => {
-  const currentPageData = pages[pageIndex] || pages[0]
-    const th = currentPageData.theme || currentTheme.value || builtinThemes[0]
+  const th = currentTheme.value || builtinThemes[0]
   const accent     = th.accent     || '#6c63ff'
   const accentH    = th.accentHover|| '#4f46e5'
   const bg         = th.bg         || '#ffffff'
@@ -1271,6 +1587,7 @@ const generateHtml = (pageIndex = 0) => {
     ? `<img src="logo.png" alt="${name}" class="nav-logo"/>`
     : `<span class="brand">${name}</span>`
 
+  const currentPageData = pages[pageIndex] || pages[0]
   const pageStyle = currentPageData.style
     ? Object.entries(currentPageData.style).map(([k,v]) => `${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`).join(';')
     : ''
@@ -2105,12 +2422,8 @@ const setPageStyle = (type, value) => {
         <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
       </select>
       <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
-      <label class="btn-action icon-btn" :title="t.themeBtn || '🎨 Thèmes'" style="cursor:pointer">
-          <input type="file" accept=".json" @change="importThemeFile" hidden/>
-          🎨
-        </label>
-        <button class="btn-action icon-btn" @click="openThemeModal(currentTheme)" :title="t.themeBtn || '🎨 Thèmes'">{{ currentTheme.name || 'Thème' }}</button>
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
+      <button class="btn-action icon-btn btn-theme-pick" @click="showThemeModal=true" title="Thème du site">🎨</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -2413,112 +2726,50 @@ const setPageStyle = (type, value) => {
       </div>
     </main>
   </div>
-
-    <!-- THEME MODAL -->
-    <Transition name="modal">
-      <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false" :dir="isRtl?'rtl':'ltr'">
-        <div class="modal-box theme-modal">
-          <button class="modal-close" @click="showThemeModal=false">✕</button>
-          <div class="modal-header">
-            <span class="modal-icon">🎨</span>
-            <h2>{{ t.themeTitle || 'Thèmes & Apparence' }}</h2>
-            <p class="modal-desc">{{ t.themeFormatHint || 'Choisissez ou importez un thème JSON' }}</p>
-          </div>
-
-          <!-- Thèmes intégrés -->
-          <p class="theme-section-label">{{ t.themeBuiltin || 'Thèmes intégrés' }}</p>
-          <div class="theme-grid">
-            <div
-              v-for="th in builtinThemes" :key="th.name"
-              class="theme-card"
-              :class="{ 'theme-card-active': pendingTheme && pendingTheme.name === th.name }"
-              @click="pendingTheme = th"
-            >
-              <div class="theme-swatch" :style="{ background: th.bgHero || th.bg, border: '3px solid ' + th.accent }">
-                <span class="theme-swatch-dot" :style="{ background: th.accent }"></span>
-                <span class="theme-swatch-dot" :style="{ background: th.text }"></span>
-              </div>
-              <span class="theme-name">{{ th.name }}</span>
-            </div>
-          </div>
-
-          <!-- Thèmes importés -->
-          <div v-if="importedThemes.length > 0">
-            <p class="theme-section-label" style="margin-top:16px">{{ t.themeImported || 'Thèmes importés' }}</p>
-            <div class="theme-grid">
-              <div
-                v-for="th in importedThemes" :key="th.name"
-                class="theme-card"
-                :class="{ 'theme-card-active': pendingTheme && pendingTheme.name === th.name }"
-                @click="pendingTheme = th"
-              >
-                <div class="theme-swatch" :style="{ background: th.bgHero || th.bg || '#f0f0f0', border: '3px solid ' + (th.accent || '#888') }">
-                  <span class="theme-swatch-dot" :style="{ background: th.accent || '#888' }"></span>
-                  <span class="theme-swatch-dot" :style="{ background: th.text || '#333' }"></span>
-                </div>
-                <span class="theme-name">{{ th.name }}</span>
-              </div>
-            </div>
-          </div>
-          <p v-else class="theme-none-msg">{{ t.themeNone || 'Aucun thème importé' }} —
-            <label style="color:var(--accent);cursor:pointer;text-decoration:underline">
-              <input type="file" accept=".json" @change="importThemeFile" hidden/>
-              {{ t.themeImport || 'Importer un thème (.json)' }}
-            </label>
-          </p>
-
-          <!-- Cible d'application -->
-          <div v-if="pendingTheme" class="theme-apply-section">
-            <p class="theme-section-label" style="margin-top:16px">{{ t.themeApply || 'Appliquer à' }}</p>
-            <div class="theme-target-row">
-              <label class="theme-target-option">
-                <input type="radio" v-model="themeApplyTarget" value="site"/> {{ t.themeApplySite || 'Tout le site' }}
-              </label>
-              <label class="theme-target-option">
-                <input type="radio" v-model="themeApplyTarget" value="page"/> {{ t.themeApplyPage || 'Page courante' }}
-              </label>
-              <label class="theme-target-option">
-                <input type="radio" v-model="themeApplyTarget" value="pages"/> {{ t.themeApplyPages || 'Pages choisies' }}
-              </label>
-            </div>
-            <!-- Sélection de pages -->
-            <div v-if="themeApplyTarget === 'pages'" class="theme-pages-select">
-              <label
-                v-for="(p, idx) in site.pages" :key="p.id"
-                class="theme-page-opt"
-                :class="{ 'theme-page-opt-on': selectedPagesForTheme.includes(idx) }"
-                @click="togglePageSelection(idx)"
-              >{{ p.name }}</label>
-            </div>
-          </div>
-
-          <!-- Thèmes par page existants -->
-          <div v-if="site.pages.some(p => p.theme)" style="margin-top:16px">
-            <p class="theme-section-label">Thèmes par page actifs</p>
-            <div v-for="(p, idx) in site.pages" :key="p.id">
-              <div v-if="p.theme" class="page-theme-row">
-                <span>{{ p.name }}</span>
-                <span class="page-theme-name">{{ p.theme.name || 'Thème personnalisé' }}</span>
-                <button class="btn-action small" @click="removePageTheme(idx)">{{ t.themeRemovePage || 'Retirer' }}</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="config-modal-actions" style="margin-top:20px">
-            <button class="btn-action" @click="showThemeModal=false">{{ t.cancel || 'Annuler' }}</button>
-            <label class="btn-action" style="cursor:pointer">
-              <input type="file" accept=".json" @change="importThemeFile" hidden/>
-              📥 {{ t.themeImport || 'Importer' }}
-            </label>
-            <button v-if="pendingTheme" class="btn-action primary" @click="applyTheme">
-              🎨 {{ t.themeApply || 'Appliquer' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  
 </div>
+
+  <!-- ── MODAL THÈME ─────────────────────────────────────── -->
+  <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false; themeImportError=''">
+    <div class="modal-box theme-pick-modal">
+      <button class="modal-close" @click="showThemeModal=false; themeImportError=''">✕</button>
+      <h3 class="tpm-title">🎨 Thème du site</h3>
+      <p class="tpm-sub">Choisissez un thème prédéfini ou importez votre propre fichier <code>.json</code></p>
+
+      <p class="tpm-section-label">THÈMES PRÉDÉFINIS</p>
+      <div class="tpm-grid">
+        <button v-for="th in builtinThemes" :key="th.name"
+          class="tpm-card" :class="{ active: currentTheme?.name===th.name }"
+          @click="applyThemeObj(th)">
+          <div class="tpm-preview">
+            <div class="tpm-prev-bg" :style="{ background: th.bg }">
+              <div class="tpm-prev-nav"  :style="{ background: th.navBg, borderBottom:'1px solid '+th.navBorder }"></div>
+              <div class="tpm-prev-hero" :style="{ background: th.bgHero }"></div>
+              <div class="tpm-prev-btn"  :style="{ background: th.accent, borderRadius: th.btnRadius }"></div>
+            </div>
+          </div>
+          <span class="tpm-name">{{ th.name }}</span>
+          <span class="tpm-dot" :style="{ background: th.accent }"></span>
+        </button>
+      </div>
+
+      <p class="tpm-section-label" style="margin-top:18px">IMPORTER UN THÈME EXTERNE (.json)</p>
+      <p class="tpm-hint">
+        Format : <code>{ "name":"Mon thème", "accent":"#ff6b6b", "bg":"#fff", "text":"#111", "btnRadius":"10px", ... }</code>
+      </p>
+      <label class="tpm-drop-zone" for="theme-json-input">
+        <span>📂 Cliquez pour choisir un fichier <strong>.json</strong></span>
+        <input id="theme-json-input" type="file" accept=".json,application/json"
+               style="display:none" @change="importThemeFile"/>
+      </label>
+      <div v-if="themeImportError" class="tpm-error">⚠ {{ themeImportError }}</div>
+
+      <div class="tpm-export-row">
+        <span>Thème actuel : <strong>{{ currentTheme?.name || 'Défaut' }}</strong></span>
+        <button class="tpm-export-btn" @click="exportCurrentTheme">📤 Exporter .json</button>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <style>
@@ -2856,27 +3107,4 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions{display:flex;gap:10px}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
-
-  /* ===== THEME MODAL ===== */
-  .theme-modal{max-width:580px}
-  .theme-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px}
-  .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;margin-bottom:4px}
-  .theme-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border:2px solid var(--border2);border-radius:10px;cursor:pointer;transition:all .15s;background:var(--surface2)}
-  .theme-card:hover{border-color:var(--accent);background:rgba(108,99,255,.08)}
-  .theme-card-active{border-color:var(--accent)!important;background:rgba(108,99,255,.12)!important}
-  .theme-swatch{width:56px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0}
-  .theme-swatch-dot{width:12px;height:12px;border-radius:50%;display:inline-block}
-  .theme-name{font-size:11px;font-weight:600;color:var(--text);text-align:center;line-height:1.3}
-  .theme-apply-section{background:rgba(108,99,255,.06);border:1px solid rgba(108,99,255,.15);border-radius:10px;padding:14px}
-  .theme-target-row{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
-  .theme-target-option{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
-  .theme-target-option input{accent-color:var(--accent)}
-  .theme-pages-select{display:flex;flex-wrap:wrap;gap:8px}
-  .theme-page-opt{background:var(--surface2);border:2px solid var(--border2);color:var(--text2);font-size:12px;font-weight:500;padding:5px 12px;border-radius:100px;cursor:pointer;transition:all .15s;user-select:none;font-family:'DM Sans',sans-serif}
-  .theme-page-opt:hover{border-color:var(--accent);color:var(--accent)}
-  .theme-page-opt-on{border-color:var(--accent)!important;background:rgba(108,99,255,.15)!important;color:var(--accent)!important}
-  .theme-none-msg{font-size:13px;color:var(--text3);margin-top:8px;line-height:1.6}
-  .page-theme-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px;color:var(--text)}
-  .page-theme-name{background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;flex:1}
-  
 </style>
