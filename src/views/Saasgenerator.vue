@@ -36,116 +36,7 @@ const paymentSuccess = ref(false)
 const showConfigEditor = ref(false)
 const configEditorTarget = ref("stripe")
 const configEditorContent = ref("")
-const showExportModal  = ref(false)
-
-// ── Système de thème ──────────────────────────────────────
-// Un thème = fichier JSON avec des variables CSS et propriétés de style
-// Format : { name, accent, bg, text, btnRadius, btnFont, heroFont, ... }
-const showThemeModal   = ref(false)
-const themeImportError = ref("")
-const currentTheme     = ref(null)   // thème actif
-
-// Thèmes prédéfinis intégrés
-const builtinThemes = [
-  {
-    name: "Violet Élégant (défaut)",
-    accent: "#6c63ff", accentHover: "#4f46e5",
-    bg: "#ffffff", bgAlt: "#fafafa", bgHero: "linear-gradient(135deg,#f8f7ff,#ede9fe)",
-    text: "#1a1a2e", textSub: "#6b7280",
-    btnRadius: "10px", btnPadding: "14px 32px",
-    cardRadius: "16px", cardShadow: "0 2px 12px rgba(0,0,0,.06)",
-    heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif",
-    navBg: "#ffffff", navBorder: "#e5e7eb",
-  },
-  {
-    name: "Noir Moderne",
-    accent: "#f59e0b", accentHover: "#d97706",
-    bg: "#0f0f0f", bgAlt: "#1a1a1a", bgHero: "linear-gradient(135deg,#0f0f0f,#1a1a1a)",
-    text: "#f9fafb", textSub: "#9ca3af",
-    btnRadius: "4px", btnPadding: "14px 32px",
-    cardRadius: "8px", cardShadow: "0 2px 20px rgba(0,0,0,.4)",
-    heroFont: "'DM Sans',sans-serif", bodyFont: "'DM Sans',sans-serif",
-    navBg: "#0f0f0f", navBorder: "#2a2a2a",
-  },
-  {
-    name: "Rose Boutique",
-    accent: "#ec4899", accentHover: "#db2777",
-    bg: "#fff5f7", bgAlt: "#fce7f3", bgHero: "linear-gradient(135deg,#fff5f7,#fce7f3)",
-    text: "#1f2937", textSub: "#6b7280",
-    btnRadius: "100px", btnPadding: "12px 30px",
-    cardRadius: "20px", cardShadow: "0 4px 20px rgba(236,72,153,.12)",
-    heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif",
-    navBg: "#ffffff", navBorder: "#fce7f3",
-  },
-  {
-    name: "Vert Nature",
-    accent: "#059669", accentHover: "#047857",
-    bg: "#f0fdf4", bgAlt: "#dcfce7", bgHero: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
-    text: "#14532d", textSub: "#4b7563",
-    btnRadius: "8px", btnPadding: "13px 28px",
-    cardRadius: "12px", cardShadow: "0 2px 12px rgba(5,150,105,.1)",
-    heroFont: "'Playfair Display',serif", bodyFont: "'DM Sans',sans-serif",
-    navBg: "#ffffff", navBorder: "#bbf7d0",
-  },
-]
-
-// Appliquer un thème (prédéfini ou importé)
-const applyThemeObj = (theme) => {
-  currentTheme.value = theme
-  const root = document.documentElement
-  root.style.setProperty("--theme-accent",      theme.accent        || "#6c63ff")
-  root.style.setProperty("--theme-accent-hover", theme.accentHover  || "#4f46e5")
-  root.style.setProperty("--theme-bg",           theme.bg           || "#ffffff")
-  root.style.setProperty("--theme-bg-alt",       theme.bgAlt        || "#fafafa")
-  root.style.setProperty("--theme-bg-hero",      theme.bgHero       || "linear-gradient(135deg,#f8f7ff,#ede9fe)")
-  root.style.setProperty("--theme-text",         theme.text         || "#1a1a2e")
-  root.style.setProperty("--theme-text-sub",     theme.textSub      || "#6b7280")
-  root.style.setProperty("--theme-btn-radius",   theme.btnRadius    || "10px")
-  root.style.setProperty("--theme-btn-padding",  theme.btnPadding   || "14px 32px")
-  root.style.setProperty("--theme-card-radius",  theme.cardRadius   || "16px")
-  root.style.setProperty("--theme-card-shadow",  theme.cardShadow   || "0 2px 12px rgba(0,0,0,.06)")
-  root.style.setProperty("--theme-hero-font",    theme.heroFont     || "'Playfair Display',serif")
-  root.style.setProperty("--theme-body-font",    theme.bodyFont     || "'DM Sans',sans-serif")
-  root.style.setProperty("--theme-nav-bg",       theme.navBg        || "#ffffff")
-  root.style.setProperty("--theme-nav-border",   theme.navBorder    || "#e5e7eb")
-  notify(`✅ Thème "${theme.name}" appliqué !`, "success")
-  showThemeModal.value = false
-}
-
-// Importer un thème depuis un fichier JSON externe
-const importThemeFile = (event) => {
-  const file = event.target.files?.[0]
-  if (!file) return
-  themeImportError.value = ""
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result)
-      if (!data.accent && !data.bg && !data.name) {
-        themeImportError.value = "Format invalide. Le fichier doit contenir des propriétés de thème (accent, bg, text...)"
-        return
-      }
-      applyThemeObj({ name: data.name || "Thème importé", ...data })
-    } catch(err) {
-      themeImportError.value = "Fichier JSON invalide : " + err.message
-    }
-    event.target.value = ""
-  }
-  reader.readAsText(file)
-}
-
-// Exporter le thème actuel
-const exportCurrentTheme = () => {
-  const theme = currentTheme.value || builtinThemes[0]
-  const blob  = new Blob([JSON.stringify(theme, null, 2)], { type: "application/json" })
-  const url   = URL.createObjectURL(blob)
-  const a     = document.createElement("a")
-  a.href      = url
-  a.download  = `theme-${(theme.name || "saas").replace(/\s+/g,"-").toLowerCase()}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  notify("✅ Thème exporté !", "success")
-}
+const showExportModal = ref(false)
 
 // ===== I18N =====
 const currentLang = ref("fr")
@@ -757,7 +648,7 @@ const sectionTypes = computed(() => [
   { key: "video",    label: t.value.videoLabel,   icon: "▶️", desc: t.value.sVideo },
   { key: "products", label: t.value.productsLabel.split(" ")[0], icon: "🛍️", desc: t.value.sProducts },
   { key: "features", label: "Features",    icon: "✦",   desc: t.value.sFeatures },
-  // { key: "payment",  label: t.value.publish==="نشر"?"دفع":"Paiement", icon: "💳", desc: t.value.sPayment }, // masqué
+  // { key: "payment", ... } masqué — Stripe Connect
   { key: "form",     label: t.value.contactLabel.split(" ")[0], icon: "✉️", desc: t.value.sForm },
   { key: "divider",  label: t.value.publish==="نشر"?"فاصل":"Séparateur", icon: "—", desc: t.value.sDivider },
 ])
@@ -1146,51 +1037,491 @@ const renderSectionHTML = (s) => {
   return ''
 }
 
-const exportSite = () => {
-  const html = `<!DOCTYPE html>
+// ── Générateur HTML complet (multi-pages, thème, responsive) ──
+const buildSectionHtml = (s) => {
+  const st = s.style ? Object.entries(s.style).map(([k,v]) => `${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`).join(';') : ''
+  const inlineStyle = st ? ` style="${st}"` : ''
+
+  if (s.type === 'hero') return `
+    <section class="hero"${inlineStyle}>
+      <h1>${(s.content||'').replace(/\n/g,'<br/>')}</h1>
+      ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
+      ${s.cta ? `<button class="cta-btn" onclick="return false">${s.cta}</button>` : ''}
+    </section>`
+
+  if (s.type === 'text') return `
+    <section class="sec-text"${inlineStyle}><p>${(s.content||'').replace(/\n/g,'<br/>')}</p></section>`
+
+  if (s.type === 'image') return s.url ? `
+    <section class="sec-image"${inlineStyle}><img src="${s.url}" alt="${s.alt||''}" loading="lazy"/></section>` : ''
+
+  if (s.type === 'gallery') {
+    const imgs = (s.images||[]).map(img => `<div class="gallery-item"><img src="${img.url}" alt="${img.alt||''}" loading="lazy"/></div>`).join('')
+    return `<section class="gallery"${inlineStyle}><div class="gallery-grid" style="grid-template-columns:repeat(${s.columns||3},1fr)">${imgs}</div></section>`
+  }
+
+  if (s.type === 'video' && s.url) {
+    const embedUrl = s.url.includes('youtu') ?
+      s.url.replace('watch?v=','embed/').replace('youtu.be/','www.youtube.com/embed/') :
+      s.url.replace('vimeo.com/','player.vimeo.com/video/')
+    return `<section class="sec-video"${inlineStyle}>
+      ${s.title ? `<h3 class="video-title">${s.title}</h3>` : ''}
+      <div class="video-wrap"><iframe src="${embedUrl}" allowfullscreen loading="lazy"></iframe></div>
+    </section>`
+  }
+
+  if (s.type === 'products') {
+    const cards = (s.items||[]).map(p => `
+      <div class="product-card">
+        <div class="product-img-wrap">
+          ${p.image ? `<img src="${p.image}" alt="${p.name}" loading="lazy"/>` : `<div class="product-img-ph">🛍️</div>`}
+          ${p.badge ? `<span class="product-badge">${p.badge}</span>` : ''}
+        </div>
+        <div class="product-body">
+          <div class="product-name">${p.name||''}</div>
+          <div class="product-desc">${p.description||''}</div>
+          <div class="product-footer">
+            <span class="product-price">${p.price||''}${p.currency||'€'}</span>
+            <button class="product-btn" onclick="addToCart(${JSON.stringify({name:p.name,price:p.price,currency:p.currency||'€',image:p.image||''}).replace(/"/g,'&quot;')})">🛒 Acheter</button>
+          </div>
+        </div>
+      </div>`).join('')
+    return `<section class="sec-products"${inlineStyle}><div class="products-grid">${cards}</div></section>`
+  }
+
+  if (s.type === 'features') {
+    const feats = (s.items||[]).map(f => `
+      <div class="feature-card">
+        <span class="feat-icon">${f.icon||'⚡'}</span>
+        <strong>${f.title||''}</strong><p>${f.desc||''}</p>
+      </div>`).join('')
+    return `<section class="sec-features"${inlineStyle}><div class="features-grid">${feats}</div></section>`
+  }
+
+  if (s.type === 'form') return `
+    <section class="sec-form"${inlineStyle}>
+      <h3>Contactez-nous</h3>
+      <form onsubmit="handleForm(event)">
+        <input type="text" placeholder="Votre nom" required/>
+        <input type="email" placeholder="Votre email" required/>
+        <textarea placeholder="Votre message" rows="4"></textarea>
+        <button type="submit">Envoyer</button>
+      </form>
+    </section>`
+
+  if (s.type === 'divider') return `<div class="sec-divider"${inlineStyle}><hr/></div>`
+
+  return ''
+}
+
+const generateHtml = (pageIndex = 0) => {
+  const th = currentTheme.value || builtinThemes[0]
+  const accent     = th.accent     || '#6c63ff'
+  const accentH    = th.accentHover|| '#4f46e5'
+  const bg         = th.bg         || '#ffffff'
+  const bgAlt      = th.bgAlt      || '#fafafa'
+  const bgHero     = th.bgHero     || 'linear-gradient(135deg,#f8f7ff,#ede9fe)'
+  const textColor  = th.text       || '#1a1a2e'
+  const textSub    = th.textSub    || '#6b7280'
+  const btnRadius  = th.btnRadius  || '10px'
+  const btnPad     = th.btnPadding || '14px 32px'
+  const cardRadius = th.cardRadius || '16px'
+  const cardShadow = th.cardShadow || '0 2px 12px rgba(0,0,0,.06)'
+  const heroFont   = th.heroFont   || "'Playfair Display',serif"
+  const bodyFont   = th.bodyFont   || "'DM Sans',sans-serif"
+  const navBg      = th.navBg      || '#ffffff'
+  const navBorder  = th.navBorder  || '#e5e7eb'
+
+  const pages     = site.value.pages || []
+  const logo      = siteLogo.value
+  const name      = siteName.value || 'Mon Site'
+
+  // Navigation multi-pages
+  const navLinks  = pages.map((p,i) =>
+    `<a href="${pages.length > 1 ? `page-${i+1}.html` : '#'}" class="${pageIndex===i?'active':''}">${p.name}</a>`
+  ).join('')
+
+  const navLogoHtml = logo
+    ? `<img src="logo.png" alt="${name}" class="nav-logo"/>`
+    : `<span class="brand">${name}</span>`
+
+  const currentPageData = pages[pageIndex] || pages[0]
+  const pageStyle = currentPageData.style
+    ? Object.entries(currentPageData.style).map(([k,v]) => `${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`).join(';')
+    : ''
+
+  const sectionsHtml = (currentPageData.sections || []).map(buildSectionHtml).join('\n')
+
+  // Cart HTML
+  const cartHtml = `
+  <div id="cart-overlay" class="cart-overlay" style="display:none">
+    <div class="cart-box">
+      <div class="cart-header">
+        <h3>🛒 Mon panier</h3>
+        <button onclick="closeCart()">✕</button>
+      </div>
+      <div id="cart-items" class="cart-items"></div>
+      <div class="cart-footer">
+        <div class="cart-total">Total : <strong id="cart-total-val">0.00€</strong></div>
+        <button class="cart-checkout-btn" onclick="checkout()">Finaliser l'achat</button>
+      </div>
+    </div>
+  </div>
+  <button id="cart-btn" class="cart-fab" onclick="toggleCart()" style="display:none">🛒 <span id="cart-count">0</span></button>`
+
+  // JavaScript panier + navigation
+  const scriptHtml = `<script>
+// ── Panier ──────────────────────────────────────────────────
+const cart = JSON.parse(localStorage.getItem('cart') || '[]')
+
+function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)) }
+function updateCartUI() {
+  const count = cart.reduce((s,i) => s + i.qty, 0)
+  const total = cart.reduce((s,i) => s + parseFloat(i.price||0)*i.qty, 0)
+  document.getElementById('cart-count').textContent = count
+  document.getElementById('cart-btn').style.display = count > 0 ? 'flex' : 'none'
+  document.getElementById('cart-total-val').textContent = total.toFixed(2) + '€'
+  const list = document.getElementById('cart-items')
+  list.innerHTML = cart.map((item,i) => \`
+    <div class="cart-item">
+      \${item.image ? \`<img src="\${item.image}" alt="\${item.name}"/>\` : '<div class="cart-item-ph">🛍️</div>'}
+      <div class="cart-item-info">
+        <div class="cart-item-name">\${item.name}</div>
+        <div class="cart-item-price">\${item.price}\${item.currency||'€'}</div>
+      </div>
+      <div class="cart-item-qty">
+        <button onclick="changeQty(\${i},-1)">−</button>
+        <span>\${item.qty}</span>
+        <button onclick="changeQty(\${i},1)">+</button>
+      </div>
+      <button class="cart-item-del" onclick="removeItem(\${i})">🗑</button>
+    </div>\`).join('')
+}
+function addToCart(data) {
+  const item = typeof data === 'string' ? JSON.parse(data.replace(/&quot;/g,'"')) : data
+  const ex   = cart.find(i => i.name === item.name)
+  if (ex) ex.qty++
+  else cart.push({ ...item, qty: 1 })
+  saveCart(); updateCartUI(); openCart()
+}
+function removeItem(i)    { cart.splice(i,1); saveCart(); updateCartUI() }
+function changeQty(i, d)  { cart[i].qty = Math.max(1, cart[i].qty+d); saveCart(); updateCartUI() }
+function toggleCart()     { document.getElementById('cart-overlay').style.display = document.getElementById('cart-overlay').style.display==='flex'?'none':'flex' }
+function openCart()       { document.getElementById('cart-overlay').style.display='flex' }
+function closeCart()      { document.getElementById('cart-overlay').style.display='none' }
+function checkout()       { alert('Intégrez votre solution de paiement (Stripe, PayPal...) dans cette section.') }
+function handleForm(e)    { e.preventDefault(); alert('Message envoyé ! (Configurez un endpoint email de votre côté)') }
+
+// ── Navigation ───────────────────────────────────────────────
+document.querySelectorAll('nav a').forEach(a => {
+  a.addEventListener('click', e => {
+    document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'))
+    e.currentTarget.classList.add('active')
+  })
+})
+
+updateCartUI()
+<\/script>`
+
+  return `<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>${site.value.pages[0]?.name||'Mon Site'}</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="description" content="${name}"/>
+<title>${currentPageData.name || name}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;color:#374151;background:#fff}
-nav{background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 32px;display:flex;gap:16px;align-items:center;position:sticky;top:0;z-index:10}
-nav a{text-decoration:none;color:#6b7280;font-size:14px;font-weight:500;padding:6px 12px;border-radius:6px;transition:.15s;cursor:pointer}
-nav a:hover,nav a.active{background:#f3f4f6;color:#111}.brand{font-family:'Playfair Display',serif;font-size:18px;color:#1a1a2e;margin-right:auto}
-.page{display:none}.page.active{display:block}
-.hero{padding:100px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
-.hero h1{font-family:'Playfair Display',serif;font-size:52px;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:16px}
-.hero p{font-size:20px;color:#6b7280;margin-bottom:32px}.hero .cta{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer}
-.sec-text{padding:48px 60px}.sec-text p{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
-.sec-image{padding:32px 60px}.sec-image img{width:100%;border-radius:12px}
-.gallery{padding:40px 60px}.gallery-grid{display:grid;gap:10px}.gallery-grid img{width:100%;border-radius:8px;object-fit:cover;aspect-ratio:1}
-.video-wrap{padding:32px 60px}.video-wrap iframe{width:100%;height:400px;border-radius:12px;border:none;display:block}
-.products{padding:48px 60px;background:#fafafa}.products-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.product-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06)}
-.product-card img{width:100%;height:180px;object-fit:cover}.product-img-ph{width:100%;height:180px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:36px}
-.product-body{padding:16px}.product-name{font-weight:600;font-size:15px;color:#111;margin-bottom:6px}.product-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:12px}
-.product-footer{display:flex;align-items:center;justify-content:space-between}.product-price{font-size:18px;font-weight:700;color:#6c63ff}
-.product-btn{background:#6c63ff;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
-.badge{display:inline-block;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:3px 8px;border-radius:100px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
-.features{padding:60px;background:#fafafa}.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:840px;margin:0 auto}
-.feature-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:28px 24px;text-align:center}.feature-card .icon{font-size:32px;display:block;margin-bottom:12px}
-.feature-card strong{font-size:16px;color:#111;display:block;margin-bottom:6px}.feature-card p{font-size:14px;color:#6b7280;line-height:1.5}
-.payment-sec{padding:80px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
-.payment-sec h2{font-family:'Playfair Display',serif;font-size:36px;color:#1a1a2e;margin-bottom:10px}
-.payment-sec p{font-size:16px;color:#6b7280;margin-bottom:24px}.payment-amount{font-size:64px;font-weight:700;color:#6c63ff;margin-bottom:36px}
-.pay-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.pay-btn{padding:14px 32px;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
-.pay-btn.stripe{background:#635bff;color:#fff}.pay-btn.paypal{background:#ffc439;color:#003087}
-.form-sec{padding:60px;background:#f8f7ff;display:flex;flex-direction:column;align-items:center}
-.form-sec h3{font-family:'Playfair Display',serif;font-size:30px;color:#1a1a2e;margin-bottom:24px}
-.form-sec input,.form-sec textarea{width:100%;max-width:500px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:10px;font-size:15px;margin-bottom:12px;font-family:'DM Sans',sans-serif;background:#fff}
-.form-sec button{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:13px 28px;font-size:15px;font-weight:600;cursor:pointer}
-hr.divider{border:none;border-top:1px solid #e5e7eb;margin:8px 60px}
-</body></html>`
-  const blob = new Blob([html], { type: "text/html" })
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "mon-site.html"; a.click()
-  notify(t.value.exportSuccess); showExportModal.value = false
+  :root {
+    --accent:      ${accent};
+    --accent-h:    ${accentH};
+    --bg:          ${bg};
+    --bg-alt:      ${bgAlt};
+    --bg-hero:     ${bgHero};
+    --text:        ${textColor};
+    --text-sub:    ${textSub};
+    --btn-radius:  ${btnRadius};
+    --btn-pad:     ${btnPad};
+    --card-radius: ${cardRadius};
+    --card-shadow: ${cardShadow};
+    --hero-font:   ${heroFont};
+    --body-font:   ${bodyFont};
+    --nav-bg:      ${navBg};
+    --nav-border:  ${navBorder};
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--body-font); }
+</style>
+</head>
+<body>
+<nav>
+  ${navLogoHtml}
+  <div class="nav-links">${navLinks}</div>
+  <button id="cart-btn" class="cart-fab" onclick="toggleCart()" style="display:none">🛒 <span id="cart-count">0</span></button>
+</nav>
+<main${pageStyle ? ` style="${pageStyle}"` : ''}>
+${sectionsHtml}
+</main>
+${cartHtml}
+<footer class="site-footer">
+  <p>© ${new Date().getFullYear()} ${name} — Créé avec SaasBuilder</p>
+</footer>
+${scriptHtml}
+</body>
+</html>`
+}
+
+// CSS commun du site exporté
+const generateCSS = () => {
+  return `/* ═══ SaasBuilder — style.css ═══════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body-font,'DM Sans',sans-serif);color:var(--text,#1a1a2e);background:var(--bg,#fff);min-height:100vh}
+
+/* NAV */
+nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7eb);padding:0 24px;height:60px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+.nav-logo{height:36px;max-width:140px;object-fit:contain;border-radius:6px}
+.brand{font-family:var(--hero-font);font-size:18px;color:var(--text);font-weight:600;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.nav-links{display:flex;gap:4px;flex:1;justify-content:center;overflow-x:auto;scrollbar-width:none}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-links a{text-decoration:none;color:var(--text-sub,#6b7280);font-size:14px;font-weight:500;padding:7px 14px;border-radius:8px;transition:.15s;white-space:nowrap}
+.nav-links a:hover,.nav-links a.active{background:var(--accent,#6c63ff);color:#fff}
+
+/* HERO */
+.hero{padding:clamp(60px,10vw,120px) clamp(20px,6vw,80px);background:var(--bg-hero);text-align:center}
+.hero h1{font-family:var(--hero-font);font-size:clamp(28px,5vw,56px);color:var(--text);line-height:1.15;white-space:pre-line;margin-bottom:18px}
+.hero p{font-size:clamp(15px,2.5vw,20px);color:var(--text-sub);margin-bottom:32px;max-width:600px;margin-left:auto;margin-right:auto}
+.cta-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius,10px);padding:var(--btn-pad,14px 32px);font-size:clamp(14px,2vw,16px);font-weight:600;cursor:pointer;font-family:var(--body-font);transition:all .2s}
+.cta-btn:hover{background:var(--accent-h);transform:translateY(-2px)}
+
+/* TEXTE */
+.sec-text{padding:clamp(32px,5vw,60px) clamp(20px,6vw,80px)}
+.sec-text p{font-size:clamp(14px,2vw,17px);line-height:1.8;color:var(--text);max-width:760px}
+
+/* IMAGE */
+.sec-image{padding:clamp(20px,4vw,40px) clamp(20px,6vw,80px)}
+.sec-image img{width:100%;border-radius:12px;display:block}
+
+/* GALERIE */
+.gallery{padding:clamp(24px,4vw,48px) clamp(16px,5vw,60px)}
+.gallery-grid{display:grid;gap:10px}
+.gallery-item img{width:100%;border-radius:8px;object-fit:cover;aspect-ratio:1;display:block}
+
+/* VIDÉO */
+.sec-video{padding:clamp(24px,4vw,40px) clamp(16px,5vw,60px)}
+.video-title{font-family:var(--hero-font);font-size:clamp(18px,3vw,26px);color:var(--text);margin-bottom:16px;text-align:center}
+.video-wrap iframe{width:100%;height:clamp(220px,50vw,480px);border-radius:12px;border:none;display:block}
+
+/* PRODUITS */
+.sec-products{padding:clamp(24px,4vw,56px) clamp(16px,5vw,60px);background:var(--bg-alt)}
+.products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px}
+.product-card{background:var(--bg);border:1px solid var(--nav-border);border-radius:var(--card-radius,16px);overflow:hidden;box-shadow:var(--card-shadow);transition:transform .2s}
+.product-card:hover{transform:translateY(-4px)}
+.product-img-wrap{position:relative}
+.product-img-wrap img{width:100%;height:180px;object-fit:cover;display:block}
+.product-img-ph{width:100%;height:180px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:40px}
+.product-badge{position:absolute;top:10px;left:10px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;text-transform:uppercase}
+.product-body{padding:16px}
+.product-name{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.product-desc{font-size:13px;color:var(--text-sub);line-height:1.5;margin-bottom:14px}
+.product-footer{display:flex;align-items:center;justify-content:space-between}
+.product-price{font-size:18px;font-weight:700;color:var(--accent)}
+.product-btn{background:var(--accent);color:#fff;border:none;border-radius:calc(var(--btn-radius,10px) * .6);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--body-font);transition:all .15s}
+.product-btn:hover{background:var(--accent-h)}
+
+/* FEATURES */
+.sec-features{padding:clamp(40px,6vw,70px) clamp(20px,5vw,60px);background:var(--bg-alt)}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:24px;max-width:960px;margin:0 auto}
+.feature-card{background:var(--bg);border:1px solid var(--nav-border);border-radius:14px;padding:28px 24px;text-align:center}
+.feat-icon{font-size:32px;display:block;margin-bottom:12px}
+.feature-card strong{font-size:16px;color:var(--text);display:block;margin-bottom:6px}
+.feature-card p{font-size:14px;color:var(--text-sub);line-height:1.5}
+
+/* FORMULAIRE */
+.sec-form{padding:clamp(40px,6vw,70px) clamp(20px,5vw,60px);background:var(--bg-alt);display:flex;flex-direction:column;align-items:center}
+.sec-form h3{font-family:var(--hero-font);font-size:clamp(22px,4vw,30px);color:var(--text);margin-bottom:24px}
+.sec-form form{display:flex;flex-direction:column;gap:12px;width:100%;max-width:500px}
+.sec-form input,.sec-form textarea{padding:12px 16px;border:1px solid var(--nav-border);border-radius:10px;font-size:15px;font-family:var(--body-font);background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+.sec-form input:focus,.sec-form textarea:focus{border-color:var(--accent)}
+.sec-form button{background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius);padding:var(--btn-pad);font-size:15px;font-weight:600;cursor:pointer;font-family:var(--body-font)}
+.sec-form button:hover{background:var(--accent-h)}
+
+/* DIVIDER */
+.sec-divider{padding:8px 60px}
+.sec-divider hr{border:none;border-top:1px solid var(--nav-border)}
+
+/* PANIER */
+.cart-fab{position:fixed;bottom:24px;right:24px;z-index:200;background:var(--accent);color:#fff;border:none;border-radius:100px;padding:12px 20px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .2s}
+.cart-fab:hover{background:var(--accent-h);transform:translateY(-2px)}
+.cart-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:600px){.cart-overlay{align-items:center}}
+.cart-box{background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 32px rgba(0,0,0,.2)}
+@media(min-width:600px){.cart-box{border-radius:16px;max-height:600px}}
+.cart-header{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid var(--nav-border)}
+.cart-header h3{font-size:17px;font-weight:700;color:var(--text)}
+.cart-header button{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-sub)}
+.cart-items{overflow-y:auto;flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.cart-item{display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-alt);border-radius:10px}
+.cart-item img,.cart-item-ph{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.cart-item-ph{background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:22px}
+.cart-item-info{flex:1;min-width:0}
+.cart-item-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cart-item-price{font-size:12px;color:var(--text-sub)}
+.cart-item-qty{display:flex;align-items:center;gap:6px}
+.cart-item-qty button{background:var(--bg);border:1px solid var(--nav-border);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px}
+.cart-item-qty span{font-size:13px;font-weight:600;min-width:20px;text-align:center}
+.cart-item-del{background:none;border:none;font-size:16px;cursor:pointer;opacity:.5;margin-left:4px}
+.cart-footer{padding:16px 20px;border-top:1px solid var(--nav-border)}
+.cart-total{font-size:14px;color:var(--text-sub);margin-bottom:12px;font-weight:500}
+.cart-total strong{font-size:20px;color:var(--accent)}
+.cart-checkout-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius);padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--body-font);transition:.2s}
+.cart-checkout-btn:hover{background:var(--accent-h)}
+
+/* FOOTER */
+.site-footer{text-align:center;padding:24px;font-size:13px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt)}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  nav{padding:0 12px;height:52px}
+  .brand{font-size:15px;max-width:100px}
+  .nav-links a{font-size:12px;padding:5px 10px}
+  .hero{padding:48px 16px}
+  .products-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .features-grid{grid-template-columns:1fr}
+  .sec-text,.sec-image,.gallery,.sec-video,.sec-form,.sec-features,.sec-products{padding-left:12px;padding-right:12px}
+}
+`
+}
+
+// Générer README d'hébergement
+const generateReadme = () => {
+  const name = siteName.value || 'mon-site'
+  return `# ${name} — Hébergement du site
+
+Site généré par SaasBuilder le ${new Date().toLocaleDateString('fr-FR')}.
+
+## 📁 Fichiers inclus
+
+- \`index.html\`          — Page d'accueil (ou page unique)
+- \`page-2.html\`, etc.   — Autres pages (si multi-pages)
+- \`style.css\`           — Styles du site (thème intégré)
+- \`logo.png\`            — Logo du site (si applicable)
+- \`README.md\`           — Ce fichier
+
+## 🚀 Options d'hébergement
+
+### Option 1 — GitHub Pages (gratuit)
+1. Créez un repo GitHub (ex: \`mon-site\`)
+2. Uploadez tous les fichiers
+3. Allez dans Settings → Pages → Source: \`main\`
+4. URL : \`https://votreuser.github.io/mon-site\`
+
+### Option 2 — Netlify (gratuit)
+1. Allez sur https://netlify.com
+2. Faites glisser le dossier \`dist/\` dans la zone de déploiement
+3. URL générée automatiquement (ex: \`mon-site.netlify.app\`)
+4. Domaine personnalisé disponible dans Settings
+
+### Option 3 — Vercel (gratuit)
+\`\`\`bash
+npm i -g vercel
+cd dist/
+vercel --name ${name.toLowerCase().replace(/\s+/g,'-')}
+\`\`\`
+
+### Option 4 — Hébergement classique (OVH, Hostinger...)
+Uploadez tous les fichiers dans le dossier \`public_html/\` via FTP.
+
+## 🛒 Paiement
+
+Le panier est fonctionnel côté client (localStorage).
+Pour activer les paiements réels, intégrez :
+- **Stripe** : https://stripe.com/docs/js
+- **PayPal** : https://developer.paypal.com/sdk/js/
+
+Remplacez la fonction \`checkout()\` dans chaque page HTML.
+
+## 📧 Formulaire de contact
+
+Remplacez la fonction \`handleForm()\` par un endpoint email :
+- **Formspree** : https://formspree.io (gratuit)
+- **EmailJS** : https://emailjs.com
+- Ou votre propre backend
+
+## 🎨 Modifier le thème
+
+Éditez \`style.css\` → section \`:root { }\` :
+\`\`\`css
+:root {
+  --accent:     #6c63ff;   /* Couleur principale */
+  --bg:         #ffffff;   /* Fond */
+  --text:       #1a1a2e;   /* Texte */
+  --btn-radius: 10px;      /* Arrondi des boutons */
+}
+\`\`\`
+`
+}
+
+// Export ZIP multi-pages
+const exportDist = async () => {
+  try {
+    // Charger JSZip depuis CDN
+    if (!window.JSZip) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+        s.onload = resolve
+        s.onerror = () => reject(new Error('Impossible de charger JSZip'))
+        document.head.appendChild(s)
+      })
+    }
+    const zip = new window.JSZip()
+    const pages = site.value.pages || []
+
+    // Générer une page HTML par page du site
+    pages.forEach((page, i) => {
+      const filename = i === 0 ? 'index.html' : `page-${i+1}.html`
+      zip.file(filename, generateHtml(i))
+    })
+
+    // Ajouter le CSS commun
+    zip.file('style.css', generateCSS())
+
+    // Ajouter le logo si présent (base64 → Blob)
+    if (siteLogo.value && siteLogo.value.startsWith('data:image')) {
+      const base64 = siteLogo.value.split(',')[1]
+      zip.file('logo.png', base64, { base64: true })
+    }
+
+    // README d'hébergement
+    zip.file('README.md', generateReadme())
+
+    // Générer le ZIP
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${(siteName.value || 'mon-site').toLowerCase().replace(/\s+/g,'-')}-dist.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+    notify('✅ dist.zip téléchargé !', 'success')
+    showExportModal.value = false
+  } catch(err) {
+    notify('❌ Erreur export : ' + err.message, 'error')
+    console.error('exportDist:', err)
+  }
+}
+
+const exportSite = () => {
+  // Export mono-page HTML simple (ancien comportement conservé)
+  const html = generateHtml(0)
+  const blob = new Blob([html], { type: 'text/html' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `${(siteName.value || 'mon-site').toLowerCase().replace(/\s+/g,'-')}.html`
+  a.click()
+  notify(t.value.exportSuccess)
+  showExportModal.value = false
 }
 
 const setStyle = (type, value) => {
@@ -1513,14 +1844,15 @@ const setPageStyle = (type, value) => {
         <div class="export-options">
           <div class="export-card" @click="exportSite">
             <span class="export-icon">📄</span>
-            <strong>{{ t.htmlStatic }}</strong>
-            <p>{{ t.htmlDesc }}</p>
-            <span class="export-badge">{{ t.recommended }}</span>
+            <strong>HTML mono-page</strong>
+            <p>Un seul fichier .html avec tout intégré</p>
+            <span class="export-badge">Rapide</span>
           </div>
-          <div class="export-card" @click="exportSite">
+          <div class="export-card export-card-featured" @click="exportDist">
             <span class="export-icon">📦</span>
-            <strong>{{ t.download }}</strong>
-            <p>{{ t.dlDesc }}</p>
+            <strong>dist.zip — Hébergement</strong>
+            <p>Multi-pages + style.css + logo + README<br/>Prêt pour Netlify, Vercel, GitHub Pages, OVH...</p>
+            <span class="export-badge export-badge-pro">⭐ Recommandé</span>
           </div>
         </div>
         <div class="export-note"><strong>Note :</strong> {{ t.exportNote }}</div>
@@ -1647,11 +1979,8 @@ const setPageStyle = (type, value) => {
       <select class="lang-select" v-model="currentLang">
         <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
       </select>
-      <!-- Stripe/PayPal masqués : les Pro utilisent Stripe Connect -->
-      <!-- <button class="btn-action icon-btn" @click="openConfigEditor('stripe')" :title="t.configureStripe">💳</button> -->
-      <!-- <button class="btn-action icon-btn" @click="openConfigEditor('paypal')" :title="t.configurePaypal">🅿</button> -->
+      <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
-      <button class="btn-action icon-btn btn-theme-pick" @click="showThemeModal=true" title="Choisir / Importer un thème">🎨</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -1955,58 +2284,6 @@ const setPageStyle = (type, value) => {
     </main>
   </div>
 </div>
-
-  <!-- ── MODAL THÈME ─────────────────────────────────────── -->
-  <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false; themeImportError=''">
-    <div class="modal-box theme-pick-modal">
-      <button class="modal-close" @click="showThemeModal=false; themeImportError=''">✕</button>
-      <h3 class="tpm-title">🎨 Thème du site</h3>
-      <p class="tpm-sub">Choisissez un thème prédéfini ou importez votre propre fichier <code>.json</code></p>
-
-      <!-- Thèmes prédéfinis -->
-      <p class="tpm-section-label">THÈMES PRÉDÉFINIS</p>
-      <div class="tpm-grid">
-        <button
-          v-for="th in builtinThemes" :key="th.name"
-          class="tpm-card"
-          :class="{ active: currentTheme?.name === th.name }"
-          @click="applyThemeObj(th)"
-        >
-          <div class="tpm-preview">
-            <div class="tpm-prev-bg" :style="{ background: th.bg }">
-              <div class="tpm-prev-nav" :style="{ background: th.navBg, borderBottom: '1px solid ' + th.navBorder }"></div>
-              <div class="tpm-prev-hero" :style="{ background: th.bgHero }"></div>
-              <div class="tpm-prev-btn" :style="{ background: th.accent, borderRadius: th.btnRadius }"></div>
-              <div class="tpm-prev-card" :style="{ background: th.bgAlt, borderRadius: th.cardRadius }"></div>
-            </div>
-          </div>
-          <span class="tpm-name">{{ th.name }}</span>
-          <span class="tpm-dot" :style="{ background: th.accent }"></span>
-        </button>
-      </div>
-
-      <!-- Import JSON -->
-      <p class="tpm-section-label" style="margin-top:20px">IMPORTER UN THÈME EXTERNE</p>
-      <p class="tpm-import-hint">
-        Chargez un fichier <code>.json</code> contenant les propriétés du thème :<br/>
-        <code>{ "name":"Mon thème", "accent":"#ff0066", "bg":"#fff", "text":"#111", ... }</code>
-      </p>
-      <label class="tpm-drop-zone" for="theme-json-input">
-        <span class="tpm-drop-icon">📂</span>
-        <span>Cliquez pour choisir un fichier <strong>.json</strong></span>
-        <input id="theme-json-input" type="file" accept=".json,application/json"
-               style="display:none" @change="importThemeFile"/>
-      </label>
-      <div v-if="themeImportError" class="tpm-error">⚠ {{ themeImportError }}</div>
-
-      <!-- Export thème actuel -->
-      <div class="tpm-export-row">
-        <span>Thème actuel : <strong>{{ currentTheme?.name || 'Défaut' }}</strong></span>
-        <button class="tpm-export-btn" @click="exportCurrentTheme">📤 Exporter</button>
-      </div>
-    </div>
-  </div>
-
 </template>
 
 <style>
@@ -2220,10 +2497,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .sec-divider{padding:12px 40px}
 .divider-line{border:none;border-top:1px solid #e5e7eb}
 .preview-mode{font-family:'DM Sans',sans-serif}
-.prev-hero{padding:80px 40px;background:var(--theme-bg-hero,linear-gradient(135deg,#f8f7ff,#ede9fe));text-align:center}
-.prev-hero-title{font-family:var(--theme-hero-font,'Playfair Display',serif);font-size:clamp(28px,5vw,52px);font-weight:600;color:var(--theme-text,#1a1a2e);line-height:1.15;white-space:pre-line;margin-bottom:16px}
-.prev-hero-sub{font-size:clamp(14px,2.5vw,20px);color:var(--theme-text-sub,#6b7280);margin-bottom:32px}
-.prev-hero-cta{background:var(--theme-accent,#6c63ff);color:white;border:none;border-radius:var(--theme-btn-radius,10px);padding:var(--theme-btn-padding,14px 32px);font-size:clamp(13px,2vw,16px);font-weight:600;cursor:pointer;font-family:var(--theme-body-font,'DM Sans',sans-serif);transition:all .2s}
+.prev-hero{padding:100px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
+.prev-hero-title{font-family:'Playfair Display',serif;font-size:52px;font-weight:600;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:16px}
+.prev-hero-sub{font-size:20px;color:#6b7280;margin-bottom:32px}
+.prev-hero-cta{background:#6c63ff;color:white;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
 .prev-hero-cta:hover{transform:translateY(-2px)}
 .prev-text{padding:48px 60px}
 .prev-text p{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
@@ -2238,9 +2515,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .prev-video-title{font-family:'Playfair Display',serif;font-size:24px;color:#1a1a2e;margin-bottom:16px}
 .prev-video-wrap{border-radius:12px;overflow:hidden}
 .prev-video-iframe{width:100%;height:400px;border:none;display:block}
-.prev-products{padding:clamp(24px,4vw,48px) clamp(16px,5vw,60px);background:var(--theme-bg-alt,#fafafa)}
-.prev-products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}
-.prev-product-card{background:var(--theme-bg,white);border:1px solid #e5e7eb;border-radius:var(--theme-card-radius,16px);overflow:hidden;box-shadow:var(--theme-card-shadow,0 2px 12px rgba(0,0,0,.06));transition:transform .2s}
+.prev-products{padding:48px 60px;background:#fafafa}
+.prev-products-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.prev-product-card{background:white;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);transition:transform .2s}
 .prev-product-card:hover{transform:translateY(-4px)}
 .prev-product-img-wrap{position:relative}
 .prev-product-img{width:100%;height:180px;object-fit:cover;display:block}
@@ -2250,8 +2527,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .prev-product-name{font-size:15px;font-weight:600;color:#111;margin-bottom:6px}
 .prev-product-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:14px}
 .prev-product-footer{display:flex;align-items:center;justify-content:space-between}
-.prev-product-price{font-size:18px;font-weight:700;color:var(--theme-accent,#6c63ff)}
-.prev-product-btn{background:var(--theme-accent,#6c63ff);color:white;border:none;border-radius:calc(var(--theme-btn-radius,10px) * 0.6);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--theme-body-font,'DM Sans',sans-serif)}
+.prev-product-price{font-size:18px;font-weight:700;color:#6c63ff}
+.prev-product-btn{background:#6c63ff;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .prev-features{padding:60px;background:#fafafa}
 .prev-features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:840px;margin:0 auto}
 .prev-feature-card{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:28px 24px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.04)}
@@ -2344,62 +2621,4 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions{display:flex;gap:10px}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
-
-/* ── APERÇU PUBLIC — correctifs layout et responsive ─────── */
-.public-preview-overlay{position:fixed;inset:0;z-index:900;background:var(--theme-bg,#fff);overflow-y:auto;display:flex;flex-direction:column}
-.pub-preview-close{position:fixed;top:12px;right:12px;z-index:1000;background:#ef4444;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.pub-preview-nav{position:sticky;top:0;z-index:800;background:var(--theme-nav-bg,#fff);border-bottom:1px solid var(--theme-nav-border,#e5e7eb);display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.pub-preview-brand-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0;min-width:0}
-.pub-preview-logo{height:32px;width:auto;max-width:120px;object-fit:contain;border-radius:6px;flex-shrink:0}
-.pub-preview-brand-icon{font-size:22px;flex-shrink:0}
-.pub-preview-brand-name{font-size:15px;font-weight:700;color:var(--theme-text,#1a1a2e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
-.pub-preview-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;justify-content:center}
-.pub-preview-tabs::-webkit-scrollbar{display:none}
-.pub-preview-tab{background:none;border:none;color:var(--theme-text-sub,#6b7280);font-size:14px;font-weight:500;padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:var(--theme-body-font,'DM Sans',sans-serif)}
-.pub-preview-tab.active,.pub-preview-tab:hover{background:var(--theme-accent,#6c63ff);color:white}
-.pub-preview-cart{background:var(--theme-accent,#6c63ff);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;flex-shrink:0}
-.pub-preview-content{flex:1;width:100%;max-width:100%}
-
-/* Responsive grids en aperçu mobile */
-@media(max-width:600px){
-  .prev-hero{padding:48px 16px}
-  .prev-products{padding:24px 12px}
-  .prev-products-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
-  .prev-features-grid{grid-template-columns:1fr!important}
-  .prev-product-img,.prev-product-img-ph{height:130px}
-  .pub-preview-brand-name{max-width:80px;font-size:13px}
-  .pub-preview-close{top:8px;right:8px;padding:6px 10px;font-size:12px}
-}
-
-/* ── Bouton thème dans topbar ─────────────────────────────── */
-.btn-theme-pick{background:linear-gradient(135deg,#a78bfa,#6c63ff);color:#fff}
-.btn-theme-pick:hover{background:linear-gradient(135deg,#6c63ff,#4f46e5)}
-
-/* ── Modal Thème ──────────────────────────────────────────── */
-.theme-pick-modal{max-width:520px;width:94%;max-height:88vh;overflow-y:auto}
-.tpm-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px}
-.tpm-sub{font-size:13px;color:var(--text2);margin-bottom:16px}
-.tpm-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px}
-.tpm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:8px}
-.tpm-card{background:var(--surface2);border:2px solid var(--border);border-radius:12px;padding:10px;cursor:pointer;text-align:left;transition:.2s;display:flex;flex-direction:column;gap:8px;position:relative}
-.tpm-card:hover{border-color:var(--accent);transform:translateY(-2px)}
-.tpm-card.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.2)}
-.tpm-preview{border-radius:8px;overflow:hidden;height:72px;border:1px solid var(--border)}
-.tpm-prev-bg{height:100%;display:flex;flex-direction:column;gap:3px;padding:4px}
-.tpm-prev-nav{height:14px;border-radius:3px;flex-shrink:0}
-.tpm-prev-hero{flex:1;border-radius:3px}
-.tpm-prev-btn{height:12px;width:40%;border-radius:4px;margin-top:2px}
-.tpm-prev-card{height:16px;border-radius:4px;margin-top:2px;width:80%}
-.tpm-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tpm-dot{width:10px;height:10px;border-radius:50%;position:absolute;top:10px;right:10px}
-.tpm-import-hint{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;background:var(--surface2);padding:10px 12px;border-radius:8px;border-left:3px solid var(--accent)}
-.tpm-import-hint code{font-family:monospace;color:var(--accent2,#10b981);font-size:11px}
-.tpm-drop-zone{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px;border:2px dashed var(--border2);border-radius:12px;cursor:pointer;transition:.2s;color:var(--text2);text-align:center;margin-bottom:12px}
-.tpm-drop-zone:hover{border-color:var(--accent);background:rgba(108,99,255,.05);color:var(--accent)}
-.tpm-drop-icon{font-size:26px}
-.tpm-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#ef4444;margin-bottom:12px}
-.tpm-export-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--text2)}
-.tpm-export-btn{background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
-.tpm-export-btn:hover{background:var(--accent);color:white;border-color:var(--accent)}
-
 </style>
