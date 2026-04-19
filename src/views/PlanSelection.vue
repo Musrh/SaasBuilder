@@ -107,33 +107,33 @@
       </div>
     </section>
 
-    <!-- FOOTER -->
-    <footer class="py-6 text-center border-t mt-10 bg-white">
-      <div class="flex flex-col items-center gap-2 text-sm text-gray-500">
 
-        <router-link to="/privacy-policy" class="hover:underline">
-          Privacy Policy
-        </router-link>
+<!-- FOOTER -->
+<footer class="py-6 text-center border-t mt-10 bg-white">
+  <div class="flex flex-col items-center text-sm text-gray-500">
 
-        <router-link to="/remboursement" class="hover:underline">
-          Remboursement
-        </router-link>
+    <router-link to="/privacy-policy" class="block w-full text-center hover:underline">
+      Privacy Policy
+    </router-link>
 
-        <router-link to="/confidentialite" class="hover:underline">
-          Confidentialité
-        </router-link>
+    <router-link to="/remboursement" class="block w-full text-center hover:underline">
+      Remboursement
+    </router-link>
 
-        <router-link to="/mentions" class="hover:underline">
-          Mentions légales
-        </router-link>
+    <router-link to="/confidentialite" class="block w-full text-center hover:underline">
+      Confidentialité
+    </router-link>
 
-        <router-link to="/conditions" class="hover:underline">
-          Conditions
-        </router-link>
+    <router-link to="/mentions" class="block w-full text-center hover:underline">
+      Mentions légales
+    </router-link>
 
-      </div>
-    </footer>
+    <router-link to="/conditions" class="block w-full text-center hover:underline">
+      Conditions
+    </router-link>
 
+  </div>
+</footer>
   </div>
 </template>
 
