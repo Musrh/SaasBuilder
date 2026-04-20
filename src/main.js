@@ -1,58 +1,69 @@
 // ============================================================
-//  SaasBuilder/src/main.js — version corrigée
-//  - Généralisée à tous les propriétaires de stores (plus d'email codé en dur)
-//  - Nettoie le résidu localStorage à chaque changement d'utilisateur
-//    pour qu'un nouveau propriétaire voie un site VIDE (pas le site
-//    d'un autre compte resté en cache).
+//  SaasBuilder/src/main.js
 // ============================================================
 import { createApp } from "vue"
-import App           from "./App.vue"
-import router        from "./router.js"
-import { auth }      from "./firebase.js"
-import { onAuthStateChanged } from "firebase/auth"
+import App    from "./App.vue"
+import router from "./router.js"
 
 const app = createApp(App)
 app.use(router)
 
-// ── Nettoyage du localStorage entre comptes ───────────────────
-// Si l'UID connecté change (déconnexion / autre compte), on purge
-// "siteDataPro" pour éviter que le nouveau propriétaire hérite
-// des sections d'un autre.
-let lastUid = localStorage.getItem("lastAuthUid") || null
-onAuthStateChanged(auth, (user) => {
-  const uid = user?.uid || null
-  if (uid !== lastUid) {
-    localStorage.removeItem("siteDataPro")
-    lastUid = uid
-    if (uid) localStorage.setItem("lastAuthUid", uid)
-    else     localStorage.removeItem("lastAuthUid")
-  }
-})
-
-// ── Détection retour Stripe ───────────────────────────────────
-// Stripe redirige vers l'URL racine (il supprime le #fragment).
-// On détecte au démarrage via localStorage et on redirige.
-router.isReady().then(() => {
+// ── Détection retour Stripe AVANT le montage de l'app ────────
+// Stripe supprime le # et redirige vers :
+//   https://musrh.github.io/SaasBuilder/?stripe=ok&slug=mrstore
+// On intercepte ici, AVANT que Vue-Router charge une route.
+;(() => {
+  const params  = new URLSearchParams(window.location.search)
   const pending = localStorage.getItem("pendingStripeOrder")
-  if (!pending) return
-  try {
-    const order = JSON.parse(pending)
-    const age   = Date.now() - new Date(order.createdAt).getTime()
-    const route = router.currentRoute.value
 
-    // Détecter retour Stripe depuis n'importe quelle page racine
-    const isReturnPage = route.name === "home" || route.path === "/" || !route.name
-
-    if (age < 30 * 60 * 1000 && isReturnPage) {
-      router.replace({ name: "payment-success" })
-    } else if (age >= 30 * 60 * 1000) {
-      localStorage.removeItem("pendingStripeOrder")
-      localStorage.removeItem("stripeOwnerUid")
-      localStorage.removeItem("stripeSiteSlug")
-    }
-  } catch (e) {
+  if (params.get("stripe") === "ok" && pending) {
+    try {
+      const order = JSON.parse(pending)
+      const age   = Date.now() - new Date(order.createdAt).getTime()
+      if (age < 60 * 60 * 1000) {   // moins d'1 heure
+        // Récupérer le slug
+        const slug = params.get("slug")
+                  || localStorage.getItem("stripeSiteSlug")
+                  || order.siteSlug || order.storeSlug || ""
+        if (slug) localStorage.setItem("stripeSiteSlug", slug)
+        // Nettoyer le ?stripe=ok de l'URL sans recharger
+        window.history.replaceState({}, "", window.location.pathname)
+        // Injecter le hash pour que Vue-Router charge /payment-success
+        window.location.hash = "#/payment-success"
+        // Arrêter ici — la page va se recharger avec le bon hash
+        return
+      }
+    } catch(e) {}
+    // Commande trop vieille → nettoyer
     localStorage.removeItem("pendingStripeOrder")
+    localStorage.removeItem("stripeOwnerUid")
+    localStorage.removeItem("stripeSiteSlug")
+    return
   }
-})
+
+  // ── Cas 2 : pendingStripeOrder existant sans ?stripe=ok ──────
+  // (ex: l'utilisateur revient manuellement sur la page)
+  if (pending) {
+    try {
+      const order = JSON.parse(pending)
+      const age   = Date.now() - new Date(order.createdAt).getTime()
+      if (age < 30 * 60 * 1000) {
+        // Vérifier qu'on est bien sur la page racine (retour Stripe probable)
+        const hash = window.location.hash
+        const isRoot = !hash || hash === "#/" || hash === "#"
+        if (isRoot) {
+          window.location.hash = "#/payment-success"
+          return
+        }
+      } else {
+        localStorage.removeItem("pendingStripeOrder")
+        localStorage.removeItem("stripeOwnerUid")
+        localStorage.removeItem("stripeSiteSlug")
+      }
+    } catch(e) {
+      localStorage.removeItem("pendingStripeOrder")
+    }
+  }
+})()
 
 app.mount("#app")
