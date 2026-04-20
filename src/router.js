@@ -19,6 +19,13 @@ const routes = [
     meta: { requiresAdmin: true },
   },
   
+  {
+    path: "/connection",
+    name: "Connection",
+    component: () => import("./views/Connection.vue"),
+    
+  },
+  
   { path: "/", component: PlanSelection },
   { path: "/auth", component: AuthForm },
   { path: "/dashboard", component: Dashboard },
