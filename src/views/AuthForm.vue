@@ -116,7 +116,7 @@ const API_URL = "https://backendfinal-production-afd2.up.railway.app"
 // ── Emails admin — connexion redirige vers /#/admin ───────────
 // Ces comptes doivent exister dans Firebase Auth
 // Pas de document Firestore requis pour l'admin
-const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
+const ADMIN_EMAILS = ["musrh@gmail.com"]
 
 // ── Chargement plan depuis query ou localStorage ───────────────
 onMounted(() => {
