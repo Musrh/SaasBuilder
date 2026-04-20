@@ -50,23 +50,26 @@ const router = useRouter()
 // ── État global ───────────────────────────────────────────────
 const site         = ref(null)
 
-// ── Langue du store (visible par le client) ───────────────────
-const svLang = ref("fr")
+// ── Langue du store (sélecteur visible par les clients) ───────
+const svLang  = ref("fr")
 const svLangs = [
-  { code: "fr", label: "🇫🇷", full: "Français" },
-  { code: "en", label: "🇬🇧", full: "English"  },
-  { code: "ar", label: "🇲🇦", full: "العربية"  },
-  { code: "es", label: "🇪🇸", full: "Español"  },
+  { code:"fr", flag:"🇫🇷", full:"Français" },
+  { code:"en", flag:"🇬🇧", full:"English"  },
+  { code:"ar", flag:"🇲🇦", full:"العربية"  },
+  { code:"es", flag:"🇪🇸", full:"Español"  },
 ]
 const svIsRtl = computed(() => svLang.value === "ar")
 
-// Traductions des textes du store côté client
-const svT = computed(() => ({
-  fr: { login:"Se connecter", logout:"Se déconnecter", cart:"Panier", buy:"🛒 Acheter", contact:"Contact", profile:"Mon profil", orders:"Mes commandes", noOrders:"Aucune commande pour le moment.", totalSpent:"Total dépensé", paid:"payées", allOrders:"commandes", discover:"Découvrir les produits →", loginTo:"Connectez-vous pour finaliser vos achats", name:"Nom complet *", email:"Email *", password:"Mot de passe * (min.6)", confirm:"Confirmer *", createAccount:"✨ Créer mon compte", register:"Inscription", send:"Envoyer", address:"Adresse de livraison", city:"Ville", zip:"Code postal", country:"Pays", checkout:"Finaliser la commande", orderSummary:"Récapitulatif", backToCart:"← Retour", payStripe:"💳 Payer par carte", forgotPassword:"Mot de passe oublié ?", resetSent:"Email envoyé ! Vérifiez votre boîte mail." },
-  en: { login:"Sign in", logout:"Sign out", cart:"Cart", buy:"🛒 Buy", contact:"Contact", profile:"My profile", orders:"My orders", noOrders:"No orders yet.", totalSpent:"Total spent", paid:"paid", allOrders:"orders", discover:"Discover products →", loginTo:"Sign in to complete your purchase", name:"Full name *", email:"Email *", password:"Password * (min.6)", confirm:"Confirm *", createAccount:"✨ Create account", register:"Register", send:"Send", address:"Delivery address", city:"City", zip:"Zip code", country:"Country", checkout:"Checkout", orderSummary:"Order summary", backToCart:"← Back", payStripe:"💳 Pay by card", forgotPassword:"Forgot password?", resetSent:"Email sent! Check your inbox." },
-  ar: { login:"تسجيل الدخول", logout:"تسجيل الخروج", cart:"السلة", buy:"🛒 شراء", contact:"تواصل", profile:"ملفي", orders:"طلباتي", noOrders:"لا توجد طلبات حتى الآن.", totalSpent:"إجمالي الإنفاق", paid:"مدفوعة", allOrders:"طلبات", discover:"اكتشف المنتجات ←", loginTo:"سجّل دخولك لإتمام طلبك", name:"الاسم الكامل *", email:"البريد الإلكتروني *", password:"كلمة المرور * (6 أحرف)", confirm:"تأكيد *", createAccount:"✨ إنشاء حساب", register:"تسجيل", send:"إرسال", address:"عنوان التسليم", city:"المدينة", zip:"الرمز البريدي", country:"البلد", checkout:"إتمام الطلب", orderSummary:"ملخص الطلب", backToCart:"→ رجوع", payStripe:"💳 الدفع ببطاقة", forgotPassword:"نسيت كلمة المرور؟", resetSent:"تم الإرسال! تحقق من بريدك." },
-  es: { login:"Iniciar sesión", logout:"Cerrar sesión", cart:"Carrito", buy:"🛒 Comprar", contact:"Contacto", profile:"Mi perfil", orders:"Mis pedidos", noOrders:"Sin pedidos por ahora.", totalSpent:"Total gastado", paid:"pagados", allOrders:"pedidos", discover:"Descubrir productos →", loginTo:"Inicia sesión para finalizar tu compra", name:"Nombre completo *", email:"Email *", password:"Contraseña * (mín.6)", confirm:"Confirmar *", createAccount:"✨ Crear cuenta", register:"Registro", send:"Enviar", address:"Dirección de entrega", city:"Ciudad", zip:"Código postal", country:"País", checkout:"Finalizar pedido", orderSummary:"Resumen", backToCart:"← Volver", payStripe:"💳 Pagar con tarjeta", forgotPassword:"¿Olvidaste tu contraseña?", resetSent:"¡Email enviado! Revisa tu bandeja." },
-}[svLang.value] || {}))
+// Textes traduits du store — utilisés dans tous les boutons/labels
+const svT = computed(() => {
+  const all = {
+    fr:{ buy:"🛒 Acheter", login:"🔑 Se connecter", logout:"Déconnexion", cart:"Mon panier", delivery:"Livraison & Paiement", checkout:"Finaliser la commande", back:"← Retour", payCard:"💳 Payer par carte", name:"Nom complet *", email:"Email *", password:"Mot de passe * (min.6)", confirm:"Confirmer *", createAccount:"✨ Créer mon compte", register:"Inscription", send:"Envoyer", noOrders:"Aucune commande pour le moment.", discover:"Découvrir les produits →", orders:"MES COMMANDES", totalSpent:"TOTAL DÉPENSÉ", forgotPwd:"Mot de passe oublié ?", resetSent:"Email envoyé !", address:"Adresse", zip:"Code postal", city:"Ville", country:"Pays" },
+    en:{ buy:"🛒 Buy", login:"🔑 Sign in", logout:"Sign out", cart:"My cart", delivery:"Delivery & Payment", checkout:"Place order", back:"← Back", payCard:"💳 Pay by card", name:"Full name *", email:"Email *", password:"Password * (min.6)", confirm:"Confirm *", createAccount:"✨ Create account", register:"Register", send:"Send", noOrders:"No orders yet.", discover:"Discover products →", orders:"MY ORDERS", totalSpent:"TOTAL SPENT", forgotPwd:"Forgot password?", resetSent:"Email sent!", address:"Address", zip:"Zip code", city:"City", country:"Country" },
+    ar:{ buy:"🛒 شراء", login:"🔑 دخول", logout:"خروج", cart:"سلتي", delivery:"التسليم والدفع", checkout:"إتمام الطلب", back:"→ رجوع", payCard:"💳 الدفع ببطاقة", name:"الاسم الكامل *", email:"البريد الإلكتروني *", password:"كلمة المرور * (6 أحرف)", confirm:"تأكيد *", createAccount:"✨ إنشاء حساب", register:"تسجيل", send:"إرسال", noOrders:"لا توجد طلبات حتى الآن.", discover:"اكتشف المنتجات ←", orders:"طلباتي", totalSpent:"الإجمالي المنفق", forgotPwd:"نسيت كلمة المرور؟", resetSent:"تم الإرسال!", address:"العنوان", zip:"الرمز البريدي", city:"المدينة", country:"البلد" },
+    es:{ buy:"🛒 Comprar", login:"🔑 Entrar", logout:"Salir", cart:"Mi carrito", delivery:"Entrega y Pago", checkout:"Finalizar pedido", back:"← Volver", payCard:"💳 Pagar con tarjeta", name:"Nombre completo *", email:"Email *", password:"Contraseña * (mín.6)", confirm:"Confirmar *", createAccount:"✨ Crear cuenta", register:"Registro", send:"Enviar", noOrders:"Sin pedidos por ahora.", discover:"Descubrir productos →", orders:"MIS PEDIDOS", totalSpent:"TOTAL GASTADO", forgotPwd:"¿Olvidaste tu contraseña?", resetSent:"¡Email enviado!", address:"Dirección", zip:"Código postal", city:"Ciudad", country:"País" },
+  }
+  return all[svLang.value] || all.fr
+})
 const loading      = ref(true)
 const error        = ref("")
 const resolvedUid  = ref("")
@@ -960,7 +963,7 @@ const saveOrder = async (provider, transactionId) => {
         </div>
         <!-- Non connecté : bouton Se connecter -->
         <button v-else class="sv-login-btn" @click="svShowAuth=true; svAuthMode='login'; svAuthError=''; svAuthSuccess=''">
-          🔑 Se connecter
+          {{ svT.login }}
         </button>
       </div>
 
@@ -973,15 +976,14 @@ const saveOrder = async (provider, transactionId) => {
         >{{ p.name }}</button>
       </div>
 
-      <!-- ③ SÉLECTEUR LANGUE ────────────────────────────────────── -->
-      <div class="sv-lang-selector" :dir="'ltr'">
+      <!-- ③ SÉLECTEUR LANGUE ──────────────────────────────────── -->
+      <div class="sv-lang-sel" dir="ltr">
         <button
           v-for="l in svLangs" :key="l.code"
-          class="sv-lang-btn"
-          :class="{ active: svLang === l.code }"
-          @click="svLang = l.code"
+          :class="['sv-lang-flag', svLang===l.code && 'sv-lang-active']"
+          @click="svLang=l.code"
           :title="l.full"
-        >{{ l.label }}</button>
+        >{{ l.flag }}</button>
       </div>
 
       <!-- ④ PANIER ─────────────────────────────────────────────── -->
@@ -1042,7 +1044,7 @@ const saveOrder = async (provider, transactionId) => {
                 <div class="sv-product-desc">{{ p.description }}</div>
                 <div class="sv-product-footer">
                   <span class="sv-product-price">{{ p.price }}{{ p.currency }}</span>
-                  <button class="sv-product-btn" @click="addToCart(p)">🛒 Acheter</button>
+                  <button class="sv-product-btn" @click="addToCart(p)">{{ svT.buy }}</button>
                 </div>
               </div>
             </div>
@@ -1133,7 +1135,7 @@ const saveOrder = async (provider, transactionId) => {
             </button>
             <div class="sv-cart-header-title">
               <span>{{ svCartStep==='cart' ? '🛒' : '📋' }}</span>
-              <h2>{{ svCartStep==='cart' ? 'Mon panier' : 'Livraison & Paiement' }}</h2>
+              <h2>{{ svCartStep==='cart' ? svT.cart : svT.delivery }}</h2>
               <span v-if="svCartStep==='cart' && cart.length>0" class="sv-cart-count">
                 {{ cartCount }} article{{ cartCount>1?'s':'' }}
               </span>
@@ -1173,7 +1175,7 @@ const saveOrder = async (provider, transactionId) => {
               <div class="sv-cart-footer-btns">
                 <button class="sv-btn-sec" @click="showCart=false">Continuer</button>
                 <button class="sv-btn-primary sv-checkout-btn" @click="svCartStep='checkout'">
-                  📋 Livraison & Paiement →
+                  📋 {{ svT.delivery }} →
                 </button>
               </div>
             </div>
@@ -1450,11 +1452,11 @@ const saveOrder = async (provider, transactionId) => {
 .sv-error p{font-size:14px}.sv-error code{background:#f3f4f6;padding:2px 8px;border-radius:4px}
 
 /* NAV */
-.sv-nav{background:#fff;border-bottom:1px solid #e5e7eb;padding:0 20px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,.06);height:56px;flex-wrap:nowrap}
-.sv-lang-selector{display:flex;gap:3px;align-items:center;flex-shrink:0}
-.sv-lang-btn{background:none;border:1px solid transparent;border-radius:5px;padding:3px 5px;font-size:15px;cursor:pointer;transition:.15s;line-height:1}
-.sv-lang-btn:hover{background:#f3f4f6;border-color:#e5e7eb}
-.sv-lang-btn.active{background:#6c63ff14;border-color:#6c63ff55}
+.sv-nav{background:#fff;border-bottom:1px solid #e5e7eb;padding:0 14px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,.06);height:56px;flex-wrap:nowrap}
+.sv-lang-sel{display:flex;gap:2px;align-items:center;flex-shrink:0;direction:ltr}
+.sv-lang-flag{background:none;border:2px solid transparent;border-radius:6px;padding:2px 4px;font-size:16px;cursor:pointer;transition:.15s;line-height:1}
+.sv-lang-flag:hover{background:#f3f4f6;border-color:#e5e7eb}
+.sv-lang-active{background:#6c63ff14;border-color:#6c63ff66 !important}
 /* Nav auth (connexion/déconnexion) */
 .sv-nav-auth{display:flex;align-items:center;flex-shrink:0}
 .sv-user-pill{display:flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:100px;padding:4px 10px 4px 4px}
