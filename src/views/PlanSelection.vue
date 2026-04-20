@@ -110,31 +110,34 @@
 
 
 <!-- FOOTER -->
-<footer class="py-6 text-center border-t mt-10 bg-white">
-  <div class="flex flex-col items-center text-sm text-gray-500">
 
-    <router-link to="/privacy-policy" class="block w-full text-center hover:underline">
+
+<footer class="py-6 text-center border-t mt-10 bg-white">
+  <div class="flex flex-col items-center space-y-2 text-sm text-gray-500">
+
+    <router-link to="/privacy-policy" class="block hover:underline">
       Privacy Policy
     </router-link>
 
-    <router-link to="/remboursement" class="block w-full text-center hover:underline">
+    <router-link to="/remboursement" class="block hover:underline">
       Remboursement
     </router-link>
 
-    <router-link to="/confidentialite" class="block w-full text-center hover:underline">
+    <router-link to="/confidentialite" class="block hover:underline">
       Confidentialité
     </router-link>
 
-    <router-link to="/mentions" class="block w-full text-center hover:underline">
+    <router-link to="/mentions" class="block hover:underline">
       Mentions légales
     </router-link>
 
-    <router-link to="/conditions" class="block w-full text-center hover:underline">
+    <router-link to="/conditions" class="block hover:underline">
       Conditions
     </router-link>
 
   </div>
 </footer>
+    
   </div>
 </template>
 
