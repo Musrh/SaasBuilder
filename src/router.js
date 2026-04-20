@@ -15,7 +15,7 @@ import { getFirestore, doc, getDoc } from "firebase/firestore"
 import PlanSelection from "./views/PlanSelection.vue"
 import AuthForm      from "./views/AuthForm.vue"
 import Dashboard     from "./views/Dashboard.vue"
-import SiteViewer    from "./views/SiteViewer.vue"
+import SiteViewer    from "./views/Siteviewer.vue"
 import NotFound      from "./views/NotFound.vue"
 
 // ── Emails admin (même liste que AuthForm.vue) ────────────────
@@ -53,7 +53,7 @@ const routes = [
   {
     path: "/saasgenerator",
     name: "saasgenerator",
-    component: () => import("./views/SaasGenerator.vue"),
+    component: () => import("./views/Saasgenerator.vue"),
     meta: { requiresAuth: true },
   },
 
@@ -65,7 +65,7 @@ const routes = [
   {
     path: "/site/:uid",
     name: "site",
-    component: SiteViewer,
+    component: Siteviewer,
     props: true,
   },
 
@@ -73,7 +73,7 @@ const routes = [
   {
     path: "/store-auth",
     name: "store-auth",
-    component: () => import("./views/StoreAuth.vue"),
+    component: () => import("./views/Storeauth.vue"),
   },
 
   // ════════════════════════════════════════════════════════════
@@ -83,12 +83,12 @@ const routes = [
   {
     path: "/payment-success",
     name: "payment-success",
-    component: () => import("./views/PaymentSuccess.vue"),
+    component: () => import("./views/Paymentsuccess.vue"),
   },
   {
     path: "/payment-cancel",
     name: "payment-cancel",
-    component: () => import("./views/PaymentCancel.vue"),
+    component: () => import("./views/Paymentcancel.vue"),
   },
 
   // Retour Stripe pour abonnement SaasBuilder
