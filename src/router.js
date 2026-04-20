@@ -11,6 +11,14 @@ import Confidentialite from "./views/Confidentialite.vue";
 import Conditions from "./views/Conditions.vue";
 const routes = [
   // ── APP SAAS ─────────────────────────────
+
+  {
+    path: "/admin",
+    name: "admin",
+    component: () => import("./views/Admin.vue"),
+    meta: { requiresAdmin: true },
+  },
+  
   { path: "/", component: PlanSelection },
   { path: "/auth", component: AuthForm },
   { path: "/dashboard", component: Dashboard },
