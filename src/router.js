@@ -65,7 +65,7 @@ const routes = [
   {
     path: "/site/:uid",
     name: "site",
-    component: Siteviewer,
+    component: SiteViewer,
     props: true,
   },
 
@@ -126,20 +126,7 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
-  // Catalogue produits (propriétaire)
-  {
-    path: "/products",
-    name: "products",
-    component: () => import("./views/ListeProducts.vue"),
-    meta: { requiresAuth: true },
-  },
 
-  // Plans tarifaires (page marketing)
-  {
-    path: "/plans",
-    name: "plans",
-    component: () => import("./views/Plans.vue"),
-  },
 
   // Panier (ancien flow)
   {
