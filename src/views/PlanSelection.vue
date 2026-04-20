@@ -26,8 +26,9 @@
           À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
 
-        <!-- Déjà un compte -->
-        <div class="bg-white/10 backdrop-blur p-4 rounded-xl mb-4 inline-block">
+        <!-- ✅ 1) Bloc "Se connecter" déplacé via translate (X = horizontal, Y = vertical) -->
+        <!-- Modifie les valeurs translate-x-[XXpx] translate-y-[XXpx] selon ton besoin -->
+        <div class="transform translate-x-[0px] translate-y-[20px] mb-6 inline-block">
           <p class="text-sm text-blue-200 mb-2">
             Tu as déjà un compte ?
           </p>
@@ -39,8 +40,7 @@
           </button>
         </div>
 
-        <!-- CTA voir offres -->
-        <div>
+        <div class="mt-4">
           <button
             @click="scrollToPlans"
             class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
@@ -48,31 +48,27 @@
             Voir les offres ↓
           </button>
         </div>
-
       </div>
     </section>
 
     <!-- PLANS -->
-    <section ref="plansSection" class="py-20 bg-gray-50">
-      <div class="max-w-5xl mx-auto px-6">
-        <h2 class="text-3xl md:text-4xl font-bold text-center mb-3">Nos offres</h2>
-        <p class="text-center text-gray-600 mb-12">
+    <section ref="plansSection" class="py-20 px-6 bg-gray-50">
+      <div class="max-w-5xl mx-auto text-center">
+        <h2 class="text-3xl md:text-4xl font-bold mb-4">Nos offres</h2>
+        <p class="text-gray-600 mb-12">
           Choisissez le plan adapté à votre activité
         </p>
 
         <div class="grid md:grid-cols-2 gap-8">
-
-          <!-- Plan Free -->
-          <div class="bg-white rounded-2xl p-8 shadow-lg border border-gray-200">
+          <!-- FREE -->
+          <div class="bg-white rounded-2xl shadow-lg p-8">
             <h3 class="text-2xl font-bold mb-2">Gratuit</h3>
             <p class="text-4xl font-bold mb-1">0€</p>
             <p class="text-gray-500 mb-6">/mois</p>
-
-            <ul class="space-y-2 mb-8 text-gray-700">
+            <ul class="text-left space-y-2 mb-8 text-gray-700">
               <li>✓ 1 page</li>
               <li>✓ Builder visuel</li>
             </ul>
-
             <button
               @click="selectPlan('free')"
               class="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-xl font-semibold"
@@ -81,23 +77,18 @@
             </button>
           </div>
 
-          <!-- Plan Pro -->
-          <div class="bg-white rounded-2xl p-8 shadow-lg border-2 border-purple-500 relative">
-            <span class="absolute -top-3 right-6 bg-purple-500 text-white text-xs px-3 py-1 rounded-full">
-              Populaire
-            </span>
+          <!-- PRO -->
+          <div class="bg-white rounded-2xl shadow-lg p-8 border-2 border-purple-500">
             <h3 class="text-2xl font-bold mb-2">Pro</h3>
             <p class="text-4xl font-bold mb-1">10€</p>
             <p class="text-gray-500 mb-6">/mois</p>
-
-            <ul class="space-y-2 mb-8 text-gray-700">
+            <ul class="text-left space-y-2 mb-8 text-gray-700">
               <li>✓ Multi-pages</li>
               <li>✓ Builder visuel</li>
               <li>✓ Configuration Paiement</li>
               <li>✓ Analytics</li>
               <li>✓ Support prioritaire</li>
             </ul>
-
             <button
               @click="selectPlan('pro')"
               class="w-full bg-purple-500 hover:bg-purple-600 text-white py-3 rounded-xl font-semibold"
@@ -105,19 +96,28 @@
               Choisir Pro
             </button>
           </div>
-
         </div>
       </div>
     </section>
 
-    <!-- FOOTER LIENS LÉGAUX -->
-    <footer class="bg-gray-900 text-gray-300 py-10">
-      <div class="max-w-5xl mx-auto px-6 flex flex-wrap justify-center gap-6 text-sm">
-        <router-link to="/privacy-policy" class="hover:text-white">Privacy Policy</router-link>
-        <router-link to="/remboursement" class="hover:text-white">Remboursement</router-link>
-        <router-link to="/confidentialite" class="hover:text-white">Confidentialité</router-link>
-        <router-link to="/mentions" class="hover:text-white">Mentions légales</router-link>
-        <router-link to="/conditions" class="hover:text-white">Conditions</router-link>
+    <!-- ✅ 2) FOOTER : 1 colonne x 4 lignes -->
+    <footer class="bg-gray-900 text-white py-10 px-6">
+      <div class="max-w-md mx-auto flex flex-col gap-3 text-center">
+        <router-link to="/privacy-policy" class="hover:text-blue-400 transition">
+          Privacy Policy
+        </router-link>
+        <router-link to="/remboursement" class="hover:text-blue-400 transition">
+          Remboursement
+        </router-link>
+        <router-link to="/confidentialite" class="hover:text-blue-400 transition">
+          Confidentialité
+        </router-link>
+        <router-link to="/mentions" class="hover:text-blue-400 transition">
+          Mentions légales
+        </router-link>
+        <router-link to="/conditions" class="hover:text-blue-400 transition">
+          Conditions
+        </router-link>
       </div>
     </footer>
 
@@ -125,22 +125,22 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
-import { useRouter } from "vue-router"
+import { ref } from "vue";
+import { useRouter } from "vue-router";
 
-const router = useRouter()
-const plansSection = ref(null)
+const router = useRouter();
+const plansSection = ref(null);
 
-const goToLogin = () => {
-  router.push("/auth?mode=login")
+function goToLogin() {
+  router.push("/auth?mode=login");
 }
 
-const scrollToPlans = () => {
-  plansSection.value?.scrollIntoView({ behavior: "smooth" })
+function scrollToPlans() {
+  plansSection.value?.scrollIntoView({ behavior: "smooth" });
 }
 
-const selectPlan = (plan) => {
-  localStorage.setItem("selectedPlan", plan)
-  router.push(`/auth?plan=${plan}`)
+function selectPlan(plan) {
+  localStorage.setItem("selectedPlan", plan);
+  router.push("/auth?mode=signup");
 }
 </script>
