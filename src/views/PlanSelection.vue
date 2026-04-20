@@ -26,7 +26,8 @@
           À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
 
-        <div class="box">
+      
+        <div class="transform translate-x-10 bg-blue-500 p-4">
           <p class="text-sm text-blue-200 mb-2">
             Tu as déjà un compte ?
           </p>
