@@ -26,12 +26,11 @@
           À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
 
-      
-        <div class="transform translate-x-[200px] bg-blue-500 p-4">
+        <!-- Déjà un compte -->
+        <div class="bg-white/10 backdrop-blur p-4 rounded-xl mb-4 inline-block">
           <p class="text-sm text-blue-200 mb-2">
             Tu as déjà un compte ?
           </p>
-
           <button
             @click="goToLogin"
             class="bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-lg font-medium transition"
@@ -40,7 +39,8 @@
           </button>
         </div>
 
-        <div class="mt-6">
+        <!-- CTA voir offres -->
+        <div>
           <button
             @click="scrollToPlans"
             class="bg-blue-500 hover:bg-blue-400 text-white px-8 py-4 rounded-xl text-lg font-semibold transition"
@@ -53,23 +53,22 @@
     </section>
 
     <!-- PLANS -->
-    <section ref="plansRef" class="py-20 bg-gray-50">
+    <section ref="plansSection" class="py-20 bg-gray-50">
       <div class="max-w-5xl mx-auto px-6">
-        <h2 class="text-3xl font-bold text-center mb-4">Nos offres</h2>
-
-        <p class="text-gray-500 text-center mb-12">
+        <h2 class="text-3xl md:text-4xl font-bold text-center mb-3">Nos offres</h2>
+        <p class="text-center text-gray-600 mb-12">
           Choisissez le plan adapté à votre activité
         </p>
 
         <div class="grid md:grid-cols-2 gap-8">
 
-          <!-- FREE -->
-          <div class="bg-white rounded-2xl shadow p-8 flex flex-col">
-            <h3 class="text-xl font-bold mb-2">Gratuit</h3>
-            <p class="text-4xl font-bold">0€</p>
-            <p class="text-gray-400 mb-6">/mois</p>
+          <!-- Plan Free -->
+          <div class="bg-white rounded-2xl p-8 shadow-lg border border-gray-200">
+            <h3 class="text-2xl font-bold mb-2">Gratuit</h3>
+            <p class="text-4xl font-bold mb-1">0€</p>
+            <p class="text-gray-500 mb-6">/mois</p>
 
-            <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
+            <ul class="space-y-2 mb-8 text-gray-700">
               <li>✓ 1 page</li>
               <li>✓ Builder visuel</li>
             </ul>
@@ -82,13 +81,16 @@
             </button>
           </div>
 
-          <!-- PRO -->
-          <div class="bg-white rounded-2xl shadow p-8 flex flex-col">
-            <h3 class="text-xl font-bold mb-2">Pro</h3>
-            <p class="text-4xl font-bold">10€</p>
-            <p class="text-gray-400 mb-6">/mois</p>
+          <!-- Plan Pro -->
+          <div class="bg-white rounded-2xl p-8 shadow-lg border-2 border-purple-500 relative">
+            <span class="absolute -top-3 right-6 bg-purple-500 text-white text-xs px-3 py-1 rounded-full">
+              Populaire
+            </span>
+            <h3 class="text-2xl font-bold mb-2">Pro</h3>
+            <p class="text-4xl font-bold mb-1">10€</p>
+            <p class="text-gray-500 mb-6">/mois</p>
 
-            <ul class="space-y-2 text-sm text-gray-600 mb-8 flex-1">
+            <ul class="space-y-2 mb-8 text-gray-700">
               <li>✓ Multi-pages</li>
               <li>✓ Builder visuel</li>
               <li>✓ Configuration Paiement</li>
@@ -108,36 +110,17 @@
       </div>
     </section>
 
+    <!-- FOOTER LIENS LÉGAUX -->
+    <footer class="bg-gray-900 text-gray-300 py-10">
+      <div class="max-w-5xl mx-auto px-6 flex flex-wrap justify-center gap-6 text-sm">
+        <router-link to="/privacy-policy" class="hover:text-white">Privacy Policy</router-link>
+        <router-link to="/remboursement" class="hover:text-white">Remboursement</router-link>
+        <router-link to="/confidentialite" class="hover:text-white">Confidentialité</router-link>
+        <router-link to="/mentions" class="hover:text-white">Mentions légales</router-link>
+        <router-link to="/conditions" class="hover:text-white">Conditions</router-link>
+      </div>
+    </footer>
 
-<!-- FOOTER -->
-
-
-<footer class="py-6 text-center border-t mt-10 bg-white">
-  <div class="flex flex-col items-center space-y-2 text-sm text-gray-500">
-
-    <router-link to="/privacy-policy" class="block hover:underline">
-      Privacy Policy
-    </router-link>
-
-    <router-link to="/remboursement" class="block hover:underline">
-      Remboursement
-    </router-link>
-
-    <router-link to="/confidentialite" class="block hover:underline">
-      Confidentialité
-    </router-link>
-
-    <router-link to="/mentions" class="block hover:underline">
-      Mentions légales
-    </router-link>
-
-    <router-link to="/conditions" class="block hover:underline">
-      Conditions
-    </router-link>
-
-  </div>
-</footer>
-    
   </div>
 </template>
 
@@ -146,28 +129,18 @@ import { ref } from "vue"
 import { useRouter } from "vue-router"
 
 const router = useRouter()
-const plansRef = ref(null)
-
-const selectPlan = (plan) => {
-  localStorage.setItem("planChoisi", plan)
-
-  router.push({
-    path: "/auth",
-    query: { plan }
-  })
-}
+const plansSection = ref(null)
 
 const goToLogin = () => {
-  router.push("/connection")
+  router.push("/auth?mode=login")
 }
 
 const scrollToPlans = () => {
-  plansRef.value?.scrollIntoView({ behavior: "smooth" })
+  plansSection.value?.scrollIntoView({ behavior: "smooth" })
+}
+
+const selectPlan = (plan) => {
+  localStorage.setItem("selectedPlan", plan)
+  router.push(`/auth?plan=${plan}`)
 }
 </script>
-
-<style>
-.box {
-  text-align: center;
-}
-</style>
