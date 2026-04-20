@@ -27,7 +27,7 @@
         </p>
 
       
-        <div class="transform translate-x-100 bg-blue-500 p-4">
+        <div class="transform translate-x-24 bg-blue-500 p-4">
           <p class="text-sm text-blue-200 mb-2">
             Tu as déjà un compte ?
           </p>
