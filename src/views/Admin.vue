@@ -219,7 +219,7 @@ import {
   doc,
   updateDoc
 } from 'firebase/firestore'
-import { db } from '@/firebase' // adapte le chemin si besoin
+import { db } from '../firebase' // adapte le chemin si besoin
 
 // ── Liste des emails admin (en minuscules) ────────────────────
 const ADMIN_EMAILS = [
