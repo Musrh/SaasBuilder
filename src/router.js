@@ -21,8 +21,8 @@ const routes = [
   
   {
     path: "/connection",
-    name: "Connection",
-    component: () => import("./views/Connection.vue"),
+    name: "Connexion",
+    component: () => import("./views/Connexion.vue"),
     
   },
   
