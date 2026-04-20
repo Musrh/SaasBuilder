@@ -48,6 +48,11 @@
         {{ errorMsg }}
       </p>
 
+      <!-- COMPTE DÉSACTIVÉ -->
+      <p v-if="disabledMsg" class="text-yellow-400 text-sm mb-3 text-center bg-yellow-400/10 border border-yellow-400/30 rounded-xl p-3">
+        🚫 {{ disabledMsg }}
+      </p>
+
       <!-- LOADING -->
       <p v-if="loading" class="text-purple-400 text-sm mb-3 text-center">
         Chargement...
@@ -68,7 +73,7 @@
         :disabled="loading"
         class="w-full bg-white/10 py-3 rounded-xl font-semibold hover:bg-white/20 transition disabled:opacity-50"
       >
-        S'inscrire
+        ✨ S'inscrire
       </button>
 
       <!-- RETOUR -->
@@ -82,94 +87,164 @@
     </div>
   </div>
 </template>
+
 <script setup>
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
-
 import { db, auth } from "../firebase"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
-
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
 } from "firebase/auth"
 
-const route = useRoute()
+const route  = useRoute()
 const router = useRouter()
 
-// STATE
-const email = ref("")
-const password = ref("")
+// ── État ──────────────────────────────────────────────────────
+const email       = ref("")
+const password    = ref("")
 const selectedPlan = ref("free")
-const loading = ref(false)
-const errorMsg = ref("")
+const loading     = ref(false)
+const errorMsg    = ref("")
+const disabledMsg = ref("")
 
 const API_URL = "https://backendfinal-production-afd2.up.railway.app"
 
-// LOAD PLAN
+// ── Emails admin — connexion redirige vers /#/admin ───────────
+// Ces comptes doivent exister dans Firebase Auth
+// Pas de document Firestore requis pour l'admin
+const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
+
+// ── Chargement plan depuis query ou localStorage ───────────────
 onMounted(() => {
   selectedPlan.value =
     route.query.plan ||
     localStorage.getItem("planChoisi") ||
     "free"
 
-  auth.onAuthStateChanged((user) => {
-    if (user) router.push("/dashboard")
+  // Si déjà connecté → rediriger intelligemment
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return
+    await redirectUser(user)
   })
 })
 
-// LOGIN
-const login = async () => {
-  errorMsg.value = ""
-  loading.value = true
+// ── Redirection selon le rôle ──────────────────────────────────
+const redirectUser = async (user) => {
+  const emailLower = user.email?.toLowerCase() || ""
+
+  // 1. Admin → tableau de bord admin
+  if (ADMIN_EMAILS.includes(emailLower)) {
+    window.location.href = "https://musrh.github.io/SaasBuilder/#/admin"
+    return
+  }
+
+  // 2. Propriétaire de store → vérifier son statut dans Firestore
   try {
-    const cred = await signInWithEmailAndPassword(
-      auth,
-      email.value,
-      password.value
-    )
+    const snap = await getDoc(doc(db, "users", user.uid))
 
-    const user = cred.user
+    if (!snap.exists()) {
+      // Nouveau compte sans document → rester sur auth
+      return
+    }
 
-    localStorage.setItem("user", JSON.stringify({
-      uid: user.uid,
-      email: user.email
-    }))
+    const data    = snap.data()
+    const plan    = data.plan    || "free"
+    const paye    = data.paye    || false
+    const expiry  = data.expiry  || 0
+    const active  = data.active  !== false   // true par défaut
 
+    // Compte désactivé par l'admin
+    if (!active) {
+      disabledMsg.value = "Votre compte a été désactivé. Contactez l'administrateur."
+      await signOut(auth)
+      return
+    }
+
+    const planExpired = expiry && expiry < Date.now()
+
+    // Plan FREE → dashboard basique
+    if (plan === "free") {
+      router.push("/dashboard")
+      return
+    }
+
+    // Plan payant mais pas encore payé → dashboard en attente
+    if (!paye) {
+      router.push("/dashboard")
+      return
+    }
+
+    // Plan payant + payé + non expiré → builder complet
+    if (!planExpired) {
+      router.push("/saasgenerator")
+      return
+    }
+
+    // Plan expiré → dashboard (renouvellement)
     router.push("/dashboard")
 
   } catch (err) {
-    errorMsg.value = "Erreur connexion : " + err.message
+    console.error("redirectUser:", err.message)
+    router.push("/dashboard")
+  }
+}
+
+// ── Connexion ──────────────────────────────────────────────────
+const login = async () => {
+  errorMsg.value    = ""
+  disabledMsg.value = ""
+  loading.value     = true
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email.value.trim(), password.value)
+    await redirectUser(cred.user)
+  } catch (err) {
+    const msgs = {
+      "auth/user-not-found":      "Email introuvable.",
+      "auth/wrong-password":      "Mot de passe incorrect.",
+      "auth/invalid-email":       "Email invalide.",
+      "auth/too-many-requests":   "Trop de tentatives. Réessayez plus tard.",
+      "auth/invalid-credential":  "Email ou mot de passe incorrect.",
+    }
+    errorMsg.value = msgs[err.code] || ("Erreur connexion : " + err.message)
   } finally {
     loading.value = false
   }
 }
 
-// REGISTER
+// ── Inscription ────────────────────────────────────────────────
 const register = async () => {
-  errorMsg.value = ""
-  loading.value = true
+  errorMsg.value    = ""
+  disabledMsg.value = ""
+  loading.value     = true
   try {
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      email.value,
-      password.value
-    )
+    // Bloquer l'inscription avec un email admin
+    if (ADMIN_EMAILS.includes(email.value.trim().toLowerCase())) {
+      errorMsg.value = "Cet email est réservé à l'administration."
+      return
+    }
 
+    const cred = await createUserWithEmailAndPassword(auth, email.value.trim(), password.value)
     const user = cred.user
-    const uid = user.uid
+    const uid  = user.uid
 
+    // Créer le document propriétaire dans Firestore
     const userData = {
       uid,
-      email: user.email,
-      role: "owner",
-      ownerId: uid,
-      storeId: uid,
-      plan: selectedPlan.value,
+      email:              user.email,
+      role:               "owner",
+      ownerId:            uid,
+      storeId:            uid,
+      plan:               selectedPlan.value || "free",
+      paye:               false,
       subscriptionActive: false,
-      stripeAccountId: null,
-      createdAt: serverTimestamp(),
-      expiry: null
+      stripeAccountId:    null,
+      active:             true,
+      createdAt:          serverTimestamp(),
+      expiry:             null,
     }
 
     await setDoc(doc(db, "users", uid), userData)
@@ -177,40 +252,46 @@ const register = async () => {
     localStorage.setItem("user", JSON.stringify({
       uid,
       email: user.email,
-      plan: selectedPlan.value
+      plan:  selectedPlan.value,
     }))
+    localStorage.setItem("planChoisi", selectedPlan.value)
 
+    // Plan payant → rediriger vers Stripe
     if (selectedPlan.value === "pro" || selectedPlan.value === "basic") {
-      const res = await fetch(`${API_URL}/create-billing-session`, {
-        method: "POST",
+      const res  = await fetch(`${API_URL}/create-billing-session`, {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: user.email,
-          plan: selectedPlan.value,
-          ownerUid: uid
-        })
+          email:    user.email,
+          plan:     selectedPlan.value,
+          ownerUid: uid,
+        }),
       })
-
       const data = await res.json()
-
       if (data.url) {
         window.location.href = data.url
         return
-      } else {
-        errorMsg.value = "Erreur paiement : impossible de créer la session Stripe."
       }
+      errorMsg.value = "Erreur paiement : impossible de créer la session Stripe."
+      return
     }
 
+    // Plan FREE → dashboard directement
     router.push("/dashboard")
 
   } catch (err) {
-    errorMsg.value = "Erreur inscription : " + err.message
+    const msgs = {
+      "auth/email-already-in-use": "Email déjà utilisé. Connectez-vous.",
+      "auth/weak-password":        "Mot de passe trop faible (min. 6 caractères).",
+      "auth/invalid-email":        "Email invalide.",
+    }
+    errorMsg.value = msgs[err.code] || ("Erreur inscription : " + err.message)
   } finally {
     loading.value = false
   }
 }
 
-// ✅ FIX : fonction bien placée
+// ── Retour aux plans ───────────────────────────────────────────
 const goToPlans = () => {
   router.push("/")
 }
