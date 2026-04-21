@@ -240,6 +240,7 @@ const loadSite = async () => {
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false }
         await loadPayConfig(uid)
+        if (data.siteTheme) applySiteTheme(data.siteTheme)
         loading.value = false
         console.log("  ✅ Site chargé via UID direct | plan:", storeOwner.value.plan, "| backend:", BACKEND_URL.value)
         return
@@ -277,6 +278,7 @@ const loadSite = async () => {
         resolvedUid.value    = realUid
         storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false }
         await loadPayConfig(realUid)
+        if (rd.siteTheme) applySiteTheme(rd.siteTheme)
         loading.value = false
         console.log("  ✅ Site chargé via slug →", realUid, "| plan:", storeOwner.value.plan, "| backend:", BACKEND_URL.value)
         return
@@ -313,6 +315,32 @@ const loadPayConfig = async (uid) => {
       storePayConfig.value = mainSnap.data().storePaymentConfig
     }
   } catch (e) { console.warn("Pas de config paiement:", e.message) }
+}
+
+// ── Appliquer le thème du store (depuis Firestore ou localStorage) ──
+// Appelé après chaque résolution de slug/uid
+const applySiteTheme = (themeData) => {
+  if (!themeData) return
+  try {
+    const th = typeof themeData === "string" ? JSON.parse(themeData) : themeData
+    const r  = document.documentElement
+    if (th.accent)      r.style.setProperty("--theme-accent",      th.accent)
+    if (th.accentHover) r.style.setProperty("--theme-accent-hover",th.accentHover)
+    if (th.bg)          r.style.setProperty("--theme-bg",          th.bg)
+    if (th.bgAlt)       r.style.setProperty("--theme-bg-alt",      th.bgAlt)
+    if (th.bgHero)      r.style.setProperty("--theme-bg-hero",     th.bgHero)
+    if (th.text)        r.style.setProperty("--theme-text",        th.text)
+    if (th.textSub)     r.style.setProperty("--theme-text-sub",    th.textSub)
+    if (th.btnRadius)   r.style.setProperty("--theme-btn-radius",  th.btnRadius)
+    if (th.btnPadding)  r.style.setProperty("--theme-btn-padding", th.btnPadding)
+    if (th.cardRadius)  r.style.setProperty("--theme-card-radius", th.cardRadius)
+    if (th.cardShadow)  r.style.setProperty("--theme-card-shadow", th.cardShadow)
+    if (th.heroFont)    r.style.setProperty("--theme-hero-font",   th.heroFont)
+    if (th.bodyFont)    r.style.setProperty("--theme-body-font",   th.bodyFont)
+    if (th.navBg)       r.style.setProperty("--theme-nav-bg",      th.navBg)
+    if (th.navBorder)   r.style.setProperty("--theme-nav-border",  th.navBorder)
+    console.log("🎨 Thème appliqué:", th.name || "custom")
+  } catch(e) { console.warn("applySiteTheme:", e.message) }
 }
 
 onMounted(() => {
@@ -1767,4 +1795,41 @@ const saveOrder = async (provider, transactionId) => {
 .svp-signout-btn{width:calc(100% - 32px);margin:10px 16px 14px;padding:11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center;flex-shrink:0}
 .svp-signout-btn:hover{background:rgba(239,68,68,.15)}
 
+
+/* ══ VARIABLES THÈME (appliquées par SaasGenerator) ════════ */
+/* Valeurs par défaut — remplacées dynamiquement via JS */
+:root {
+  --theme-accent:      #6c63ff;
+  --theme-accent-hover:#4f46e5;
+  --theme-bg:          #ffffff;
+  --theme-bg-alt:      #fafafa;
+  --theme-bg-hero:     linear-gradient(135deg,#f8f7ff,#ede9fe);
+  --theme-text:        #1a1a2e;
+  --theme-text-sub:    #6b7280;
+  --theme-btn-radius:  10px;
+  --theme-btn-padding: 14px 32px;
+  --theme-card-radius: 16px;
+  --theme-card-shadow: 0 2px 12px rgba(0,0,0,.06);
+  --theme-hero-font:   'Playfair Display',serif;
+  --theme-body-font:   'DM Sans',sans-serif;
+  --theme-nav-bg:      #ffffff;
+  --theme-nav-border:  #e5e7eb;
+}
+/* Sections du store branchées sur les variables thème */
+.sv-hero-section    { background: var(--theme-bg-hero) !important; }
+.sv-hero-title      { font-family: var(--theme-hero-font) !important; color: var(--theme-text) !important; }
+.sv-hero-sub        { color: var(--theme-text-sub) !important; }
+.sv-hero-cta        { background: var(--theme-accent) !important; border-radius: var(--theme-btn-radius) !important; padding: var(--theme-btn-padding) !important; font-family: var(--theme-body-font) !important; }
+.sv-hero-cta:hover  { background: var(--theme-accent-hover) !important; }
+.sv-product-card    { border-radius: var(--theme-card-radius) !important; box-shadow: var(--theme-card-shadow) !important; }
+.sv-product-price   { color: var(--theme-accent) !important; }
+.sv-product-btn     { background: var(--theme-accent) !important; border-radius: calc(var(--theme-btn-radius) * .6) !important; font-family: var(--theme-body-font) !important; }
+.sv-product-btn:hover { background: var(--theme-accent-hover) !important; }
+.sv-nav             { background: var(--theme-nav-bg) !important; border-bottom-color: var(--theme-nav-border) !important; }
+.sv-cart-btn        { background: var(--theme-accent) !important; }
+.sv-login-btn       { border-color: var(--theme-accent) !important; color: var(--theme-accent) !important; }
+.sv-pay-btn         { background: var(--theme-accent) !important; border-radius: var(--theme-btn-radius) !important; }
+.sv-pay-btn:hover   { background: var(--theme-accent-hover) !important; }
+.sv-form-btn        { background: var(--theme-accent) !important; border-radius: var(--theme-btn-radius) !important; }
+.sv-tab.active      { background: var(--theme-accent) !important; color: #fff !important; }
 </style>
