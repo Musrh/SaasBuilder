@@ -26,20 +26,7 @@
           À partir de <span class="text-yellow-300">10€ / mois</span>
         </p>
 
-        <!-- ✅ 1) Bloc "Se connecter" déplacé via translate (X = horizontal, Y = vertical) -->
-        <!-- Modifie les valeurs translate-x-[XXpx] translate-y-[XXpx] selon ton besoin -->
-        <div class="transform translate-x-[0px] translate-y-[20px] mb-6 inline-block">
-          <p class="text-sm text-blue-200 mb-2">
-            Tu as déjà un compte ?
-          </p>
-          <button
-            @click="goToLogin"
-            class="bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-lg font-medium transition"
-          >
-            Se connecter
-          </button>
-        </div>
-
+        <!-- Bouton "Se connecter" — positionné en haut à droite du Hero -->
         <div class="mt-4">
           <button
             @click="scrollToPlans"
@@ -49,6 +36,18 @@
           </button>
         </div>
       </div>
+
+      <!-- ✅ Se connecter — coin supérieur droit du hero, fixe et visible -->
+      <div class="absolute top-5 right-6 z-20 flex flex-col items-end gap-1">
+        <p class="text-xs text-blue-200">Tu as déjà un compte ?</p>
+        <button
+          @click="goToLogin"
+          class="bg-white/20 hover:bg-white/30 text-white px-5 py-2 rounded-lg font-medium text-sm transition border border-white/30"
+        >
+          Se connecter
+        </button>
+      </div>
+
     </section>
 
     <!-- PLANS -->
@@ -100,24 +99,15 @@
       </div>
     </section>
 
-    <!-- ✅ 2) FOOTER : 1 colonne x 4 lignes -->
+    <!-- ✅ FOOTER — 1 colonne, liens empilés verticalement -->
     <footer class="bg-gray-900 text-white py-10 px-6">
-      <div class="max-w-md mx-auto flex flex-col gap-3 text-center">
-        <router-link to="/privacy-policy" class="hover:text-blue-400 transition">
-          Privacy Policy
-        </router-link>
-        <router-link to="/remboursement" class="hover:text-blue-400 transition">
-          Remboursement
-        </router-link>
-        <router-link to="/confidentialite" class="hover:text-blue-400 transition">
-          Confidentialité
-        </router-link>
-        <router-link to="/mentions" class="hover:text-blue-400 transition">
-          Mentions légales
-        </router-link>
-        <router-link to="/conditions" class="hover:text-blue-400 transition">
-          Conditions
-        </router-link>
+      <div class="max-w-xs mx-auto flex flex-col items-center gap-4 text-sm text-gray-400">
+        <router-link to="/privacy-policy"   class="hover:text-white transition">Privacy Policy</router-link>
+        <router-link to="/remboursement"    class="hover:text-white transition">Remboursement</router-link>
+        <router-link to="/confidentialite"  class="hover:text-white transition">Confidentialité</router-link>
+        <router-link to="/mentions"         class="hover:text-white transition">Mentions légales</router-link>
+        <router-link to="/conditions"       class="hover:text-white transition">Conditions générales</router-link>
+        <p class="mt-4 text-xs text-gray-600">© {{ new Date().getFullYear() }} SaasBuilder</p>
       </div>
     </footer>
 
@@ -125,22 +115,22 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { ref } from "vue"
+import { useRouter } from "vue-router"
 
-const router = useRouter();
-const plansSection = ref(null);
+const router = useRouter()
+const plansSection = ref(null)
 
 function goToLogin() {
-  router.push("/auth?mode=login");
+  router.push("/auth?mode=login")
 }
 
 function scrollToPlans() {
-  plansSection.value?.scrollIntoView({ behavior: "smooth" });
+  plansSection.value?.scrollIntoView({ behavior: "smooth" })
 }
 
 function selectPlan(plan) {
-  localStorage.setItem("selectedPlan", plan);
-  router.push("/auth?mode=signup");
+  localStorage.setItem("selectedPlan", plan)
+  router.push("/auth?mode=signup")
 }
 </script>
