@@ -217,6 +217,33 @@
           </div>
         </Transition>
 
+        <!-- ── PAIEMENTS ─────────────────────────────────────── -->
+        <div class="db-payments-card">
+          <h2 class="db-payments-title">💳 Paiements</h2>
+          <div class="db-payments-row">
+
+            <!-- FREE → bouton Upgrade Pro -->
+            <div v-if="userData?.plan === 'free'" class="db-payment-block">
+              <p class="db-payment-desc">Passez au plan Pro pour activer Stripe et recevoir des paiements.</p>
+              <button @click="upgradeToPro" class="db-btn db-btn-upgrade">
+                🚀 Passer à Pro
+              </button>
+            </div>
+
+            <!-- PRO → bouton Stripe Connect -->
+            <div v-if="userData?.plan !== 'free'" class="db-payment-block">
+              <p class="db-payment-desc">
+                <span v-if="hasPaymentConfig" class="db-stripe-ok">✓ Stripe connecté</span>
+                <span v-else>Connectez Stripe pour recevoir les paiements de vos clients.</span>
+              </p>
+              <button @click="connectStripe" class="db-btn db-btn-stripe">
+                💳 {{ hasPaymentConfig ? 'Reconfigurer Stripe' : 'Connecter Stripe' }}
+              </button>
+            </div>
+
+          </div>
+        </div>
+
         <!-- ── BUILDER ─────────────────────────────────────── -->
         <div class="db-builder-card">
           <div class="db-builder-left">
@@ -298,6 +325,8 @@ import { useRouter } from "vue-router"
 import { auth, db } from "../firebase"
 import { doc, getDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { signOut } from "firebase/auth"
+
+const BACKEND     = "https://backendfinal-production-afd2.up.railway.app"
 
 const router      = useRouter()
 const user        = ref(null)
@@ -447,6 +476,47 @@ const renewPlan = () => {
   const plan  = userData.value?.plan || "pro"
   const price = plan === "pro" ? 10 : 20
   router.push({ path: "/panier", query: { plan, price } })
+}
+
+// ── Upgrade vers Pro — logique originale ─────────────────────
+const upgradeToPro = async () => {
+  try {
+    const res  = await fetch(`${BACKEND}/create-billing-session`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email:    user.value.email,
+        plan:     "pro",
+        ownerUid: user.value.uid,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.url) { alert(data.error || "Erreur paiement"); return }
+    window.location.href = data.url
+  } catch(err) {
+    console.error(err)
+    alert("Erreur upgrade Pro")
+  }
+}
+
+// ── Stripe Connect — logique originale ───────────────────────
+const connectStripe = async () => {
+  try {
+    const res  = await fetch(`${BACKEND}/create-connect-account`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ownerUid: user.value.uid,
+        email:    user.value.email,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.url) { alert(data.error || "Erreur Stripe Connect"); return }
+    window.location.href = data.url
+  } catch(err) {
+    console.error(err)
+    alert("Erreur connexion Stripe")
+  }
 }
 
 const logout = async () => {
@@ -808,4 +878,26 @@ const exportOrdersCSV = () => {
   .db-search-input { width: 100%; }
   .db-order-main { flex-wrap: wrap; }
 }
+
+/* ── Section paiements ────────────────────────────────────── */
+.db-payments-card {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 18px; padding: 22px 24px;
+}
+.db-payments-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.db-payments-row   { display: flex; gap: 16px; flex-wrap: wrap; }
+.db-payment-block  { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 220px; }
+.db-payment-desc   { font-size: 13px; color: #8a8a9a; line-height: 1.5; }
+.db-stripe-ok      { color: #22c55e; font-weight: 600; }
+.db-btn-upgrade {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff; align-self: flex-start;
+}
+.db-btn-upgrade:hover { opacity: .9; transform: translateY(-1px); }
+.db-btn-stripe {
+  background: linear-gradient(135deg, #635bff, #4f46e5);
+  color: #fff; align-self: flex-start;
+}
+.db-btn-stripe:hover { opacity: .9; transform: translateY(-1px); }
 </style>
