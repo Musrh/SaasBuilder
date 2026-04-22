@@ -116,7 +116,7 @@ const API_URL = "https://backendfinal-production-afd2.up.railway.app"
 // ── Emails admin — connexion redirige vers /#/admin ───────────
 // Ces comptes doivent exister dans Firebase Auth
 // Pas de document Firestore requis pour l'admin
-const ADMIN_EMAILS = ["musrh@gmail.com"]
+const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
 // ── Chargement plan depuis query ou localStorage ───────────────
 onMounted(() => {
@@ -166,25 +166,9 @@ const redirectUser = async (user) => {
 
     const planExpired = expiry && expiry < Date.now()
 
-    // Plan FREE → dashboard basique
-    if (plan === "free") {
-      router.push("/dashboard")
-      return
-    }
-
-    // Plan payant mais pas encore payé → dashboard en attente
-    if (!paye) {
-      router.push("/dashboard")
-      return
-    }
-
-    // Plan payant + payé + non expiré → builder complet
-    if (!planExpired) {
-      router.push("/saasgenerator")
-      return
-    }
-
-    // Plan expiré → dashboard (renouvellement)
+    // Tous les cas → Dashboard
+    // Le Dashboard affiche les boutons Stripe Connect, Renouveler, et Accéder au Builder
+    // Le propriétaire Pro peut ensuite cliquer "Accéder au Builder →" depuis le Dashboard
     router.push("/dashboard")
 
   } catch (err) {
