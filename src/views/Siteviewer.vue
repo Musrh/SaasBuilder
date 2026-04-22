@@ -76,19 +76,27 @@ const resolvedUid  = ref("")
 const siteMeta     = ref({})          // { name, logo }
 const currentPageIndex = ref(0)
 
-// ── Pages légales publiées ───────────────────────────────────
-const svDefaultLegalPages = [
-  { key: "privacy", title: "Privacy Policy", enabled: true, content: "Décrivez ici comment votre boutique collecte, utilise et protège les données personnelles des visiteurs et clients." },
-  { key: "refund", title: "Remboursement", enabled: true, content: "Décrivez ici vos conditions de remboursement, délais, exceptions et procédure de demande." },
-  { key: "confidentialite", title: "Confidentialité", enabled: true, content: "Présentez ici vos engagements de confidentialité concernant les informations transmises par vos clients." },
-  { key: "mentions", title: "Mentions légales", enabled: true, content: "Indiquez ici l'identité du propriétaire du site, les coordonnées, l'hébergeur et les informations légales obligatoires." },
-  { key: "conditions", title: "Conditions générales", enabled: true, content: "Ajoutez ici vos conditions générales de vente ou d'utilisation : commandes, paiements, livraison, responsabilités et litiges." },
+
+// ── Pages légales affichées dans le footer ───────────────────
+const defaultLegalPages = [
+  { key:"privacy", title:"Privacy Policy", enabled:true, content:"Politique de confidentialité\n\nCette boutique collecte uniquement les informations nécessaires au traitement des commandes et du service client." },
+  { key:"refund", title:"Remboursement", enabled:true, content:"Politique de remboursement\n\nLes demandes sont étudiées selon les conditions commerciales du store." },
+  { key:"confidentialite", title:"Confidentialité", enabled:true, content:"Confidentialité\n\nLes données personnelles sont traitées de manière confidentielle." },
+  { key:"mentions", title:"Mentions légales", enabled:true, content:"Mentions légales\n\nInformations légales à compléter par le propriétaire du store." },
+  { key:"conditions", title:"Conditions générales", enabled:true, content:"Conditions générales\n\nToute commande implique l'acceptation des conditions générales du store." },
 ]
-const svLegalPages = ref(svDefaultLegalPages.map(p => ({ ...p })))
-const svActiveLegalPage = ref(null)
-const svVisibleLegalPages = computed(() => svLegalPages.value.filter(p => p.enabled !== false))
-const svNormalizeLegalPages = (pages = []) => svDefaultLegalPages.map(def => ({ ...def, ...(pages.find(p => p.key === def.key) || {}) }))
-const svOpenLegalPage = (page) => { svActiveLegalPage.value = page }
+const normalizeLegalPages = (pages) => {
+  const list = Array.isArray(pages) ? pages : Object.values(pages || {})
+  return defaultLegalPages.map((def) => {
+    const saved = list.find((p) => p.key === def.key || p.title === def.title) || {}
+    return { ...def, ...saved, enabled: saved.enabled !== false, content: saved.content || def.content }
+  })
+}
+const legalPages = ref(normalizeLegalPages())
+const visibleLegalPages = computed(() => legalPages.value.filter((p) => p.enabled))
+const showLegalPage = ref(false)
+const activeLegalPage = ref(null)
+const openLegalPage = (page) => { activeLegalPage.value = page; showLegalPage.value = true }
 
 // ── Config paiement du store ──────────────────────────────────
 const storePayConfig = ref({ stripe: null, paypal: null })
@@ -250,8 +258,8 @@ const loadSite = async () => {
       if (data.siteData) {
         // ✅ UID direct avec siteData
         site.value           = data.siteData
+        legalPages.value     = normalizeLegalPages(data.legalPages || data.siteData?.legalPages)
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
-        svLegalPages.value   = svNormalizeLegalPages(data.legalPages || [])
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false }
         await loadPayConfig(uid)
@@ -289,8 +297,8 @@ const loadSite = async () => {
         // ✅ Slug résolu avec succès
         const rd             = realSnap.data()
         site.value           = rd.siteData
+        legalPages.value     = normalizeLegalPages(rd.legalPages || rd.siteData?.legalPages)
         siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
-        svLegalPages.value   = svNormalizeLegalPages(rd.legalPages || [])
         resolvedUid.value    = realUid
         storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false }
         await loadPayConfig(realUid)
@@ -1170,6 +1178,32 @@ const saveOrder = async (provider, transactionId) => {
       </template>
     </main>
 
+    <!-- FOOTER PAGES LÉGALES -->
+    <footer v-if="visibleLegalPages.length" class="sv-footer-legal">
+      <button
+        v-for="page in visibleLegalPages"
+        :key="page.key"
+        type="button"
+        class="sv-footer-link"
+        @click="openLegalPage(page)"
+      >
+        {{ page.title }}
+      </button>
+    </footer>
+
+    <Transition name="sv-modal">
+      <div v-if="showLegalPage && activeLegalPage" class="sv-modal-overlay sv-legal-overlay" @click.self="showLegalPage=false">
+        <div class="sv-modal-box sv-legal-box">
+          <button class="sv-modal-close" @click="showLegalPage=false">✕</button>
+          <div class="sv-modal-header">
+            <span>⚖</span>
+            <h2>{{ activeLegalPage.title }}</h2>
+          </div>
+          <div class="sv-legal-content">{{ activeLegalPage.content }}</div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- ── MODAL PANIER 2 ÉTAPES (panier → livraison → paiement) -->
     <Transition name="sv-modal">
       <div v-if="showCart" class="sv-modal-overlay sv-cart-overlay"
@@ -1619,6 +1653,15 @@ const saveOrder = async (provider, transactionId) => {
 /* DIVIDER */
 .sv-divider hr{border:none;border-top:1px solid #e5e7eb;margin:8px 60px}
 
+
+/* FOOTER PAGES LÉGALES */
+.sv-footer-legal{border-top:1px solid #e5e7eb;background:#fafafa;padding:28px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.sv-footer-link{width:100%;max-width:360px;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:11px 14px;color:#374151;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:normal;overflow-wrap:anywhere}
+.sv-footer-link:hover{border-color:#6c63ff;color:#6c63ff;background:#f8f7ff}
+.sv-legal-box{max-width:680px}
+.sv-legal-content{white-space:pre-line;color:#374151;line-height:1.75;font-size:15px}
+@media(max-width:480px){.sv-footer-legal{padding:22px 12px}.sv-footer-link{font-size:13px;padding:10px 12px}}
+
 /* MODALS */
 .sv-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:16px 20px;overflow-y:auto}
 .sv-modal-box{background:white;border-radius:16px;padding:32px;position:relative;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.18)}
@@ -1848,12 +1891,4 @@ const saveOrder = async (provider, transactionId) => {
 .sv-pay-btn:hover   { background: var(--theme-accent-hover) !important; }
 .sv-form-btn        { background: var(--theme-accent) !important; border-radius: var(--theme-btn-radius) !important; }
 .sv-tab.active      { background: var(--theme-accent) !important; color: #fff !important; }
-
-/* PAGES LÉGALES PUBLIÉES */
-.sv-legal-footer{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:26px 20px;background:#f9fafb;border-top:1px solid #e5e7eb}
-.sv-legal-link{background:none;border:none;color:#6c63ff;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif}
-.sv-legal-link:hover{color:#4f46e5}
-.sv-legal-modal{max-width:720px}
-.sv-legal-content{white-space:pre-line;color:#374151;font-size:14px;line-height:1.8;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:18px}
-
 </style>
