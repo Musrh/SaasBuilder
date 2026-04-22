@@ -76,6 +76,20 @@ const resolvedUid  = ref("")
 const siteMeta     = ref({})          // { name, logo }
 const currentPageIndex = ref(0)
 
+// ── Pages légales publiées ───────────────────────────────────
+const svDefaultLegalPages = [
+  { key: "privacy", title: "Privacy Policy", enabled: true, content: "Décrivez ici comment votre boutique collecte, utilise et protège les données personnelles des visiteurs et clients." },
+  { key: "refund", title: "Remboursement", enabled: true, content: "Décrivez ici vos conditions de remboursement, délais, exceptions et procédure de demande." },
+  { key: "confidentialite", title: "Confidentialité", enabled: true, content: "Présentez ici vos engagements de confidentialité concernant les informations transmises par vos clients." },
+  { key: "mentions", title: "Mentions légales", enabled: true, content: "Indiquez ici l'identité du propriétaire du site, les coordonnées, l'hébergeur et les informations légales obligatoires." },
+  { key: "conditions", title: "Conditions générales", enabled: true, content: "Ajoutez ici vos conditions générales de vente ou d'utilisation : commandes, paiements, livraison, responsabilités et litiges." },
+]
+const svLegalPages = ref(svDefaultLegalPages.map(p => ({ ...p })))
+const svActiveLegalPage = ref(null)
+const svVisibleLegalPages = computed(() => svLegalPages.value.filter(p => p.enabled !== false))
+const svNormalizeLegalPages = (pages = []) => svDefaultLegalPages.map(def => ({ ...def, ...(pages.find(p => p.key === def.key) || {}) }))
+const svOpenLegalPage = (page) => { svActiveLegalPage.value = page }
+
 // ── Config paiement du store ──────────────────────────────────
 const storePayConfig = ref({ stripe: null, paypal: null })
 
@@ -237,6 +251,7 @@ const loadSite = async () => {
         // ✅ UID direct avec siteData
         site.value           = data.siteData
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
+        svLegalPages.value   = svNormalizeLegalPages(data.legalPages || [])
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false }
         await loadPayConfig(uid)
@@ -275,6 +290,7 @@ const loadSite = async () => {
         const rd             = realSnap.data()
         site.value           = rd.siteData
         siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
+        svLegalPages.value   = svNormalizeLegalPages(rd.legalPages || [])
         resolvedUid.value    = realUid
         storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false }
         await loadPayConfig(realUid)
@@ -1832,4 +1848,12 @@ const saveOrder = async (provider, transactionId) => {
 .sv-pay-btn:hover   { background: var(--theme-accent-hover) !important; }
 .sv-form-btn        { background: var(--theme-accent) !important; border-radius: var(--theme-btn-radius) !important; }
 .sv-tab.active      { background: var(--theme-accent) !important; color: #fff !important; }
+
+/* PAGES LÉGALES PUBLIÉES */
+.sv-legal-footer{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:26px 20px;background:#f9fafb;border-top:1px solid #e5e7eb}
+.sv-legal-link{background:none;border:none;color:#6c63ff;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif}
+.sv-legal-link:hover{color:#4f46e5}
+.sv-legal-modal{max-width:720px}
+.sv-legal-content{white-space:pre-line;color:#374151;font-size:14px;line-height:1.8;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:18px}
+
 </style>
