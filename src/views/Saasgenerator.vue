@@ -34,22 +34,6 @@ const configEditorTarget = ref("stripe")
 const configEditorContent = ref("")
 const showExportModal = ref(false)
 
-
-// ===== PAGES LÉGALES DU STORE =====
-const showLegalPagesModal = ref(false)
-const activeLegalKey = ref("privacy")
-const legalPagesConfiguredAt = ref("")
-const defaultLegalPages = [
-  { key: "privacy", title: "Privacy Policy", enabled: true, content: "Décrivez ici comment votre boutique collecte, utilise et protège les données personnelles des visiteurs et clients." },
-  { key: "refund", title: "Remboursement", enabled: true, content: "Décrivez ici vos conditions de remboursement, délais, exceptions et procédure de demande." },
-  { key: "confidentialite", title: "Confidentialité", enabled: true, content: "Présentez ici vos engagements de confidentialité concernant les informations transmises par vos clients." },
-  { key: "mentions", title: "Mentions légales", enabled: true, content: "Indiquez ici l'identité du propriétaire du site, les coordonnées, l'hébergeur et les informations légales obligatoires." },
-  { key: "conditions", title: "Conditions générales", enabled: true, content: "Ajoutez ici vos conditions générales de vente ou d'utilisation : commandes, paiements, livraison, responsabilités et litiges." },
-]
-const legalPages = ref(defaultLegalPages.map(p => ({ ...p })))
-const activeLegalPage = computed(() => legalPages.value.find(p => p.key === activeLegalKey.value) || legalPages.value[0])
-const legalPagesConfigured = computed(() => !!legalPagesConfiguredAt.value)
-
 // ===== I18N =====
 const currentLang = ref("fr")
 const langs = [
@@ -426,6 +410,88 @@ const siteName = ref("WellShoppings")
 
 // ===== LOGO =====
 const siteLogo = ref("")
+
+
+// ===== PAGES LÉGALES (footer du site publié) =====
+const defaultLegalPages = [
+  {
+    key: "privacy",
+    title: "Privacy Policy",
+    enabled: true,
+    content: "Politique de confidentialité\n\nCette boutique collecte uniquement les informations nécessaires au traitement des commandes, au service client et à l'amélioration de l'expérience utilisateur. Les données ne sont jamais revendues à des tiers."
+  },
+  {
+    key: "refund",
+    title: "Remboursement",
+    enabled: true,
+    content: "Politique de remboursement\n\nLe client peut demander un remboursement selon les conditions commerciales affichées sur le site. Les demandes sont étudiées sous 30 jours après réception des informations nécessaires."
+  },
+  {
+    key: "confidentialite",
+    title: "Confidentialité",
+    enabled: true,
+    content: "Confidentialité\n\nLes informations personnelles sont traitées avec confidentialité et utilisées uniquement pour la gestion de la relation client, des commandes et des communications liées au store."
+  },
+  {
+    key: "mentions",
+    title: "Mentions légales",
+    enabled: true,
+    content: "Mentions légales\n\nÉditeur du site : à compléter par le propriétaire du store.\nContact : à compléter.\nHébergement : GitHub Pages / solution choisie par le propriétaire du store."
+  },
+  {
+    key: "conditions",
+    title: "Conditions générales",
+    enabled: true,
+    content: "Conditions générales\n\nToute commande passée sur ce site implique l'acceptation des présentes conditions générales. Le propriétaire du store doit adapter ce contenu à son activité, ses produits, ses délais et ses obligations légales."
+  },
+]
+
+const normalizeLegalPages = (pages) => {
+  const list = Array.isArray(pages) ? pages : Object.values(pages || {})
+  return defaultLegalPages.map((def) => {
+    const saved = list.find((p) => p.key === def.key || p.title === def.title) || {}
+    return {
+      ...def,
+      ...saved,
+      enabled: saved.enabled !== false,
+      content: saved.content || def.content,
+    }
+  })
+}
+
+const legalPages = ref(normalizeLegalPages())
+const showLegalPagesModal = ref(false)
+const activeLegalPageKey = ref("privacy")
+const activeLegalPage = computed(() => legalPages.value.find((p) => p.key === activeLegalPageKey.value) || legalPages.value[0])
+const visibleLegalPages = computed(() => legalPages.value.filter((p) => p.enabled))
+const legalPagesConfigured = computed(() => legalPages.value.some((p) => p.configuredAt))
+
+const openLegalPagesModal = () => {
+  activeLegalPageKey.value = legalPages.value[0]?.key || "privacy"
+  showLegalPagesModal.value = true
+}
+
+const saveLegalPages = async () => {
+  if (!currentUser.value) { notify("Connectez-vous d'abord.", "error"); return }
+  const now = new Date().toISOString()
+  legalPages.value = legalPages.value.map((p) => ({ ...p, configuredAt: p.configuredAt || now, updatedAt: now }))
+  try {
+    await setDoc(doc(db, "users", currentUser.value.uid), {
+      legalPages: legalPages.value,
+      legalPagesConfigured: true,
+      legalPagesConfiguredAt: now,
+      siteData: site.value,
+      siteName: siteName.value,
+      siteLogo: siteLogo.value,
+    }, { merge: true })
+    localStorage.setItem("legalPages", JSON.stringify(legalPages.value))
+    notify("✓ Pages légales sauvegardées — elles apparaîtront dans le footer du site publié")
+    showLegalPagesModal.value = false
+  } catch (e) {
+    console.error("Erreur pages légales:", e)
+    notify("Erreur de sauvegarde des pages légales.", "error")
+  }
+}
 const uploadLogo = (e) => {
   const file = e.target.files[0]; if (!file) return
   const reader = new FileReader()
@@ -483,12 +549,12 @@ const publishSite = async () => {
       siteData: site.value,
       siteName: siteName.value,
       siteLogo: siteLogo.value,
+      legalPages: legalPages.value,
+      legalPagesConfigured: legalPagesConfigured.value,
+      legalPagesConfiguredAt: legalPagesConfigured.value ? new Date().toISOString() : null,
       publishedSlug: slug,
       publishedAt: new Date().toISOString(),
       customDomain: domain || null,
-      legalPages: normalizeLegalPages(legalPages.value),
-      legalPagesConfigured: legalPagesConfigured.value,
-      legalPagesConfiguredAt: legalPagesConfiguredAt.value || null,
     }, { merge: true })
 
     // 2. Créer l'entrée dans la collection publique slugs/{slug} → uid
@@ -658,36 +724,6 @@ const exportCurrentTheme = () => {
   notify("✅ Thème exporté !", "success")
 }
 
-
-const normalizeLegalPages = (pages = []) => defaultLegalPages.map(def => ({
-  ...def,
-  ...(pages.find(p => p.key === def.key) || {}),
-}))
-
-const openLegalPagesConfig = () => {
-  activeLegalKey.value = legalPages.value[0]?.key || "privacy"
-  showLegalPagesModal.value = true
-}
-
-const saveLegalPagesConfig = async () => {
-  if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
-  try {
-    const configuredAt = new Date().toISOString()
-    legalPages.value = normalizeLegalPages(legalPages.value)
-    await setDoc(doc(db, "users", currentUser.value.uid), {
-      legalPages: legalPages.value,
-      legalPagesConfiguredAt: configuredAt,
-      legalPagesConfigured: true,
-    }, { merge: true })
-    legalPagesConfiguredAt.value = configuredAt
-    notify("Pages légales sauvegardées ✓")
-    showLegalPagesModal.value = false
-  } catch (e) {
-    console.error("Erreur pages légales:", e)
-    notify("Erreur de sauvegarde des pages légales.", "error")
-  }
-}
-
 onMounted(() => {
   // Restaurer depuis localStorage immédiatement (avant Firestore)
   const sn = localStorage.getItem("siteName")
@@ -705,10 +741,7 @@ onMounted(() => {
         const d = snap.data()
         if (d.siteName) siteName.value = d.siteName
         if (d.siteLogo) siteLogo.value = d.siteLogo
-        legalPages.value = normalizeLegalPages(d.legalPages || [])
-        legalPagesConfiguredAt.value = d.legalPagesConfiguredAt || ""
-        if (d.publishedSlug) { publishAddress.value = d.publishedSlug; publishInfo.value = { slug: d.publishedSlug, urlSlug: `https://musrh.github.io/SaasBuilder/#/site/${d.publishedSlug}`, urlUid: `https://musrh.github.io/SaasBuilder/#/site/${user.uid}`, domain: d.customDomain || "", uid: user.uid } }
-        if (d.customDomain) publishDomain.value = d.customDomain
+        if (d.legalPages) legalPages.value = normalizeLegalPages(d.legalPages)
 
         if (d.siteData) {
           // Utilisateur existant → charger son site sauvegardé
@@ -772,8 +805,15 @@ const saveSite = async () => {
   isSaving.value = true
   try {
     const docRef = doc(db, "users", currentUser.value.uid)
-    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value, legalPages: normalizeLegalPages(legalPages.value), legalPagesConfiguredAt: legalPagesConfiguredAt.value || null, legalPagesConfigured: legalPagesConfigured.value }, { merge: true })
+    await setDoc(docRef, {
+      siteData: site.value,
+      siteName: siteName.value,
+      siteLogo: siteLogo.value,
+      legalPages: legalPages.value,
+      legalPagesConfigured: legalPagesConfigured.value,
+    }, { merge: true })
     localStorage.setItem("siteDataPro", JSON.stringify(site.value))
+    localStorage.setItem("legalPages", JSON.stringify(legalPages.value))
     isSaved.value = true
     notify(t.value.saved)
   } catch (e) {
@@ -1368,6 +1408,15 @@ function openCart()       { document.getElementById('cart-overlay').style.displa
 function closeCart()      { document.getElementById('cart-overlay').style.display='none' }
 function checkout()       { alert('Intégrez votre solution de paiement (Stripe, PayPal...) dans cette section.') }
 function handleForm(e)    { e.preventDefault(); alert('Message envoyé ! (Configurez un endpoint email de votre côté)') }
+const legalPages = ${legalPagesJson};
+function openLegalPage(key) {
+  const page = legalPages.find(p => p.key === key);
+  if (!page) return;
+  document.getElementById('legal-modal-title').textContent = page.title;
+  document.getElementById('legal-modal-content').textContent = page.content || '';
+  document.getElementById('legal-modal').style.display = 'flex';
+}
+function closeLegalPage() { document.getElementById('legal-modal').style.display = 'none'; }
 
 // ── Navigation ───────────────────────────────────────────────
 document.querySelectorAll('nav a').forEach(a => {
@@ -1411,22 +1460,25 @@ updateCartUI()
   body { background: var(--bg); color: var(--text); font-family: var(--body-font); }
 
 
-/* ══ PAGES LÉGALES ═══════════════════════════════════════════ */
-.legal-pages-modal{max-width:860px;width:94%;max-height:88vh;overflow-y:auto}
-.legal-editor-layout{display:grid;grid-template-columns:220px 1fr;gap:14px;margin-top:16px}
+
+/* PAGES LÉGALES */
+.legal-top-btn{white-space:nowrap}
+.legal-modal{max-width:920px}
+.legal-editor-layout{display:grid;grid-template-columns:240px 1fr;gap:16px;min-height:420px}
 .legal-tabs{display:flex;flex-direction:column;gap:8px}
-.legal-tab{background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:10px 12px;text-align:left;cursor:pointer;font-size:13px;font-weight:600}
-.legal-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.legal-tab{border:1px solid var(--border,#e5e7eb);background:var(--surface,#fff);border-radius:12px;padding:12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px;color:var(--text,#1a1a2e)}
+.legal-tab.active{border-color:var(--primary,#6c63ff);box-shadow:0 0 0 3px rgba(108,99,255,.12)}
+.legal-tab small{color:var(--text3,#6b7280);font-size:11px}
 .legal-editor-panel{display:flex;flex-direction:column;gap:10px}
-.legal-toggle{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:13px}
-.legal-title-input,.legal-content-textarea{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:11px 13px;font-family:'DM Sans',sans-serif;outline:none}
-.legal-content-textarea{min-height:280px;resize:vertical;line-height:1.6}
-.publish-config-status{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin:8px 0;display:flex;flex-direction:column;gap:8px}
-.pcs-row{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--text2);align-items:center;flex-wrap:wrap}
-.pcs-row a,.pcs-row strong{color:var(--accent2);font-weight:700;word-break:break-all}
-.prev-legal-footer{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:24px;background:#f9fafb;border-top:1px solid #e5e7eb}
-.prev-legal-footer button{background:none;border:none;color:#6c63ff;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline}
-@media(max-width:700px){.legal-editor-layout{grid-template-columns:1fr}.legal-tabs{display:grid;grid-template-columns:1fr 1fr}.legal-tab{font-size:12px}}
+.legal-check{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2,#374151)}
+.legal-field-label{font-size:12px;font-weight:700;color:var(--text2,#374151)}
+.legal-textarea{min-height:300px;resize:vertical;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:14px;font-family:inherit;line-height:1.6;color:var(--text,#1a1a2e);background:var(--surface,#fff)}
+.legal-publish-status{border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;background:var(--surface2,#f8fafc);margin-bottom:12px}
+.legal-publish-status strong{font-size:13px;color:var(--text,#1a1a2e)}
+.legal-publish-status span{font-size:12px;color:var(--text3,#6b7280)}
+.legal-publish-status.ok{border-color:#22c55e;background:#f0fdf4}
+.legal-publish-status .btn-action{grid-row:1 / span 2;grid-column:2}
+@media(max-width:760px){.legal-editor-layout{grid-template-columns:1fr}.legal-tabs{max-height:180px;overflow:auto}.legal-publish-status{grid-template-columns:1fr}.legal-publish-status .btn-action{grid-row:auto;grid-column:auto}}
 
 </style>
 </head>
@@ -1441,8 +1493,16 @@ ${sectionsHtml}
 </main>
 ${cartHtml}
 <footer class="site-footer">
+  <div class="site-footer-links">${footerLegalLinks}</div>
   <p>© ${new Date().getFullYear()} ${name} — Créé avec SaasBuilder</p>
 </footer>
+<div id="legal-modal" class="legal-modal-overlay" onclick="if(event.target===this)closeLegalPage()" style="display:none">
+  <div class="legal-modal-box">
+    <button class="legal-modal-close" onclick="closeLegalPage()">✕</button>
+    <h2 id="legal-modal-title"></h2>
+    <div id="legal-modal-content" class="legal-modal-content"></div>
+  </div>
+</div>
 ${scriptHtml}
 </body>
 </html>`
@@ -1554,7 +1614,15 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 .cart-checkout-btn:hover{background:var(--accent-h)}
 
 /* FOOTER */
-.site-footer{text-align:center;padding:24px;font-size:13px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt)}
+.site-footer{text-align:center;padding:28px 18px;font-size:13px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt);display:flex;flex-direction:column;align-items:center;gap:16px}
+.site-footer-links{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:360px}
+.legal-footer-link{width:100%;background:transparent;border:0;color:var(--text);font:inherit;font-weight:600;cursor:pointer;padding:8px 10px;border-radius:8px;text-align:center}
+.legal-footer-link:hover{background:var(--bg);color:var(--accent)}
+.legal-modal-overlay{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:18px}
+.legal-modal-box{background:var(--bg);color:var(--text);width:min(680px,100%);max-height:86vh;overflow:auto;border-radius:16px;padding:26px;position:relative;box-shadow:0 24px 70px rgba(0,0,0,.24)}
+.legal-modal-close{position:absolute;top:12px;right:12px;border:0;background:var(--bg-alt);color:var(--text);width:32px;height:32px;border-radius:50%;cursor:pointer}
+.legal-modal-box h2{font-family:var(--hero-font);margin-bottom:14px}
+.legal-modal-content{white-space:pre-line;line-height:1.7;color:var(--text-sub)}
 
 /* RESPONSIVE */
 @media(max-width:600px){
@@ -1858,6 +1926,52 @@ const setPageStyle = (type, value) => {
     </div>
   </Transition>
 
+
+
+  <!-- PAGES LÉGALES MODAL -->
+  <Transition name="modal">
+    <div v-if="showLegalPagesModal" class="modal-overlay" @click.self="showLegalPagesModal=false">
+      <div class="modal-box legal-modal">
+        <button class="modal-close" @click="showLegalPagesModal=false">✕</button>
+        <div class="modal-header">
+          <span class="modal-icon">⚖</span>
+          <h2>Pages du footer</h2>
+          <p class="modal-desc">Modifiez les contenus par défaut. Les pages activées apparaissent dans le footer du site publié.</p>
+        </div>
+
+        <div class="legal-editor-layout">
+          <div class="legal-tabs">
+            <button
+              v-for="p in legalPages"
+              :key="p.key"
+              :class="['legal-tab', { active: activeLegalPageKey === p.key }]"
+              @click="activeLegalPageKey = p.key"
+            >
+              <span>{{ p.title }}</span>
+              <small>{{ p.enabled ? 'Visible footer' : 'Masquée' }}</small>
+            </button>
+          </div>
+
+          <div v-if="activeLegalPage" class="legal-editor-panel">
+            <label class="legal-check">
+              <input type="checkbox" v-model="activeLegalPage.enabled" />
+              Afficher cette page dans le footer du site publié
+            </label>
+            <label class="legal-field-label">Titre affiché</label>
+            <input v-model="activeLegalPage.title" class="pub-input" />
+            <label class="legal-field-label">Contenu de la page</label>
+            <textarea v-model="activeLegalPage.content" class="legal-textarea" spellcheck="true"></textarea>
+          </div>
+        </div>
+
+        <div class="config-modal-actions">
+          <button class="btn-action" @click="showLegalPagesModal=false">Annuler</button>
+          <button class="btn-action primary" @click="saveLegalPages">✓ Valider les modifications</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
   <!-- PUBLISH MODAL -->
   <Transition name="modal">
     <div v-if="showPublishModal" class="modal-overlay" @click.self="showPublishModal=false" :dir="isRtl?'rtl':'ltr'">
@@ -1870,6 +1984,11 @@ const setPageStyle = (type, value) => {
         </div>
 
         <div v-if="publishStatus !== 'published'" class="publish-form">
+          <div class="legal-publish-status" :class="{ ok: legalPagesConfigured }">
+            <strong>⚖ Pages du footer</strong>
+            <span>{{ legalPagesConfigured ? 'Déjà configurées ✓' : 'Configuration par défaut active' }}</span>
+            <button type="button" class="btn-action small" @click="openLegalPagesModal">Modifier</button>
+          </div>
           <div class="pub-field">
             <label>{{ t.siteAddress }}</label>
             <div class="pub-url-wrap">
@@ -1887,11 +2006,6 @@ const setPageStyle = (type, value) => {
           <div class="pub-field">
             <label>{{ t.domainLink }}</label>
             <input v-model="publishDomain" class="pub-input" :placeholder="t.domainPlaceholder"/>
-          </div>
-
-          <div v-if="publishInfo || legalPagesConfigured" class="publish-config-status">
-            <div v-if="publishInfo" class="pcs-row"><span>🔗 Site publié</span><a :href="publishInfo.urlSlug" target="_blank">{{ publishInfo.urlSlug }}</a></div>
-            <div class="pcs-row"><span>📄 Pages légales</span><strong>{{ legalPagesConfigured ? 'Configurées ✓' : 'À configurer' }}</strong></div>
           </div>
 
           <button class="pay-submit stripe-submit" @click="publishSite" style="margin-top:8px">
@@ -2163,7 +2277,7 @@ const setPageStyle = (type, value) => {
       <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
       <button class="btn-action icon-btn btn-theme-pick" @click="showThemeModal=true" title="Thème du site">🎨</button>
-      <button class="btn-action" @click="openLegalPagesConfig" title="Configurer les pages légales">📄 Pages légales</button>
+      <button class="btn-action legal-top-btn" @click="openLegalPagesModal" title="Pages du footer">⚖ Pages légales</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -2475,47 +2589,9 @@ const setPageStyle = (type, value) => {
           </div>
         </template>
       </div>
-      <footer class="prev-legal-footer">
-        <button v-for="page in legalPages.filter(p => p.enabled)" :key="page.key" @click="activeLegalKey=page.key; showLegalPagesModal=true">
-          {{ page.title }}
-        </button>
-      </footer>
     </main>
   </div>
 </div>
-
-
-  <!-- ── MODAL PAGES LÉGALES ─────────────────────────────────── -->
-  <Transition name="modal">
-    <div v-if="showLegalPagesModal" class="modal-overlay" @click.self="showLegalPagesModal=false">
-      <div class="modal-box legal-pages-modal">
-        <button class="modal-close" @click="showLegalPagesModal=false">✕</button>
-        <div class="modal-header">
-          <span class="modal-icon">📄</span>
-          <h2>Pages légales du store</h2>
-          <p class="modal-desc">Modifiez le contenu par défaut puis validez. Ces pages apparaîtront automatiquement dans le footer du site publié.</p>
-        </div>
-
-        <div class="legal-editor-layout">
-          <div class="legal-tabs">
-            <button v-for="page in legalPages" :key="page.key" class="legal-tab" :class="{active: activeLegalKey===page.key}" @click="activeLegalKey=page.key">
-              {{ page.title }}
-            </button>
-          </div>
-          <div v-if="activeLegalPage" class="legal-editor-panel">
-            <label class="legal-toggle"><input type="checkbox" v-model="activeLegalPage.enabled"/> Afficher dans le footer publié</label>
-            <input v-model="activeLegalPage.title" class="legal-title-input" placeholder="Titre de la page"/>
-            <textarea v-model="activeLegalPage.content" class="legal-content-textarea" spellcheck="true"/>
-          </div>
-        </div>
-
-        <div class="config-modal-actions">
-          <button class="btn-action" @click="showLegalPagesModal=false">Annuler</button>
-          <button class="btn-action primary" @click="saveLegalPagesConfig">✅ Valider les modifications</button>
-        </div>
-      </div>
-    </div>
-  </Transition>
 
   <!-- ── MODAL THÈME ─────────────────────────────────────── -->
   <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false; themeImportError=''">
