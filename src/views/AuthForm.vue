@@ -125,11 +125,10 @@ onMounted(() => {
     localStorage.getItem("planChoisi") ||
     "free"
 
-  // Si déjà connecté → rediriger intelligemment
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) return
-    await redirectUser(user)
-  })
+  // NE PAS rediriger automatiquement au chargement de /auth
+  // L'utilisateur doit cliquer sur "Se connecter" ou "S'inscrire"
+  // pour déclencher la redirection. Cela évite les redirections
+  // non désirées (ex: session admin persistante qui force /#/admin)
 })
 
 // ── Redirection selon le rôle ──────────────────────────────────
