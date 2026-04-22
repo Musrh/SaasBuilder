@@ -72,16 +72,25 @@
             </div>
           </div>
 
-          <div class="db-stat-card">
-            <div class="db-stat-icon" :class="hasPaymentConfig ? 'db-icon-green' : 'db-icon-yellow'">
-              {{ hasPaymentConfig ? '💳' : '⚙️' }}
+          <!-- Carte Stripe cliquable selon le plan -->
+          <div
+            class="db-stat-card"
+            :class="userData?.plan !== 'free' ? 'db-stat-card-clickable' : ''"
+            @click="userData?.plan !== 'free' ? connectStripe() : upgradeToPro()"
+            style="cursor:pointer"
+            :title="userData?.plan === 'free' ? 'Passer à Pro pour activer Stripe' : (hasPaymentConfig ? 'Reconfigurer Stripe' : 'Cliquez pour connecter Stripe')"
+          >
+            <div class="db-stat-icon" :class="hasPaymentConfig ? 'db-icon-green' : (userData?.plan === 'free' ? 'db-icon-gray' : 'db-icon-yellow')">
+              {{ hasPaymentConfig ? '💳' : (userData?.plan === 'free' ? '🔒' : '⚙️') }}
             </div>
             <div class="db-stat-body">
               <p class="db-stat-label">Store Stripe</p>
-              <p class="db-stat-val" :class="hasPaymentConfig ? 'db-val-green' : 'db-val-yellow'">
-                {{ hasPaymentConfig ? 'Configuré' : 'À configurer' }}
+              <p class="db-stat-val" :class="hasPaymentConfig ? 'db-val-green' : (userData?.plan === 'free' ? 'db-val-gray' : 'db-val-yellow')">
+                {{ hasPaymentConfig ? 'Configuré' : (userData?.plan === 'free' ? 'Plan Pro requis' : 'À configurer ▶') }}
               </p>
-              <p class="db-stat-sub">Paiements clients</p>
+              <p class="db-stat-sub">
+                {{ userData?.plan === 'free' ? 'Passez à Pro' : (hasPaymentConfig ? 'Cliquer pour reconfigurer' : 'Cliquez pour connecter') }}
+              </p>
             </div>
           </div>
 
@@ -219,24 +228,50 @@
 
         <!-- ── PAIEMENTS ─────────────────────────────────────── -->
         <div class="db-payments-card">
-          <h2 class="db-payments-title">💳 Paiements</h2>
+          <h2 class="db-payments-title">💳 Paiements & Abonnement</h2>
           <div class="db-payments-row">
 
-            <!-- FREE → bouton Upgrade Pro -->
-            <div v-if="userData?.plan === 'free'" class="db-payment-block">
-              <p class="db-payment-desc">Passez au plan Pro pour activer Stripe et recevoir des paiements.</p>
-              <button @click="upgradeToPro" class="db-btn db-btn-upgrade">
-                🚀 Passer à Pro
+            <!-- Toujours visible : statut plan + upgrade si free -->
+            <div class="db-payment-block">
+              <p class="db-stat-label" style="font-size:11px;color:#5a5a6a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Abonnement SaasBuilder</p>
+              <p class="db-payment-desc" style="margin-bottom:10px">
+                <span v-if="userData?.plan === 'free'">Plan <strong style="color:#9ca3af">Gratuit</strong> — fonctionnalités limitées.</span>
+                <span v-else>Plan <strong style="color:#60a5fa">{{ userData?.plan?.toUpperCase() }}</strong>
+                  — {{ userData?.paye ? '✓ Actif' : '⚠ Non payé' }}
+                </span>
+              </p>
+              <button
+                @click="upgradeToPro"
+                :disabled="isProActive"
+                class="db-btn db-btn-upgrade"
+                :title="isProActive ? 'Plan Pro déjà actif' : ''"
+              >
+                <span v-if="isProActive">✓ Plan Pro actif</span>
+                <span v-else-if="userData?.plan === 'free'">🚀 Passer à Pro — 10€/mois</span>
+                <span v-else>🔄 Renouveler l'abonnement</span>
               </button>
             </div>
 
-            <!-- PRO → bouton Stripe Connect -->
-            <div v-if="userData?.plan !== 'free'" class="db-payment-block">
-              <p class="db-payment-desc">
-                <span v-if="hasPaymentConfig" class="db-stripe-ok">✓ Stripe connecté</span>
-                <span v-else>Connectez Stripe pour recevoir les paiements de vos clients.</span>
+            <!-- Stripe Connect : visible selon plan -->
+            <div class="db-payment-block">
+              <p class="db-stat-label" style="font-size:11px;color:#5a5a6a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Paiements clients (Stripe)</p>
+              <p class="db-payment-desc" style="margin-bottom:10px">
+                <span v-if="userData?.plan === 'free'" style="color:#5a5a6a">
+                  🔒 Disponible avec le plan Pro.
+                </span>
+                <span v-else-if="hasPaymentConfig" class="db-stripe-ok">
+                  ✓ Stripe connecté — vos clients peuvent payer.
+                </span>
+                <span v-else>
+                  ⚠ Non configuré — connectez Stripe pour recevoir des paiements.
+                </span>
               </p>
-              <button @click="connectStripe" class="db-btn db-btn-stripe">
+              <button
+                @click="connectStripe"
+                :disabled="userData?.plan === 'free'"
+                class="db-btn db-btn-stripe"
+                :title="userData?.plan === 'free' ? 'Nécessite le plan Pro' : ''"
+              >
                 💳 {{ hasPaymentConfig ? 'Reconfigurer Stripe' : 'Connecter Stripe' }}
               </button>
             </div>
@@ -292,11 +327,11 @@
             </div>
           </button>
 
-          <button @click="goToPlans" class="db-action-card">
+          <button @click="showPlanModal=true" class="db-action-card">
             <span class="db-action-icon">⭐</span>
             <div>
               <p class="db-action-title">Changer de plan</p>
-              <p class="db-action-desc">Passez à Pro</p>
+              <p class="db-action-desc">{{ isProActive ? 'Pro actif ✓' : 'Passez à Pro' }}</p>
             </div>
           </button>
 
@@ -317,6 +352,93 @@
       </template>
     </main>
   </div>
+  <!-- ── MODAL CHOIX DE PLAN ────────────────────────────────── -->
+  <Transition name="db-slide">
+    <div v-if="showPlanModal" class="db-modal-overlay" @click.self="showPlanModal=false">
+      <div class="db-modal-box">
+
+        <button class="db-modal-close" @click="showPlanModal=false">✕</button>
+
+        <div class="db-modal-header">
+          <span class="db-modal-icon">⭐</span>
+          <h2 class="db-modal-title">Choisir votre plan</h2>
+          <p class="db-modal-sub">Sélectionnez le plan adapté à votre activité</p>
+        </div>
+
+        <!-- Cartes plans -->
+        <div class="db-plan-grid">
+
+          <!-- Plan FREE -->
+          <div
+            class="db-plan-card"
+            :class="{ 'db-plan-selected': planChoix === 'free', 'db-plan-current': userData?.plan === 'free' && !isProActive }"
+            @click="planChoix = 'free'"
+          >
+            <div class="db-plan-badge" v-if="userData?.plan === 'free' && !isProActive">Actuel</div>
+            <div class="db-plan-name">🆓 Gratuit</div>
+            <div class="db-plan-price">0€<span>/mois</span></div>
+            <ul class="db-plan-features">
+              <li>✓ 1 page</li>
+              <li>✓ Builder visuel</li>
+              <li>✗ Paiements clients</li>
+              <li>✗ Multi-pages</li>
+            </ul>
+          </div>
+
+          <!-- Plan PRO -->
+          <div
+            class="db-plan-card db-plan-pro"
+            :class="{ 'db-plan-selected': planChoix === 'pro', 'db-plan-current': isProActive }"
+            @click="planChoix = 'pro'"
+          >
+            <div class="db-plan-badge db-plan-badge-pro" v-if="isProActive">Actuel ✓</div>
+            <div class="db-plan-badge db-plan-badge-pro" v-else>Recommandé</div>
+            <div class="db-plan-name">⚡ Pro</div>
+            <div class="db-plan-price">10€<span>/mois</span></div>
+            <ul class="db-plan-features">
+              <li>✓ Multi-pages illimité</li>
+              <li>✓ Builder complet</li>
+              <li>✓ Paiements Stripe</li>
+              <li>✓ Catalogue produits</li>
+              <li>✓ Support prioritaire</li>
+            </ul>
+          </div>
+
+        </div>
+
+        <!-- Résumé du choix -->
+        <div class="db-plan-summary">
+          <div class="db-plan-summary-row">
+            <span>Plan sélectionné</span>
+            <strong :class="planChoix === 'pro' ? 'db-val-blue' : 'db-val-gray'">
+              {{ planChoix === 'pro' ? 'Pro — 10€/mois' : 'Gratuit — 0€' }}
+            </strong>
+          </div>
+          <div v-if="isProActive && planChoix === 'pro'" class="db-plan-already-active">
+            ✓ Ce plan est déjà actif sur votre compte
+          </div>
+        </div>
+
+        <!-- Bouton confirmation -->
+        <button
+          @click="confirmPlan"
+          :disabled="planLoading || planChoix === 'free' || (isProActive && planChoix === 'pro')"
+          class="db-btn db-btn-confirm"
+        >
+          <span v-if="planLoading">⏳ Redirection vers le paiement...</span>
+          <span v-else-if="planChoix === 'free'">Plan gratuit — aucun paiement requis</span>
+          <span v-else-if="isProActive && planChoix === 'pro'">✓ Plan Pro déjà actif</span>
+          <span v-else>Confirmer et payer 10€/mois →</span>
+        </button>
+
+        <p class="db-plan-note">
+          Paiement sécurisé via Stripe. Annulable à tout moment.
+        </p>
+
+      </div>
+    </div>
+  </Transition>
+
 </template>
 
 <script setup>
@@ -332,6 +454,11 @@ const router      = useRouter()
 const user        = ref(null)
 const userData    = ref(null)
 const loading     = ref(true)
+
+// ── Modal choix de plan ───────────────────────────────────────
+const showPlanModal  = ref(false)
+const planChoix      = ref("pro")    // plan sélectionné dans le modal
+const planLoading    = ref(false)
 
 // ── Commandes ──────────────────────────────────────────────────
 const orders        = ref([])
@@ -381,6 +508,15 @@ const planTextColor  = computed(() => ({
 const hasPaymentConfig = computed(() => {
   const cfg = userData.value?.storePaymentConfig?.stripe
   return cfg && cfg.publishableKey && cfg.publishableKey.length > 5
+})
+
+// Plan Pro actuellement actif (payé + non expiré)
+const isProActive = computed(() => {
+  const d = userData.value
+  if (!d) return false
+  if (d.plan === "free") return false
+  const notExpired = !d.expiry || d.expiry > Date.now()
+  return d.paye === true && notExpired
 })
 
 // ── Commandes filtrées ─────────────────────────────────────────
@@ -900,4 +1036,81 @@ const exportOrdersCSV = () => {
   color: #fff; align-self: flex-start;
 }
 .db-btn-stripe:hover { opacity: .9; transform: translateY(-1px); }
+
+.db-stat-card-clickable:hover {
+  border-color: rgba(108,99,255,.4) !important;
+  background: rgba(108,99,255,.08) !important;
+  transform: translateY(-2px);
+}
+
+/* ── Modal choix de plan ──────────────────────────────────── */
+.db-modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.db-modal-box {
+  background: #16162a; border: 1px solid rgba(255,255,255,.1);
+  border-radius: 20px; padding: 32px 28px;
+  width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto;
+  position: relative;
+}
+.db-modal-close {
+  position: absolute; top: 16px; right: 16px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1);
+  color: #8a8a9a; width: 30px; height: 30px; border-radius: 50%;
+  cursor: pointer; font-size: 13px; transition: .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.db-modal-close:hover { background: rgba(255,255,255,.15); color: #fff; }
+.db-modal-header { text-align: center; margin-bottom: 24px; }
+.db-modal-icon   { font-size: 36px; display: block; margin-bottom: 10px; }
+.db-modal-title  { font-size: 20px; font-weight: 700; color: #f0f0f0; margin-bottom: 6px; }
+.db-modal-sub    { font-size: 13px; color: #8a8a9a; }
+
+/* Grille des plans */
+.db-plan-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.db-plan-card    {
+  background: rgba(255,255,255,.04); border: 2px solid rgba(255,255,255,.08);
+  border-radius: 14px; padding: 18px 14px;
+  cursor: pointer; transition: .2s; position: relative;
+}
+.db-plan-card:hover { border-color: rgba(108,99,255,.4); background: rgba(108,99,255,.06); }
+.db-plan-selected { border-color: #6c63ff !important; background: rgba(108,99,255,.12) !important; }
+.db-plan-current  { border-color: #22c55e !important; }
+.db-plan-pro      { border-color: rgba(108,99,255,.25); }
+.db-plan-badge    {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  background: rgba(255,255,255,.15); color: #8a8a9a;
+  font-size: 10px; font-weight: 700; padding: 2px 10px;
+  border-radius: 100px; white-space: nowrap;
+}
+.db-plan-badge-pro { background: linear-gradient(135deg,#6c63ff,#a78bfa); color: #fff; }
+.db-plan-name    { font-size: 16px; font-weight: 700; margin-bottom: 6px; margin-top: 8px; }
+.db-plan-price   { font-size: 26px; font-weight: 800; color: #f0f0f0; margin-bottom: 12px; }
+.db-plan-price span { font-size: 13px; font-weight: 400; color: #8a8a9a; }
+.db-plan-features { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.db-plan-features li { font-size: 12px; color: #8a8a9a; }
+.db-plan-features li:first-child,
+.db-plan-features li:nth-child(2),
+.db-plan-features li:nth-child(3) { color: #f0f0f0; }
+
+/* Résumé + confirmation */
+.db-plan-summary {
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+}
+.db-plan-summary-row { display: flex; justify-content: space-between; font-size: 14px; color: #8a8a9a; }
+.db-plan-already-active { font-size: 12px; color: #22c55e; margin-top: 8px; font-weight: 600; }
+.db-btn-confirm {
+  width: 100%; padding: 14px; font-size: 15px; font-weight: 700;
+  border-radius: 12px; border: none; cursor: pointer; transition: .2s;
+  background: linear-gradient(135deg, #6c63ff, #4f46e5); color: #fff;
+  font-family: 'DM Sans', sans-serif;
+}
+.db-btn-confirm:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+.db-btn-confirm:disabled { opacity: .45; cursor: not-allowed; }
+.db-plan-note { text-align: center; font-size: 11px; color: #5a5a6a; margin-top: 10px; }
 </style>
