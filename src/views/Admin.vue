@@ -140,7 +140,7 @@
               <td class="adm-td-slug">
                 <a
                   v-if="owner.publishedSlug"
-                  :href="\`https://musrh.github.io/SaasBuilder/#/site/\${owner.publishedSlug}\`"
+                  :href="'https://musrh.github.io/SaasBuilder/#/site/' + owner.publishedSlug"
                   target="_blank"
                   class="adm-slug-link"
                 >
@@ -269,23 +269,18 @@ const toggleActive = async (owner) => {
   if (toggling.value) return   // éviter double-clic
   toggling.value = owner.id
   try {
-    // Lire la valeur actuelle depuis Firestore pour éviter désync
-    const snap = await import("firebase/firestore").then(m =>
-      m.getDoc(m.doc(db, "users", owner.id))
-    )
-    const currentActive = snap.exists() ? snap.data().active !== false : true
-    const newActive     = !currentActive
+    // Lire la valeur actuelle depuis Firestore (getDoc déjà importé)
+    const snap      = await getDoc(doc(db, "users", owner.id))
+    const current   = snap.exists() ? snap.data().active !== false : true
+    const newActive = !current
 
     await updateDoc(doc(db, "users", owner.id), { active: newActive })
 
     // Mettre à jour l'objet local APRÈS succès Firestore
     owner.active = newActive
-    showToast(newActive
-      ? `✅ ${owner.email} activé`
-      : `🔴 ${owner.email} désactivé`
-    )
+    showToast(newActive ? `✅ ${owner.email} activé` : `🔴 ${owner.email} désactivé`)
   } catch(e) {
-    showToast("Erreur toggleActive : " + e.message, "error")
+    showToast("Erreur : " + e.message, "error")
   } finally {
     toggling.value = null
   }
