@@ -472,13 +472,16 @@ const orderFilter   = ref("")
 const planExpired = computed(() => {
   if (!userData.value) return false
   if (userData.value.plan === "free") return false
-  return (userData.value.expiry || 0) < Date.now()
+  // Si expiry est null/absent → pas expiré (ex: passage Free→Pro sans expiry défini)
+  if (!userData.value.expiry) return false
+  return userData.value.expiry < Date.now()
 })
 
 const canAccessBuilder = computed(() => {
   if (!userData.value) return false
   if (userData.value.plan === "free") return true
-  return userData.value.paye && !planExpired.value
+  // Pro payé : accès même si expiry absent (passage Free→Pro récent)
+  return userData.value.paye === true && !planExpired.value
 })
 
 const expiryFormatted = computed(() => {
