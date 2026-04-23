@@ -204,7 +204,7 @@
 import { ref, computed, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth"
-import { collection, getDocs, doc, updateDoc, query, orderBy } from "firebase/firestore"
+import { collection, getDocs, getDoc, doc, updateDoc, query, orderBy } from "firebase/firestore"
 import { db } from "../firebase"
 
 // ── Email(s) admin autorisés ──────────────────────────────────
@@ -266,19 +266,19 @@ const loadOwners = async () => {
 
 // ── Activer / Désactiver un propriétaire ──────────────────────
 const toggleActive = async (owner) => {
-  if (toggling.value) return   // éviter double-clic
+  if (toggling.value === owner.id) return  // éviter double-clic
   toggling.value = owner.id
   try {
-    // Lire la valeur actuelle depuis Firestore (getDoc déjà importé)
-    const snap      = await getDoc(doc(db, "users", owner.id))
-    const current   = snap.exists() ? snap.data().active !== false : true
-    const newActive = !current
-
+    // Inverser l'état actuel
+    const newActive = owner.active === false ? true : false
     await updateDoc(doc(db, "users", owner.id), { active: newActive })
-
-    // Mettre à jour l'objet local APRÈS succès Firestore
+    // Mettre à jour l'objet local après succès
     owner.active = newActive
-    showToast(newActive ? `✅ ${owner.email} activé` : `🔴 ${owner.email} désactivé`)
+    showToast(
+      newActive
+        ? "✅ " + owner.email + " activé"
+        : "🔴 " + owner.email + " désactivé"
+    )
   } catch(e) {
     showToast("Erreur : " + e.message, "error")
   } finally {
@@ -288,21 +288,30 @@ const toggleActive = async (owner) => {
 
 // ── Changer le plan ───────────────────────────────────────────
 const changePlan = async (owner, newPlan) => {
+  if (owner.plan === newPlan) return  // pas de changement
   try {
+    const newExpiry = newPlan !== "free"
+      ? Date.now() + 30 * 24 * 60 * 60 * 1000   // +30 jours en ms
+      : null                                       // Free → pas d'expiry
+
     const update = {
       plan:   newPlan,
       paye:   newPlan !== "free",
-      // Toujours écrire expiry : Pro → 30 jours, Free → null
-      expiry: newPlan !== "free"
-        ? Date.now() + 30 * 24 * 60 * 60 * 1000
-        : null,
+      expiry: newExpiry,
+      active: true,   // réactiver si désactivé lors du changement de plan
     }
     await updateDoc(doc(db, "users", owner.id), update)
-    // Mettre à jour l'objet local
+
+    // Mettre à jour tous les champs locaux pour forcer le re-render Vue
     owner.plan   = newPlan
     owner.paye   = update.paye
-    owner.expiry = update.expiry
-    showToast(`✅ Plan de ${owner.email} → ${newPlan.toUpperCase()}`)
+    owner.expiry = newExpiry
+    owner.active = true
+
+    showToast(
+      "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
+      (newExpiry ? " (expire le " + formatDate(newExpiry) + ")" : "")
+    )
   } catch(e) {
     showToast("Erreur changePlan : " + e.message, "error")
   }
