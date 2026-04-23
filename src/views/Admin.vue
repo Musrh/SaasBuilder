@@ -266,19 +266,15 @@ const loadOwners = async () => {
 
 // ── Activer / Désactiver un propriétaire ──────────────────────
 const toggleActive = async (owner) => {
-  if (toggling.value === owner.id) return  // éviter double-clic
+  if (toggling.value === owner.id) return
   toggling.value = owner.id
   try {
-    // Inverser l'état actuel
     const newActive = owner.active === false ? true : false
     await updateDoc(doc(db, "users", owner.id), { active: newActive })
-    // Mettre à jour l'objet local après succès
-    owner.active = newActive
-    showToast(
-      newActive
-        ? "✅ " + owner.email + " activé"
-        : "🔴 " + owner.email + " désactivé"
-    )
+    // Trouver et modifier l'objet DANS owners.value pour déclencher Vue réactivité
+    const idx = owners.value.findIndex(o => o.id === owner.id)
+    if (idx !== -1) owners.value[idx].active = newActive
+    showToast(newActive ? "✅ " + owner.email + " activé" : "🔴 " + owner.email + " désactivé")
   } catch(e) {
     showToast("Erreur : " + e.message, "error")
   } finally {
@@ -288,32 +284,34 @@ const toggleActive = async (owner) => {
 
 // ── Changer le plan ───────────────────────────────────────────
 const changePlan = async (owner, newPlan) => {
-  if (owner.plan === newPlan) return  // pas de changement
+  if (owner.plan === newPlan) return
   try {
     const newExpiry = newPlan !== "free"
-      ? Date.now() + 30 * 24 * 60 * 60 * 1000   // +30 jours en ms
-      : null                                       // Free → pas d'expiry
+      ? Date.now() + 30 * 24 * 60 * 60 * 1000   // +30 jours
+      : null
 
-    const update = {
+    await updateDoc(doc(db, "users", owner.id), {
       plan:   newPlan,
       paye:   newPlan !== "free",
       expiry: newExpiry,
-      active: true,   // réactiver si désactivé lors du changement de plan
-    }
-    await updateDoc(doc(db, "users", owner.id), update)
+      active: true,
+    })
 
-    // Mettre à jour tous les champs locaux pour forcer le re-render Vue
-    owner.plan   = newPlan
-    owner.paye   = update.paye
-    owner.expiry = newExpiry
-    owner.active = true
+    // Modifier l'objet DANS owners.value pour déclencher Vue réactivité
+    const idx = owners.value.findIndex(o => o.id === owner.id)
+    if (idx !== -1) {
+      owners.value[idx].plan   = newPlan
+      owners.value[idx].paye   = newPlan !== "free"
+      owners.value[idx].expiry = newExpiry
+      owners.value[idx].active = true
+    }
 
     showToast(
-      "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
-      (newExpiry ? " (expire le " + formatDate(newExpiry) + ")" : "")
+      "✅ " + owner.email + " → " + newPlan.toUpperCase() +
+      (newExpiry ? " · expire le " + formatDate(newExpiry) : "")
     )
   } catch(e) {
-    showToast("Erreur changePlan : " + e.message, "error")
+    showToast("Erreur : " + e.message, "error")
   }
 }
 
