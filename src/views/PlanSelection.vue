@@ -167,7 +167,7 @@ function scrollToPlans() {
 function selectPlan(plan) {
   localStorage.setItem("planChoisi",   plan)
   localStorage.setItem("selectedPlan", plan)
-  router.push({ path: "/auth", query: { plan } })
+  router.push({ path: "/auth")
 }
 </script>
 
