@@ -606,7 +606,36 @@ const goToBuilder = () => {
   window.location.href = "https://musrh.github.io/SaasBuilder/#/saasgenerator"
 }
 
-const goToPlans = () => router.push("/")
+const goToPlans = () => { showPlanModal.value = true }
+
+// Confirme et lance le paiement Stripe pour le plan choisi
+const confirmPlan = async () => {
+  if (planChoix.value === 'free') return
+  if (isProActive.value && planChoix.value === 'pro') return
+  planLoading.value = true
+  try {
+    const res  = await fetch(`${BACKEND}/create-billing-session`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email:    user.value.email,
+        plan:     planChoix.value,
+        ownerUid: user.value.uid,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.url) {
+      alert(data.error || "Erreur lors de la création de la session de paiement")
+      return
+    }
+    window.location.href = data.url
+  } catch(err) {
+    console.error("confirmPlan:", err)
+    alert("Erreur réseau. Vérifiez votre connexion.")
+  } finally {
+    planLoading.value = false
+  }
+}
 
 const renewPlan = () => {
   const plan  = userData.value?.plan || "pro"
