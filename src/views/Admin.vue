@@ -266,15 +266,25 @@ const loadOwners = async () => {
 
 // ── Activer / Désactiver un propriétaire ──────────────────────
 const toggleActive = async (owner) => {
-  if (toggling.value === owner.id) return
+  if (toggling.value === owner.id) return  // éviter double-clic
   toggling.value = owner.id
   try {
-    const newActive = owner.active === false ? true : false
+    // Inverser l'état actuel (true par défaut si undefined)
+    const currentActive = owner.active !== false
+    const newActive = !currentActive
     await updateDoc(doc(db, "users", owner.id), { active: newActive })
-    // Trouver et modifier l'objet DANS owners.value pour déclencher Vue réactivité
+
+    // ⚡ Forcer la réactivité Vue : remplacer l'objet dans le tableau
     const idx = owners.value.findIndex(o => o.id === owner.id)
-    if (idx !== -1) owners.value[idx].active = newActive
-    showToast(newActive ? "✅ " + owner.email + " activé" : "🔴 " + owner.email + " désactivé")
+    if (idx !== -1) {
+      owners.value.splice(idx, 1, { ...owners.value[idx], active: newActive })
+    }
+
+    showToast(
+      newActive
+        ? "✅ " + owner.email + " activé"
+        : "🔴 " + owner.email + " désactivé"
+    )
   } catch(e) {
     showToast("Erreur : " + e.message, "error")
   } finally {
@@ -284,34 +294,48 @@ const toggleActive = async (owner) => {
 
 // ── Changer le plan ───────────────────────────────────────────
 const changePlan = async (owner, newPlan) => {
-  if (owner.plan === newPlan) return
+  const currentPlan = owner.plan || "free"
+  if (currentPlan === newPlan) return  // pas de changement
   try {
-    const newExpiry = newPlan !== "free"
-      ? Date.now() + 30 * 24 * 60 * 60 * 1000   // +30 jours
-      : null
+    // ⚡ Si on passe d'un plan Free (sans expiry) vers Pro/Premium
+    //    OU si l'expiry actuelle est vide/expirée → on fixe une nouvelle date d'expiration (+30j)
+    //    Sinon, on conserve l'expiration existante (cas Pro → Premium par ex.)
+    let newExpiry
+    if (newPlan === "free") {
+      newExpiry = null   // Free → pas d'expiry
+    } else {
+      const hasValidExpiry = owner.expiry && owner.expiry > Date.now()
+      newExpiry = hasValidExpiry
+        ? owner.expiry
+        : Date.now() + 30 * 24 * 60 * 60 * 1000   // +30 jours
+    }
 
-    await updateDoc(doc(db, "users", owner.id), {
+    const update = {
       plan:   newPlan,
       paye:   newPlan !== "free",
       expiry: newExpiry,
-      active: true,
-    })
+      active: true,   // réactiver si désactivé lors du changement de plan
+    }
+    await updateDoc(doc(db, "users", owner.id), update)
 
-    // Modifier l'objet DANS owners.value pour déclencher Vue réactivité
+    // ⚡ Forcer la réactivité Vue : remplacer l'objet dans le tableau
     const idx = owners.value.findIndex(o => o.id === owner.id)
     if (idx !== -1) {
-      owners.value[idx].plan   = newPlan
-      owners.value[idx].paye   = newPlan !== "free"
-      owners.value[idx].expiry = newExpiry
-      owners.value[idx].active = true
+      owners.value.splice(idx, 1, {
+        ...owners.value[idx],
+        plan:   newPlan,
+        paye:   update.paye,
+        expiry: newExpiry,
+        active: true,
+      })
     }
 
     showToast(
-      "✅ " + owner.email + " → " + newPlan.toUpperCase() +
-      (newExpiry ? " · expire le " + formatDate(newExpiry) : "")
+      "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
+      (newExpiry ? " (expire le " + formatDate(newExpiry) + ")" : "")
     )
   } catch(e) {
-    showToast("Erreur : " + e.message, "error")
+    showToast("Erreur changePlan : " + e.message, "error")
   }
 }
 
