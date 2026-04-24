@@ -1,12 +1,10 @@
 <!-- ============================================================
   Admin.vue — Dashboard administrateur SaasBuilder
-  Accessible uniquement pour l'email admin défini
+  Correctif: toggle active/désactivé + plan/expiry + colonnes tableau
   Route : /#/admin
 ============================================================ -->
 <template>
   <div class="adm-root">
-
-    <!-- HEADER -->
     <header class="adm-header">
       <div class="adm-brand">
         <span class="adm-logo">⚙</span>
@@ -18,13 +16,11 @@
       </div>
     </header>
 
-    <!-- CHARGEMENT -->
     <div v-if="loading" class="adm-loading">
       <div class="adm-spinner"></div>
       <p>Chargement des stores...</p>
     </div>
 
-    <!-- ACCÈS REFUSÉ -->
     <div v-else-if="!isAdmin" class="adm-denied">
       <span class="adm-denied-icon">🚫</span>
       <h2>Accès refusé</h2>
@@ -32,10 +28,7 @@
       <button @click="$router.push('/')" class="adm-btn-back">← Retour</button>
     </div>
 
-    <!-- CONTENU ADMIN -->
     <main v-else class="adm-main">
-
-      <!-- Statistiques rapides -->
       <div class="adm-stats">
         <div class="adm-stat-card">
           <span class="adm-stat-icon">👥</span>
@@ -47,27 +40,26 @@
         <div class="adm-stat-card">
           <span class="adm-stat-icon">✅</span>
           <div>
-            <div class="adm-stat-val">{{ owners.filter(o=>o.active!==false && o.paye).length }}</div>
+            <div class="adm-stat-val">{{ owners.filter(o => isOwnerActive(o.active) && o.paye).length }}</div>
             <div class="adm-stat-label">Actifs payants</div>
           </div>
         </div>
         <div class="adm-stat-card">
           <span class="adm-stat-icon">🆓</span>
           <div>
-            <div class="adm-stat-val">{{ owners.filter(o=>o.plan==="free").length }}</div>
+            <div class="adm-stat-val">{{ owners.filter(o => (o.plan || 'free') === 'free').length }}</div>
             <div class="adm-stat-label">Plans Free</div>
           </div>
         </div>
         <div class="adm-stat-card">
           <span class="adm-stat-icon">🔴</span>
           <div>
-            <div class="adm-stat-val">{{ owners.filter(o=>o.active===false).length }}</div>
+            <div class="adm-stat-val">{{ owners.filter(o => !isOwnerActive(o.active)).length }}</div>
             <div class="adm-stat-label">Désactivés</div>
           </div>
         </div>
       </div>
 
-      <!-- Barre de recherche -->
       <div class="adm-toolbar">
         <input
           v-model="search"
@@ -84,7 +76,6 @@
         <button class="adm-btn-export" @click="exportCSV" title="Exporter en CSV">📥 Export CSV</button>
       </div>
 
-      <!-- TABLE DES PROPRIÉTAIRES -->
       <div class="adm-table-wrap">
         <table class="adm-table">
           <thead>
@@ -101,34 +92,31 @@
           </thead>
           <tbody>
             <tr v-if="filteredOwners.length === 0">
-              <td colspan="7" class="adm-empty">Aucun propriétaire trouvé.</td>
+              <td colspan="8" class="adm-empty">Aucun propriétaire trouvé.</td>
             </tr>
+
             <tr
               v-for="owner in filteredOwners"
-              :key="owner.id"
-              :class="{ 'adm-row-disabled': owner.active === false }"
+              :key="resolveOwnerDocId(owner)"
+              :class="{ 'adm-row-disabled': !isOwnerActive(owner.active) }"
             >
-              <!-- Email -->
               <td class="adm-td-email">
                 <div class="adm-email-wrap">
-                  <span class="adm-avatar">{{ (owner.email||'?')[0].toUpperCase() }}</span>
+                  <span class="adm-avatar">{{ (owner.email || '?')[0].toUpperCase() }}</span>
                   <span>{{ owner.email || '—' }}</span>
                 </div>
               </td>
 
-              <!-- Plan -->
               <td>
-                <span :class="['adm-plan-badge', 'plan-' + (owner.plan||'free')]">
+                <span :class="['adm-plan-badge', 'plan-' + (owner.plan || 'free')]">
                   {{ (owner.plan || 'free').toUpperCase() }}
                 </span>
               </td>
 
-              <!-- Date inscription -->
               <td class="adm-td-date">
                 {{ formatDate(owner.createdAt) }}
               </td>
 
-              <!-- Date expiration -->
               <td class="adm-td-date">
                 <span :class="isExpired(owner.expiry) ? 'adm-expired' : 'adm-valid'">
                   {{ owner.expiry ? formatDate(owner.expiry) : '—' }}
@@ -136,7 +124,6 @@
                 </span>
               </td>
 
-              <!-- Slug -->
               <td class="adm-td-slug">
                 <a
                   v-if="owner.publishedSlug"
@@ -150,26 +137,26 @@
                 <span v-else class="adm-no-slug">Non publié</span>
               </td>
 
-              <!-- Statut -->
+              <td class="adm-td-orders">
+                <span class="adm-orders-badge">{{ owner.orderCount || 0 }}</span>
+              </td>
+
               <td>
-                <span :class="owner.active === false ? 'adm-status-off' : 'adm-status-on'">
-                  {{ owner.active === false ? 'Désactivé' : 'Actif' }}
+                <span :class="isOwnerActive(owner.active) ? 'adm-status-on' : 'adm-status-off'">
+                  {{ isOwnerActive(owner.active) ? 'Actif' : 'Désactivé' }}
                 </span>
               </td>
 
-              <!-- Actions -->
               <td class="adm-td-actions">
-                <!-- Activer / Désactiver -->
                 <button
-                  :class="owner.active === false ? 'adm-btn-activate' : 'adm-btn-disable'"
+                  :class="isOwnerActive(owner.active) ? 'adm-btn-disable' : 'adm-btn-activate'"
                   @click="toggleActive(owner)"
-                  :disabled="toggling === owner.id"
+                  :disabled="toggling === resolveOwnerDocId(owner)"
                 >
-                  <span v-if="toggling === owner.id" class="adm-spinner-sm"></span>
-                  <span v-else>{{ owner.active === false ? '✅ Activer' : '🔴 Désactiver' }}</span>
+                  <span v-if="toggling === resolveOwnerDocId(owner)" class="adm-spinner-sm"></span>
+                  <span v-else>{{ isOwnerActive(owner.active) ? '✅ Désactiver' : '🔓 Activer' }}</span>
                 </button>
 
-                <!-- Modifier plan -->
                 <select
                   class="adm-plan-select"
                   :value="owner.plan || 'free'"
@@ -180,7 +167,6 @@
                   <option value="premium">Premium</option>
                 </select>
 
-                <!-- Prolonger expiration -->
                 <button class="adm-btn-extend" @click="extendExpiry(owner, 30)" title="Prolonger de 30 jours">
                   +30j
                 </button>
@@ -189,14 +175,11 @@
           </tbody>
         </table>
       </div>
-
     </main>
 
-    <!-- TOAST notifications -->
     <Transition name="toast">
       <div v-if="toast" class="adm-toast" :class="toastType">{{ toast }}</div>
     </Transition>
-
   </div>
 </template>
 
@@ -207,188 +190,254 @@ import { getAuth, onAuthStateChanged, signOut } from "firebase/auth"
 import { collection, getDocs, getDoc, doc, updateDoc, query, orderBy } from "firebase/firestore"
 import { db } from "../firebase"
 
-// ── Email(s) admin autorisés ──────────────────────────────────
-// Modifiez cette liste selon vos besoins
 const ADMIN_EMAILS = [
-  "musmamon@gmail.com",   // ← remplacez par votre email admin
+  "musmamon@gmail.com",
   "musrh@gmail.com",
 ]
 
-const router      = useRouter()
-const auth        = getAuth()
+const router = useRouter()
+const auth = getAuth()
 const currentUser = ref(null)
-const loading     = ref(true)
-const owners      = ref([])
-const search      = ref("")
-const filterPlan  = ref("")
-const toggling    = ref(null)
-const toast       = ref("")
-const toastType   = ref("success")
+const loading = ref(true)
+const owners = ref([])
+const search = ref("")
+const filterPlan = ref("")
+const toggling = ref(null)
+const toast = ref("")
+const toastType = ref("success")
 
 const isAdmin = computed(() =>
   ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase())
 )
 
+const isOwnerActive = (value) => value !== false && value !== "false"
+
+const resolveOwnerDocId = (owner) => {
+  return owner?.id || owner?.uid || owner?.ownerId || owner?.storeId || null
+}
+
+const toMillis = (value) => {
+  if (!value) return null
+  if (typeof value === "number") return value
+  if (typeof value?.toMillis === "function") return value.toMillis()
+  if (typeof value?.seconds === "number") return value.seconds * 1000
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const normalizeOwner = (raw, fallbackId = null) => ({
+  id: fallbackId || raw.id || raw.uid || raw.ownerId || raw.storeId || null,
+  ...raw,
+  email: raw.email || "—",
+  plan: raw.plan || "free",
+  paye: raw.paye || false,
+  active: isOwnerActive(raw.active),
+  createdAt: raw.createdAt || null,
+  expiry: raw.expiry || null,
+  publishedSlug: raw.publishedSlug || "",
+  orderCount: raw.orderCount || 0,
+})
+
+const replaceOwnerLocal = (docId, patch) => {
+  const index = owners.value.findIndex((item) => resolveOwnerDocId(item) === docId)
+  if (index === -1) return
+  owners.value.splice(index, 1, {
+    ...owners.value[index],
+    ...patch,
+  })
+}
+
+const readOwnerBack = async (docId) => {
+  const snap = await getDoc(doc(db, "users", docId))
+  if (!snap.exists()) return null
+  return normalizeOwner(snap.data(), snap.id)
+}
+
 const filteredOwners = computed(() => {
   let list = owners.value
-  const s  = search.value.toLowerCase()
-  if (s) list = list.filter(o =>
-    (o.email||"").toLowerCase().includes(s) ||
-    (o.publishedSlug||"").toLowerCase().includes(s)
-  )
-  if (filterPlan.value) list = list.filter(o => (o.plan||"free") === filterPlan.value)
+  const s = search.value.toLowerCase()
+
+  if (s) {
+    list = list.filter((o) =>
+      (o.email || "").toLowerCase().includes(s) ||
+      (o.publishedSlug || "").toLowerCase().includes(s)
+    )
+  }
+
+  if (filterPlan.value) {
+    list = list.filter((o) => (o.plan || "free") === filterPlan.value)
+  }
+
   return list
 })
 
-// ── Chargement des propriétaires ─────────────────────────────
 const loadOwners = async () => {
   loading.value = true
   try {
     const snap = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc")))
-    owners.value = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      // Normaliser les champs manquants
-      email:         d.data().email         || "—",
-      plan:          d.data().plan          || "free",
-      paye:          d.data().paye          || false,
-      active:        d.data().active        !== false, // true par défaut
-      createdAt:     d.data().createdAt     || null,
-      expiry:        d.data().expiry        || null,
-      publishedSlug: d.data().publishedSlug || "",
-    }))
-  } catch(e) {
-    showToast("Erreur chargement : " + e.message, "error")
+    owners.value = snap.docs.map((d) => normalizeOwner(d.data(), d.id))
+  } catch (e) {
+    showToast("Erreur chargement : " + (e?.message || e), "error")
   } finally {
     loading.value = false
   }
 }
 
-// ── Activer / Désactiver un propriétaire ──────────────────────
 const toggleActive = async (owner) => {
-  if (toggling.value === owner.id) return
-  toggling.value = owner.id
+  const docId = resolveOwnerDocId(owner)
+  if (!docId) {
+    showToast("Erreur : identifiant utilisateur introuvable", "error")
+    return
+  }
+
+  if (toggling.value === docId) return
+  toggling.value = docId
+
   try {
-    const currentActive = owner.active !== false
+    const currentActive = isOwnerActive(owner.active)
     const newActive = !currentActive
+    const ownerRef = doc(db, "users", docId)
 
-    await updateDoc(doc(db, "users", owner.id), { active: newActive })
+    await updateDoc(ownerRef, { active: newActive })
 
-    const idx = owners.value.findIndex(o => o.id === owner.id)
-    if (idx !== -1) {
-      owners.value.splice(idx, 1, {
-        ...owners.value[idx],
-        active: newActive,
-      })
+    const freshOwner = await readOwnerBack(docId)
+    if (freshOwner) {
+      replaceOwnerLocal(docId, freshOwner)
+      if (isOwnerActive(freshOwner.active) !== newActive) {
+        throw new Error("La base n'a pas confirmé le nouvel état du compte")
+      }
+    } else {
+      replaceOwnerLocal(docId, { active: newActive })
     }
 
-    showToast(
-      newActive
-        ? "✅ " + owner.email + " activé"
-        : "🔴 " + owner.email + " désactivé"
-    )
-  } catch(e) {
-    showToast("Erreur : " + e.message, "error")
+    showToast(newActive ? `✅ ${owner.email} activé` : `🔴 ${owner.email} désactivé`)
+  } catch (e) {
+    showToast("Erreur désactivation : " + (e?.message || e), "error")
   } finally {
     toggling.value = null
   }
 }
 
-// ── Changer le plan ───────────────────────────────────────────
 const changePlan = async (owner, newPlan) => {
-  if ((owner.plan || "free") === newPlan) return
-  try {
-    const isPaidPlan = newPlan !== "free"
-    const hasValidExpiry = typeof owner.expiry === "number" && owner.expiry > Date.now()
-    const newExpiry = isPaidPlan
-      ? (hasValidExpiry ? owner.expiry : Date.now() + 30 * 24 * 60 * 60 * 1000)
-      : null
+  if (owner.plan === newPlan) return
 
-    const update = {
+  const docId = resolveOwnerDocId(owner)
+  if (!docId) {
+    showToast("Erreur : identifiant utilisateur introuvable", "error")
+    return
+  }
+
+  try {
+    const currentExpiry = toMillis(owner.expiry)
+    const hasValidExpiry = currentExpiry && currentExpiry > Date.now()
+
+    const newExpiry = newPlan === "free"
+      ? null
+      : (hasValidExpiry ? currentExpiry : Date.now() + 30 * 24 * 60 * 60 * 1000)
+
+    const payload = {
       plan: newPlan,
-      paye: isPaidPlan,
+      paye: newPlan !== "free",
       expiry: newExpiry,
       active: true,
     }
-    await updateDoc(doc(db, "users", owner.id), update)
 
-    const idx = owners.value.findIndex(o => o.id === owner.id)
-    if (idx !== -1) {
-      owners.value.splice(idx, 1, {
-        ...owners.value[idx],
-        ...update,
-      })
+    await updateDoc(doc(db, "users", docId), payload)
+
+    const freshOwner = await readOwnerBack(docId)
+    if (freshOwner) {
+      replaceOwnerLocal(docId, freshOwner)
+    } else {
+      replaceOwnerLocal(docId, payload)
     }
 
     showToast(
-      "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
-      (newExpiry ? " (expire le " + formatDate(newExpiry) + ")" : "")
+      `✅ Plan de ${owner.email} → ${newPlan.toUpperCase()}` +
+      (newExpiry ? ` (expire le ${formatDate(newExpiry)})` : "")
     )
-  } catch(e) {
-    showToast("Erreur changePlan : " + e.message, "error")
+  } catch (e) {
+    showToast("Erreur changePlan : " + (e?.message || e), "error")
   }
 }
 
-// ── Prolonger l'expiration ────────────────────────────────────
 const extendExpiry = async (owner, days) => {
-  try {
-    const base = (owner.expiry && owner.expiry > Date.now()) ? owner.expiry : Date.now()
-    const newExp = base + days * 24 * 60 * 60 * 1000
-    await updateDoc(doc(db, "users", owner.id), { expiry: newExp })
+  const docId = resolveOwnerDocId(owner)
+  if (!docId) {
+    showToast("Erreur : identifiant utilisateur introuvable", "error")
+    return
+  }
 
-    const idx = owners.value.findIndex(o => o.id === owner.id)
-    if (idx !== -1) {
-      owners.value.splice(idx, 1, {
-        ...owners.value[idx],
-        expiry: newExp,
-      })
+  try {
+    const currentExpiry = toMillis(owner.expiry)
+    const base = currentExpiry && currentExpiry > Date.now() ? currentExpiry : Date.now()
+    const newExp = base + days * 24 * 60 * 60 * 1000
+
+    await updateDoc(doc(db, "users", docId), { expiry: newExp })
+
+    const freshOwner = await readOwnerBack(docId)
+    if (freshOwner) {
+      replaceOwnerLocal(docId, freshOwner)
+    } else {
+      replaceOwnerLocal(docId, { expiry: newExp })
     }
 
     showToast(`+${days}j pour ${owner.email} → expire le ${formatDate(newExp)}`)
-  } catch(e) {
-    showToast("Erreur : " + e.message, "error")
+  } catch (e) {
+    showToast("Erreur expiration : " + (e?.message || e), "error")
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────
 const exportCSV = () => {
   const rows = [
-    ["Email","Plan","Payé","Inscrit le","Expiration","Slug","Commandes","Actif"],
-    ...filteredOwners.value.map(o => [
+    ["Email", "Plan", "Payé", "Inscrit le", "Expiration", "Slug", "Commandes", "Actif"],
+    ...filteredOwners.value.map((o) => [
       o.email,
       o.plan,
       o.paye ? "oui" : "non",
       o.createdAt ? formatDate(o.createdAt) : "",
-      o.expiry    ? formatDate(o.expiry)    : "",
+      o.expiry ? formatDate(o.expiry) : "",
       o.publishedSlug || "",
       o.orderCount || 0,
-      o.active !== false ? "oui" : "non",
-    ])
+      isOwnerActive(o.active) ? "oui" : "non",
+    ]),
   ]
-  const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n")
+
+  const csv = rows
+    .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+    .join("\n")
+
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement("a")
-  a.href     = url
-  a.download = `stores-${new Date().toISOString().slice(0,10)}.csv`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `stores-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
 
 const formatDate = (ts) => {
-  if (!ts) return "—"
-  const d = typeof ts === "number" ? new Date(ts) : ts?.toDate?.() || new Date(ts)
-  return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" })
+  const ms = toMillis(ts)
+  if (!ms) return "—"
+  return new Date(ms).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
 }
 
-const isExpired = (expiry) => expiry && expiry < Date.now()
+const isExpired = (expiry) => {
+  const ms = toMillis(expiry)
+  return !!ms && ms < Date.now()
+}
 
 let toastTimer = null
 const showToast = (msg, type = "success") => {
-  toast.value    = msg
+  toast.value = msg
   toastType.value = type
   if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = "" }, 3000)
+  toastTimer = setTimeout(() => {
+    toast.value = ""
+  }, 3000)
 }
 
 const logout = async () => {
@@ -396,11 +445,14 @@ const logout = async () => {
   router.push("/")
 }
 
-// ── Init ──────────────────────────────────────────────────────
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     currentUser.value = user
-    if (!user) { router.push("/"); return }
+    if (!user) {
+      router.push("/")
+      return
+    }
+
     if (ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
       await loadOwners()
     } else {
@@ -415,8 +467,6 @@ onMounted(() => {
 *{box-sizing:border-box;margin:0;padding:0}
 
 .adm-root{min-height:100vh;background:#0f0f1a;color:#e2e8f0;font-family:'DM Sans',sans-serif}
-
-/* HEADER */
 .adm-header{background:#1a1a2e;border-bottom:1px solid #2d2d44;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.4)}
 .adm-brand{display:flex;align-items:center;gap:10px}
 .adm-logo{font-size:22px}
@@ -426,7 +476,6 @@ onMounted(() => {
 .adm-logout{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;transition:.2s}
 .adm-logout:hover{background:rgba(239,68,68,.25)}
 
-/* LOADING / DENIED */
 .adm-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px;color:#94a3b8}
 .adm-spinner{width:36px;height:36px;border:3px solid #2d2d44;border-top-color:#a78bfa;border-radius:50%;animation:adm-spin .7s linear infinite}
 .adm-spinner-sm{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:adm-spin .7s linear infinite;display:inline-block}
@@ -437,17 +486,13 @@ onMounted(() => {
 .adm-denied p{color:#94a3b8}
 .adm-btn-back{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px}
 
-/* MAIN */
 .adm-main{padding:24px;max-width:1400px;margin:0 auto}
-
-/* STATS */
 .adm-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px}
 .adm-stat-card{background:#1a1a2e;border:1px solid #2d2d44;border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px}
 .adm-stat-icon{font-size:28px;flex-shrink:0}
 .adm-stat-val{font-size:28px;font-weight:700;color:#a78bfa;line-height:1}
 .adm-stat-label{font-size:12px;color:#64748b;margin-top:3px}
 
-/* TOOLBAR */
 .adm-toolbar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
 .adm-search{flex:1;min-width:200px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:10px;padding:10px 14px;font-size:14px;outline:none;transition:.15s}
 .adm-search:focus{border-color:#a78bfa}
@@ -455,8 +500,9 @@ onMounted(() => {
 .adm-filter{background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;cursor:pointer}
 .adm-btn-refresh{background:#2d2d44;border:1px solid #3d3d5c;color:#a78bfa;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
 .adm-btn-refresh:hover{background:#3d3d5c}
+.adm-btn-export{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px}
+.adm-btn-export:hover{background:linear-gradient(135deg,#059669,#047857)}
 
-/* TABLE */
 .adm-table-wrap{overflow-x:auto;border-radius:14px;border:1px solid #2d2d44}
 .adm-table{width:100%;border-collapse:collapse;font-size:13px}
 .adm-table thead tr{background:#1a1a2e}
@@ -468,7 +514,6 @@ onMounted(() => {
 .adm-empty{text-align:center;padding:40px;color:#475569;font-size:14px}
 td{padding:12px 16px;vertical-align:middle}
 
-/* Cells */
 .adm-email-wrap{display:flex;align-items:center;gap:8px}
 .adm-avatar{width:28px;height:28px;background:linear-gradient(135deg,#6c63ff,#a78bfa);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
 .adm-td-email{max-width:220px}
@@ -481,18 +526,17 @@ td{padding:12px 16px;vertical-align:middle}
 .adm-expired{color:#f87171}
 .adm-valid{color:#4ade80}
 .adm-exp-badge{background:rgba(239,68,68,.15);color:#f87171;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px}
+.adm-td-orders{text-align:center}
+.adm-orders-badge{background:rgba(108,99,255,.15);color:#6c63ff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px;border:1px solid rgba(108,99,255,.3)}
 
-/* Plan badges */
 .adm-plan-badge{padding:3px 10px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .plan-free{background:rgba(100,116,139,.2);color:#94a3b8}
 .plan-pro{background:rgba(108,99,255,.2);color:#a78bfa}
 .plan-premium{background:rgba(234,179,8,.2);color:#fbbf24}
 
-/* Status */
 .adm-status-on{background:rgba(74,222,128,.15);color:#4ade80;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600}
 .adm-status-off{background:rgba(239,68,68,.15);color:#f87171;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600}
 
-/* Action buttons */
 .adm-td-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .adm-btn-activate{background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);color:#4ade80;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap}
 .adm-btn-activate:hover{background:rgba(74,222,128,.25)}
@@ -502,7 +546,6 @@ td{padding:12px 16px;vertical-align:middle}
 .adm-btn-extend{background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:#fbbf24;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:.2s;white-space:nowrap}
 .adm-btn-extend:hover{background:rgba(251,191,36,.22)}
 
-/* TOAST */
 .adm-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;padding:12px 22px;border-radius:12px;font-size:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:2000;white-space:nowrap}
 .adm-toast.error{background:#2d1515;border-color:rgba(239,68,68,.3);color:#f87171}
 .toast-enter-active,.toast-leave-active{transition:all .3s}
@@ -513,10 +556,4 @@ td{padding:12px 16px;vertical-align:middle}
   .adm-stats{grid-template-columns:repeat(2,1fr)}
   .adm-td-actions{flex-direction:column;align-items:flex-start}
 }
-
-.adm-btn-export{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px}
-.adm-btn-export:hover{background:linear-gradient(135deg,#059669,#047857)}
-.adm-td-orders{text-align:center}
-.adm-orders-badge{background:rgba(108,99,255,.15);color:#6c63ff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px;border:1px solid rgba(108,99,255,.3)}
-
 </style>
