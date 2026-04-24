@@ -180,11 +180,18 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
-import { collection, doc, getDoc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  updateDoc
+} from 'firebase/firestore'
 import { db } from '../firebase'
 
 const ADMIN_EMAILS = ['musmamon@gmail.com', 'musrh@gmail.com']
-const PLAN_DURATION_MS = 30 * 24 * 60 * 60 * 1000
 
 const router = useRouter()
 const auth = getAuth()
@@ -202,36 +209,18 @@ const isAdmin = computed(() =>
   ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase())
 )
 
-const filteredOwners = computed(() => {
-  let list = [...owners.value]
-  const s = search.value.trim().toLowerCase()
-
-  if (s) {
-    list = list.filter((o) =>
-      (o.email || '').toLowerCase().includes(s) ||
-      (o.publishedSlug || '').toLowerCase().includes(s)
-    )
-  }
-
-  if (filterPlan.value) {
-    list = list.filter((o) => (o.plan || 'free') === filterPlan.value)
-  }
-
-  return list
-})
-
 /* =========================
-   🔥 FIX IMPORTANT ICI
+   🔥 NORMALISATION FIX
 ========================= */
 const normalizeOwner = (id, data = {}) => ({
   id,
-  uid: data.uid || data.userId || id,
+  uid: data.uid || id,
   email: data.email || '—',
   plan: data.plan || 'free',
-  paye: data.paye === true || (data.plan && data.plan !== 'free'),
+  paye: Boolean(data.paye),
 
-  // ✅ FIX BOOLÉEN PROPRE
-  active: typeof data.active === 'boolean' ? data.active : false,
+  // ✅ FIX FINAL
+  active: Boolean(data.active),
 
   createdAt: data.createdAt || null,
   expiry: data.expiry || null,
@@ -240,33 +229,34 @@ const normalizeOwner = (id, data = {}) => ({
 })
 
 const resolveOwnerDocId = (owner) =>
-  owner?.id || owner?.uid || owner?.ownerId || null
+  owner?.id || owner?.uid || null
 
 const replaceOwnerLocally = (updatedOwner) => {
-  const index = owners.value.findIndex((item) => item.id === updatedOwner.id)
-  if (index !== -1) {
-    owners.value.splice(index, 1, updatedOwner)
-  }
+  const i = owners.value.findIndex(o => o.id === updatedOwner.id)
+  if (i !== -1) owners.value.splice(i, 1, updatedOwner)
 }
 
+/* =========================
+   🔥 LOAD USERS
+========================= */
 const loadOwners = async () => {
   loading.value = true
   try {
-    const snapshot = await getDocs(
+    const snap = await getDocs(
       query(collection(db, 'users'), orderBy('createdAt', 'desc'))
     )
-    owners.value = snapshot.docs.map((doc) =>
-      normalizeOwner(doc.id, doc.data())
+    owners.value = snap.docs.map(d =>
+      normalizeOwner(d.id, d.data())
     )
-  } catch (error) {
-    showToast('Erreur chargement : ' + error.message, 'error')
+  } catch (e) {
+    showToast('Erreur chargement : ' + e.message, 'error')
   } finally {
     loading.value = false
   }
 }
 
 /* =========================
-   🔥 TOGGLE CORRIGÉ
+   🔥 TOGGLE ULTRA STABLE
 ========================= */
 const toggleActive = async (owner) => {
   const docId = resolveOwnerDocId(owner)
@@ -275,26 +265,36 @@ const toggleActive = async (owner) => {
   toggling.value = owner.id
 
   try {
-    const newActive = !(owner.active === true)
+    const newActive = !Boolean(owner.active)
 
-    // 🔥 update Firestore
+    // ✅ UPDATE FIRESTORE
     await updateDoc(doc(db, 'users', docId), {
       active: newActive,
     })
 
-    // 🔥 update UI instantanément
+    // ✅ UPDATE UI IMMÉDIAT
     replaceOwnerLocally({
       ...owner,
       active: newActive,
     })
+
+    // ✅ RESYNC FIRESTORE (anti bug)
+    setTimeout(async () => {
+      const fresh = await getDoc(doc(db, 'users', docId))
+      if (fresh.exists()) {
+        replaceOwnerLocally(
+          normalizeOwner(fresh.id, fresh.data())
+        )
+      }
+    }, 300)
 
     showToast(
       newActive
         ? `✅ ${owner.email} activé`
         : `🔴 ${owner.email} désactivé`
     )
-  } catch (error) {
-    showToast('Erreur : ' + error.message, 'error')
+  } catch (e) {
+    showToast('Erreur : ' + e.message, 'error')
   } finally {
     toggling.value = null
   }
@@ -302,13 +302,28 @@ const toggleActive = async (owner) => {
 
 /* ========================= */
 
-const formatDate = (value) => {
-  if (!value) return '—'
-  const date =
-    typeof value.toDate === 'function'
-      ? value.toDate()
-      : new Date(value)
-  return date.toLocaleDateString('fr-FR')
+const filteredOwners = computed(() => {
+  let list = [...owners.value]
+  const s = search.value.toLowerCase()
+
+  if (s) {
+    list = list.filter(o =>
+      (o.email || '').toLowerCase().includes(s) ||
+      (o.publishedSlug || '').toLowerCase().includes(s)
+    )
+  }
+
+  if (filterPlan.value) {
+    list = list.filter(o => o.plan === filterPlan.value)
+  }
+
+  return list
+})
+
+const formatDate = (v) => {
+  if (!v) return '—'
+  const d = typeof v.toDate === 'function' ? v.toDate() : new Date(v)
+  return d.toLocaleDateString('fr-FR')
 }
 
 const showToast = (msg, type = 'success') => {
@@ -321,6 +336,8 @@ const logout = async () => {
   await signOut(auth)
   router.push('/')
 }
+
+/* ========================= */
 
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
@@ -336,6 +353,7 @@ onMounted(() => {
   })
 })
 </script>
+    
   
 
 <style scoped>
