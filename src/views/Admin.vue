@@ -1,5 +1,12 @@
+<!-- ============================================================
+  Admin.vue — Dashboard administrateur SaasBuilder
+  Accessible uniquement pour l'email admin défini
+  Route : /#/admin
+============================================================ -->
 <template>
   <div class="adm-root">
+
+    <!-- HEADER -->
     <header class="adm-header">
       <div class="adm-brand">
         <span class="adm-logo">⚙</span>
@@ -11,11 +18,13 @@
       </div>
     </header>
 
+    <!-- CHARGEMENT -->
     <div v-if="loading" class="adm-loading">
       <div class="adm-spinner"></div>
       <p>Chargement des stores...</p>
     </div>
 
+    <!-- ACCÈS REFUSÉ -->
     <div v-else-if="!isAdmin" class="adm-denied">
       <span class="adm-denied-icon">🚫</span>
       <h2>Accès refusé</h2>
@@ -23,7 +32,10 @@
       <button @click="$router.push('/')" class="adm-btn-back">← Retour</button>
     </div>
 
+    <!-- CONTENU ADMIN -->
     <main v-else class="adm-main">
+
+      <!-- Statistiques rapides -->
       <div class="adm-stats">
         <div class="adm-stat-card">
           <span class="adm-stat-icon">👥</span>
@@ -35,44 +47,44 @@
         <div class="adm-stat-card">
           <span class="adm-stat-icon">✅</span>
           <div>
-            <div class="adm-stat-val">{{ owners.filter((o) => o.active !== false && o.paye).length }}</div>
+            <div class="adm-stat-val">{{ owners.filter(o=>o.active!==false && o.paye).length }}</div>
             <div class="adm-stat-label">Actifs payants</div>
           </div>
         </div>
         <div class="adm-stat-card">
           <span class="adm-stat-icon">🆓</span>
           <div>
-            <div class="adm-stat-val">{{ owners.filter((o) => o.plan === 'free').length }}</div>
+            <div class="adm-stat-val">{{ owners.filter(o=>o.plan==="free").length }}</div>
             <div class="adm-stat-label">Plans Free</div>
           </div>
         </div>
         <div class="adm-stat-card">
           <span class="adm-stat-icon">🔴</span>
           <div>
-            <div class="adm-stat-val">{{ owners.filter((o) => o.active === false).length }}</div>
+            <div class="adm-stat-val">{{ owners.filter(o=>o.active===false).length }}</div>
             <div class="adm-stat-label">Désactivés</div>
           </div>
         </div>
       </div>
 
+      <!-- Barre de recherche -->
       <div class="adm-toolbar">
         <input
           v-model="search"
           class="adm-search"
           placeholder="🔍 Rechercher par email ou slug..."
         />
-
         <select v-model="filterPlan" class="adm-filter">
           <option value="">Tous les plans</option>
           <option value="free">Free</option>
           <option value="pro">Pro</option>
           <option value="premium">Premium</option>
         </select>
-
         <button class="adm-btn-refresh" @click="loadOwners">🔄 Actualiser</button>
         <button class="adm-btn-export" @click="exportCSV" title="Exporter en CSV">📥 Export CSV</button>
       </div>
 
+      <!-- TABLE DES PROPRIÉTAIRES -->
       <div class="adm-table-wrap">
         <table class="adm-table">
           <thead>
@@ -89,29 +101,34 @@
           </thead>
           <tbody>
             <tr v-if="filteredOwners.length === 0">
-              <td colspan="8" class="adm-empty">Aucun propriétaire trouvé.</td>
+              <td colspan="7" class="adm-empty">Aucun propriétaire trouvé.</td>
             </tr>
-
             <tr
               v-for="owner in filteredOwners"
               :key="owner.id"
               :class="{ 'adm-row-disabled': owner.active === false }"
             >
+              <!-- Email -->
               <td class="adm-td-email">
                 <div class="adm-email-wrap">
-                  <span class="adm-avatar">{{ (owner.email || '?')[0].toUpperCase() }}</span>
+                  <span class="adm-avatar">{{ (owner.email||'?')[0].toUpperCase() }}</span>
                   <span>{{ owner.email || '—' }}</span>
                 </div>
               </td>
 
+              <!-- Plan -->
               <td>
-                <span :class="['adm-plan-badge', 'plan-' + (owner.plan || 'free')]">
+                <span :class="['adm-plan-badge', 'plan-' + (owner.plan||'free')]">
                   {{ (owner.plan || 'free').toUpperCase() }}
                 </span>
               </td>
 
-              <td class="adm-td-date">{{ formatDate(owner.createdAt) }}</td>
+              <!-- Date inscription -->
+              <td class="adm-td-date">
+                {{ formatDate(owner.createdAt) }}
+              </td>
 
+              <!-- Date expiration -->
               <td class="adm-td-date">
                 <span :class="isExpired(owner.expiry) ? 'adm-expired' : 'adm-valid'">
                   {{ owner.expiry ? formatDate(owner.expiry) : '—' }}
@@ -119,6 +136,7 @@
                 </span>
               </td>
 
+              <!-- Slug -->
               <td class="adm-td-slug">
                 <a
                   v-if="owner.publishedSlug"
@@ -132,15 +150,16 @@
                 <span v-else class="adm-no-slug">Non publié</span>
               </td>
 
-              <td>{{ owner.orderCount || 0 }}</td>
-
+              <!-- Statut -->
               <td>
                 <span :class="owner.active === false ? 'adm-status-off' : 'adm-status-on'">
                   {{ owner.active === false ? 'Désactivé' : 'Actif' }}
                 </span>
               </td>
 
+              <!-- Actions -->
               <td class="adm-td-actions">
+                <!-- Activer / Désactiver -->
                 <button
                   :class="owner.active === false ? 'adm-btn-activate' : 'adm-btn-disable'"
                   @click="toggleActive(owner)"
@@ -150,6 +169,7 @@
                   <span v-else>{{ owner.active === false ? '✅ Activer' : '🔴 Désactiver' }}</span>
                 </button>
 
+                <!-- Modifier plan -->
                 <select
                   class="adm-plan-select"
                   :value="owner.plan || 'free'"
@@ -160,6 +180,7 @@
                   <option value="premium">Premium</option>
                 </select>
 
+                <!-- Prolonger expiration -->
                 <button class="adm-btn-extend" @click="extendExpiry(owner, 30)" title="Prolonger de 30 jours">
                   +30j
                 </button>
@@ -168,197 +189,211 @@
           </tbody>
         </table>
       </div>
+
     </main>
 
+    <!-- TOAST notifications -->
     <Transition name="toast">
       <div v-if="toast" class="adm-toast" :class="toastType">{{ toast }}</div>
     </Transition>
+
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth'
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  updateDoc
-} from 'firebase/firestore'
-import { db } from '../firebase'
+import { ref, computed, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth"
+import { collection, getDocs, getDoc, doc, updateDoc, query, orderBy } from "firebase/firestore"
+import { db } from "../firebase"
 
-const ADMIN_EMAILS = ['musmamon@gmail.com', 'musrh@gmail.com']
+// ── Email(s) admin autorisés ──────────────────────────────────
+// Modifiez cette liste selon vos besoins
+const ADMIN_EMAILS = [
+  "musmamon@gmail.com",   // ← remplacez par votre email admin
+  "musrh@gmail.com",
+]
 
-const router = useRouter()
-const auth = getAuth()
-
+const router      = useRouter()
+const auth        = getAuth()
 const currentUser = ref(null)
-const loading = ref(true)
-const owners = ref([])
-const search = ref('')
-const filterPlan = ref('')
-const toggling = ref(null)
-const toast = ref('')
-const toastType = ref('success')
+const loading     = ref(true)
+const owners      = ref([])
+const search      = ref("")
+const filterPlan  = ref("")
+const toggling    = ref(null)
+const toast       = ref("")
+const toastType   = ref("success")
 
-/* =========================
-   ADMIN CHECK
-========================= */
 const isAdmin = computed(() =>
   ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase())
 )
 
-/* =========================
-   NORMALIZE DATA (SAFE)
-========================= */
-const normalizeOwner = (id, data = {}) => ({
-  id,
-  uid: data.uid || id,
-  email: data.email || '—',
-  plan: data.plan || 'free',
-  paye: Boolean(data.paye),
-  active: Boolean(data.active),
-  createdAt: data.createdAt || null,
-  expiry: data.expiry || null,
-  publishedSlug: data.publishedSlug || '',
-  orderCount: Number(data.orderCount || 0),
+const filteredOwners = computed(() => {
+  let list = owners.value
+  const s  = search.value.toLowerCase()
+  if (s) list = list.filter(o =>
+    (o.email||"").toLowerCase().includes(s) ||
+    (o.publishedSlug||"").toLowerCase().includes(s)
+  )
+  if (filterPlan.value) list = list.filter(o => (o.plan||"free") === filterPlan.value)
+  return list
 })
 
-const resolveOwnerDocId = (owner) =>
-  owner?.id || owner?.uid || null
-
-const replaceOwnerLocally = (updatedOwner) => {
-  const i = owners.value.findIndex(o => o.id === updatedOwner.id)
-  if (i !== -1) owners.value.splice(i, 1, updatedOwner)
-}
-
-/* =========================
-   🔥 LOAD USERS (FIXED)
-========================= */
+// ── Chargement des propriétaires ─────────────────────────────
 const loadOwners = async () => {
   loading.value = true
-
   try {
-    console.log("🔥 Loading users...")
-
-    // ✅ FIX : PAS DE orderBy (évite blocage)
-    const snap = await getDocs(collection(db, 'users'))
-
-    console.log("✅ Users loaded:", snap.size)
-
-    owners.value = snap.docs.map(d =>
-      normalizeOwner(d.id, d.data())
-    )
-
-  } catch (e) {
-    console.error("❌ LOAD ERROR:", e)
-    showToast('Erreur chargement : ' + e.message, 'error')
+    const snap = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc")))
+    owners.value = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      // Normaliser les champs manquants
+      email:         d.data().email         || "—",
+      plan:          d.data().plan          || "free",
+      paye:          d.data().paye          || false,
+      active:        d.data().active        !== false, // true par défaut
+      subscriptionActive: d.data().subscriptionActive === true,
+      createdAt:     d.data().createdAt     || null,
+      expiry:        d.data().expiry        || null,
+      publishedSlug: d.data().publishedSlug || "",
+    }))
+  } catch(e) {
+    showToast("Erreur chargement : " + e.message, "error")
   } finally {
     loading.value = false
   }
 }
 
-/* =========================
-   🔥 TOGGLE STABLE
-========================= */
+// ── Activer / Désactiver un propriétaire ──────────────────────
+// Bascule le champ `active` : false → true, true → false (et undefined → false car compté actif)
 const toggleActive = async (owner) => {
-  const docId = resolveOwnerDocId(owner)
-  if (!docId || toggling.value === owner.id) return
-
+  if (toggling.value === owner.id) return  // éviter double-clic
   toggling.value = owner.id
-
   try {
-    const newActive = !Boolean(owner.active)
-
-    console.log("TOGGLE:", owner.active, "→", newActive)
-
-    await updateDoc(doc(db, 'users', docId), {
-      active: newActive,
-    })
-
-    // update UI immédiat
-    replaceOwnerLocally({
-      ...owner,
-      active: newActive,
-    })
-
-    // resync Firestore
-    setTimeout(async () => {
-      const fresh = await getDoc(doc(db, 'users', docId))
-      if (fresh.exists()) {
-        replaceOwnerLocally(
-          normalizeOwner(fresh.id, fresh.data())
-        )
-      }
-    }, 300)
-
+    // État actuel considéré actif si != false (y compris undefined)
+    const isCurrentlyActive = owner.active !== false
+    const newActive = !isCurrentlyActive   // inverse strict
+    await updateDoc(doc(db, "users", owner.id), { active: newActive })
+    // Mettre à jour l'objet local après succès → re-render Vue
+    owner.active = newActive
     showToast(
       newActive
-        ? `✅ ${owner.email} activé`
-        : `🔴 ${owner.email} désactivé`
+        ? "✅ " + owner.email + " activé"
+        : "🔴 " + owner.email + " désactivé"
     )
-
-  } catch (e) {
-    console.error("❌ TOGGLE ERROR:", e)
-    showToast('Erreur : ' + e.message, 'error')
+  } catch(e) {
+    showToast("Erreur : " + e.message, "error")
   } finally {
     toggling.value = null
   }
 }
 
-/* =========================
-   FILTER
-========================= */
-const filteredOwners = computed(() => {
-  let list = [...owners.value]
-  const s = search.value.toLowerCase()
+// ── Changer le plan ───────────────────────────────────────────
+// Lorsqu'on passe à Pro/Premium, on FORCE la mise à jour de :
+//   • plan, paye=true, subscriptionActive=true
+//   • expiry = Date.now() + 30 jours  (corrige les anciens comptes free où expiry était null/vide)
+//   • active=true (réactive le compte)
+// Lorsqu'on revient à Free : plan=free, paye=false, subscriptionActive=false, expiry=null
+const changePlan = async (owner, newPlan) => {
+  // On ne bloque PAS si le plan est identique : permet de "réparer"
+  // un compte Pro où expiry serait null/expiré.
+  try {
+    const isPaid    = newPlan !== "free"
+    const newExpiry = isPaid
+      ? Date.now() + 30 * 24 * 60 * 60 * 1000   // +30 jours en ms
+      : null                                       // Free → pas d'expiry
 
-  if (s) {
-    list = list.filter(o =>
-      (o.email || '').toLowerCase().includes(s) ||
-      (o.publishedSlug || '').toLowerCase().includes(s)
+    const update = {
+      plan:               newPlan,
+      paye:               isPaid,
+      subscriptionActive: isPaid,    // ← cohérence avec le champ utilisé côté app
+      expiry:             newExpiry, // ← jamais laissé vide pour un plan payant
+      active:             true,      // réactive si désactivé
+    }
+    await updateDoc(doc(db, "users", owner.id), update)
+
+    // Mettre à jour tous les champs locaux pour forcer le re-render Vue
+    owner.plan               = newPlan
+    owner.paye               = isPaid
+    owner.subscriptionActive = isPaid
+    owner.expiry             = newExpiry
+    owner.active             = true
+
+    showToast(
+      "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
+      (newExpiry ? " (expire le " + formatDate(newExpiry) + ")" : "")
     )
+  } catch(e) {
+    showToast("Erreur changePlan : " + e.message, "error")
   }
-
-  if (filterPlan.value) {
-    list = list.filter(o => o.plan === filterPlan.value)
-  }
-
-  return list
-})
-
-/* =========================
-   HELPERS
-========================= */
-const formatDate = (v) => {
-  if (!v) return '—'
-  const d = typeof v.toDate === 'function' ? v.toDate() : new Date(v)
-  return d.toLocaleDateString('fr-FR')
 }
 
-const showToast = (msg, type = 'success') => {
-  toast.value = msg
+// ── Prolonger l'expiration ────────────────────────────────────
+const extendExpiry = async (owner, days) => {
+  try {
+    const base   = (owner.expiry && owner.expiry > Date.now()) ? owner.expiry : Date.now()
+    const newExp = base + days * 24 * 60 * 60 * 1000
+    await updateDoc(doc(db, "users", owner.id), { expiry: newExp })
+    owner.expiry = newExp
+    showToast(`+${days}j pour ${owner.email} → expire le ${formatDate(newExp)}`)
+  } catch(e) {
+    showToast("Erreur : " + e.message, "error")
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+const exportCSV = () => {
+  const rows = [
+    ["Email","Plan","Payé","Inscrit le","Expiration","Slug","Commandes","Actif"],
+    ...filteredOwners.value.map(o => [
+      o.email,
+      o.plan,
+      o.paye ? "oui" : "non",
+      o.createdAt ? formatDate(o.createdAt) : "",
+      o.expiry    ? formatDate(o.expiry)    : "",
+      o.publishedSlug || "",
+      o.orderCount || 0,
+      o.active !== false ? "oui" : "non",
+    ])
+  ]
+  const csv  = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n")
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
+  a.download = `stores-${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const formatDate = (ts) => {
+  if (!ts) return "—"
+  const d = typeof ts === "number" ? new Date(ts) : ts?.toDate?.() || new Date(ts)
+  return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" })
+}
+
+const isExpired = (expiry) => expiry && expiry < Date.now()
+
+let toastTimer = null
+const showToast = (msg, type = "success") => {
+  toast.value    = msg
   toastType.value = type
-  setTimeout(() => (toast.value = ''), 3000)
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value = "" }, 3000)
 }
 
 const logout = async () => {
   await signOut(auth)
-  router.push('/')
+  router.push("/")
 }
 
-/* =========================
-   INIT
-========================= */
+// ── Init ──────────────────────────────────────────────────────
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     currentUser.value = user
-
-    if (!user) return router.push('/')
-
-    if (isAdmin.value) {
+    if (!user) { router.push("/"); return }
+    if (ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
       await loadOwners()
     } else {
       loading.value = false
@@ -366,358 +401,114 @@ onMounted(() => {
   })
 })
 </script>
-    
-  
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+.adm-root{min-height:100vh;background:#0f0f1a;color:#e2e8f0;font-family:'DM Sans',sans-serif}
 
-.adm-root {
-  min-height: 100vh;
-  background: #0f0f1a;
-  color: #e2e8f0;
-  font-family: 'DM Sans', sans-serif;
+/* HEADER */
+.adm-header{background:#1a1a2e;border-bottom:1px solid #2d2d44;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+.adm-brand{display:flex;align-items:center;gap:10px}
+.adm-logo{font-size:22px}
+.adm-title{font-size:17px;font-weight:700;color:#a78bfa}
+.adm-header-right{display:flex;align-items:center;gap:12px}
+.adm-admin-email{font-size:13px;color:#94a3b8}
+.adm-logout{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;transition:.2s}
+.adm-logout:hover{background:rgba(239,68,68,.25)}
+
+/* LOADING / DENIED */
+.adm-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px;color:#94a3b8}
+.adm-spinner{width:36px;height:36px;border:3px solid #2d2d44;border-top-color:#a78bfa;border-radius:50%;animation:adm-spin .7s linear infinite}
+.adm-spinner-sm{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:adm-spin .7s linear infinite;display:inline-block}
+@keyframes adm-spin{to{transform:rotate(360deg)}}
+.adm-denied{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:12px;text-align:center}
+.adm-denied-icon{font-size:48px}
+.adm-denied h2{font-size:24px;color:#f87171}
+.adm-denied p{color:#94a3b8}
+.adm-btn-back{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px}
+
+/* MAIN */
+.adm-main{padding:24px;max-width:1400px;margin:0 auto}
+
+/* STATS */
+.adm-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.adm-stat-card{background:#1a1a2e;border:1px solid #2d2d44;border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px}
+.adm-stat-icon{font-size:28px;flex-shrink:0}
+.adm-stat-val{font-size:28px;font-weight:700;color:#a78bfa;line-height:1}
+.adm-stat-label{font-size:12px;color:#64748b;margin-top:3px}
+
+/* TOOLBAR */
+.adm-toolbar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.adm-search{flex:1;min-width:200px;background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:10px;padding:10px 14px;font-size:14px;outline:none;transition:.15s}
+.adm-search:focus{border-color:#a78bfa}
+.adm-search::placeholder{color:#475569}
+.adm-filter{background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;cursor:pointer}
+.adm-btn-refresh{background:#2d2d44;border:1px solid #3d3d5c;color:#a78bfa;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.adm-btn-refresh:hover{background:#3d3d5c}
+
+/* TABLE */
+.adm-table-wrap{overflow-x:auto;border-radius:14px;border:1px solid #2d2d44}
+.adm-table{width:100%;border-collapse:collapse;font-size:13px}
+.adm-table thead tr{background:#1a1a2e}
+.adm-table th{padding:12px 16px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #2d2d44;white-space:nowrap}
+.adm-table tbody tr{background:#12121f;border-bottom:1px solid #1e1e30;transition:background .15s}
+.adm-table tbody tr:hover{background:#1a1a2e}
+.adm-table tbody tr:last-child{border-bottom:none}
+.adm-row-disabled{opacity:.6}
+.adm-empty{text-align:center;padding:40px;color:#475569;font-size:14px}
+td{padding:12px 16px;vertical-align:middle}
+
+/* Cells */
+.adm-email-wrap{display:flex;align-items:center;gap:8px}
+.adm-avatar{width:28px;height:28px;background:linear-gradient(135deg,#6c63ff,#a78bfa);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.adm-td-email{max-width:220px}
+.adm-td-email span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;display:block}
+.adm-td-date{white-space:nowrap;color:#94a3b8;font-size:12px}
+.adm-td-slug a{color:#a78bfa;text-decoration:none;font-size:12px}
+.adm-td-slug a:hover{text-decoration:underline}
+.adm-ext{font-size:10px;opacity:.6}
+.adm-no-slug{color:#475569;font-size:12px}
+.adm-expired{color:#f87171}
+.adm-valid{color:#4ade80}
+.adm-exp-badge{background:rgba(239,68,68,.15);color:#f87171;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px}
+
+/* Plan badges */
+.adm-plan-badge{padding:3px 10px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.plan-free{background:rgba(100,116,139,.2);color:#94a3b8}
+.plan-pro{background:rgba(108,99,255,.2);color:#a78bfa}
+.plan-premium{background:rgba(234,179,8,.2);color:#fbbf24}
+
+/* Status */
+.adm-status-on{background:rgba(74,222,128,.15);color:#4ade80;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600}
+.adm-status-off{background:rgba(239,68,68,.15);color:#f87171;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600}
+
+/* Action buttons */
+.adm-td-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.adm-btn-activate{background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);color:#4ade80;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap}
+.adm-btn-activate:hover{background:rgba(74,222,128,.25)}
+.adm-btn-disable{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:#f87171;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap}
+.adm-btn-disable:hover{background:rgba(239,68,68,.22)}
+.adm-plan-select{background:#1e1e30;border:1px solid #2d2d44;color:#e2e8f0;border-radius:8px;padding:5px 8px;font-size:12px;cursor:pointer}
+.adm-btn-extend{background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:#fbbf24;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;transition:.2s;white-space:nowrap}
+.adm-btn-extend:hover{background:rgba(251,191,36,.22)}
+
+/* TOAST */
+.adm-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0;padding:12px 22px;border-radius:12px;font-size:14px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:2000;white-space:nowrap}
+.adm-toast.error{background:#2d1515;border-color:rgba(239,68,68,.3);color:#f87171}
+.toast-enter-active,.toast-leave-active{transition:all .3s}
+.toast-enter-from,.toast-leave-to{opacity:0;transform:translateX(-50%) translateY(12px)}
+
+@media(max-width:768px){
+  .adm-main{padding:12px}
+  .adm-stats{grid-template-columns:repeat(2,1fr)}
+  .adm-td-actions{flex-direction:column;align-items:flex-start}
 }
 
-.adm-header {
-  background: #1a1a2e;
-  border-bottom: 1px solid #2d2d44;
-  padding: 0 24px;
-  min-height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-}
+.adm-btn-export{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:6px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px}
+.adm-btn-export:hover{background:linear-gradient(135deg,#059669,#047857)}
+.adm-td-orders{text-align:center}
+.adm-orders-badge{background:rgba(108,99,255,.15);color:#6c63ff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px;border:1px solid rgba(108,99,255,.3)}
 
-.adm-brand,
-.adm-header-right,
-.adm-email-wrap,
-.adm-td-actions {
-  display: flex;
-  align-items: center;
-}
-
-.adm-brand { gap: 10px; }
-.adm-header-right { gap: 12px; }
-.adm-logo { font-size: 22px; }
-.adm-title { font-size: 17px; font-weight: 700; color: #a78bfa; }
-.adm-admin-email { font-size: 13px; color: #94a3b8; }
-
-.adm-logout,
-.adm-btn-back,
-.adm-btn-refresh,
-.adm-btn-export,
-.adm-btn-disable,
-.adm-btn-activate,
-.adm-btn-extend,
-.adm-plan-select {
-  border: 1px solid transparent;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.adm-logout {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #f87171;
-  padding: 6px 14px;
-}
-
-.adm-logout:hover { background: rgba(239, 68, 68, 0.25); }
-
-.adm-loading,
-.adm-denied {
-  min-height: 60vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  text-align: center;
-}
-
-.adm-loading { color: #94a3b8; }
-.adm-denied h2 { font-size: 24px; color: #f87171; }
-.adm-denied p { color: #94a3b8; }
-.adm-denied-icon { font-size: 48px; }
-.adm-btn-back { background: #6c63ff; color: #fff; padding: 10px 24px; }
-
-.adm-spinner,
-.adm-spinner-sm {
-  border-radius: 999px;
-  animation: adm-spin 0.7s linear infinite;
-}
-
-.adm-spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid #2d2d44;
-  border-top-color: #a78bfa;
-}
-
-.adm-spinner-sm {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
-  display: inline-block;
-}
-
-@keyframes adm-spin {
-  to { transform: rotate(360deg); }
-}
-
-.adm-main {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.adm-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-.adm-stat-card {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
-  border-radius: 14px;
-  padding: 18px 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.adm-stat-icon { font-size: 28px; }
-.adm-stat-val { font-size: 28px; font-weight: 700; color: #a78bfa; line-height: 1; }
-.adm-stat-label { font-size: 12px; color: #64748b; margin-top: 3px; }
-
-.adm-toolbar {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-}
-
-.adm-search,
-.adm-filter,
-.adm-plan-select {
-  background: #1a1a2e;
-  border: 1px solid #2d2d44;
-  color: #e2e8f0;
-}
-
-.adm-search {
-  flex: 1;
-  min-width: 220px;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 14px;
-  outline: none;
-}
-
-.adm-search:focus { border-color: #a78bfa; }
-.adm-search::placeholder { color: #475569; }
-.adm-filter,
-.adm-plan-select {
-  padding: 10px 12px;
-  font-size: 13px;
-}
-
-.adm-btn-refresh,
-.adm-btn-export {
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.adm-btn-refresh {
-  background: #2d2d44;
-  border-color: #3d3d5c;
-  color: #a78bfa;
-}
-
-.adm-btn-refresh:hover,
-.adm-btn-export:hover { transform: translateY(-1px); }
-
-.adm-btn-export {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.28);
-  color: #7dd3fc;
-}
-
-.adm-table-wrap {
-  overflow-x: auto;
-  border-radius: 14px;
-  border: 1px solid #2d2d44;
-}
-
-.adm-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  min-width: 1100px;
-}
-
-.adm-table thead tr { background: #1a1a2e; }
-
-.adm-table th,
-.adm-table td {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid #1e1e30;
-  vertical-align: middle;
-}
-
-.adm-table th {
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom-color: #2d2d44;
-  white-space: nowrap;
-}
-
-.adm-table tbody tr {
-  background: #12121f;
-  transition: background 0.15s ease;
-}
-
-.adm-table tbody tr:hover { background: #1a1a2e; }
-.adm-row-disabled { opacity: 0.58; }
-.adm-empty { text-align: center; padding: 40px; color: #64748b; }
-
-.adm-email-wrap { gap: 10px; }
-.adm-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: rgba(167, 139, 250, 0.18);
-  color: #c4b5fd;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-}
-
-.adm-td-date,
-.adm-td-slug { white-space: nowrap; }
-.adm-no-slug { color: #64748b; }
-.adm-slug-link { color: #7dd3fc; text-decoration: none; }
-.adm-slug-link:hover { text-decoration: underline; }
-.adm-ext { margin-left: 4px; }
-
-.adm-plan-badge,
-.adm-status-on,
-.adm-status-off,
-.adm-exp-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.plan-free { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
-.plan-pro { background: rgba(59, 130, 246, 0.16); color: #93c5fd; }
-.plan-premium { background: rgba(168, 85, 247, 0.16); color: #d8b4fe; }
-.adm-status-on { background: rgba(34, 197, 94, 0.16); color: #86efac; }
-.adm-status-off { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
-.adm-valid { color: #e2e8f0; }
-.adm-expired { color: #fecaca; }
-.adm-exp-badge { margin-left: 8px; background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
-
-.adm-td-actions {
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.adm-btn-disable,
-.adm-btn-activate,
-.adm-btn-extend {
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.adm-btn-disable {
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.28);
-  color: #fca5a5;
-}
-
-.adm-btn-activate {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.28);
-  color: #86efac;
-}
-
-.adm-btn-extend {
-  background: rgba(250, 204, 21, 0.14);
-  border-color: rgba(250, 204, 21, 0.3);
-  color: #fde68a;
-}
-
-.adm-btn-disable:disabled,
-.adm-btn-activate:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.adm-toast {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  max-width: calc(100vw - 32px);
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  z-index: 50;
-}
-
-.adm-toast.success {
-  background: #10281b;
-  color: #bbf7d0;
-  border: 1px solid rgba(34, 197, 94, 0.35);
-}
-
-.adm-toast.error {
-  background: #2a1010;
-  color: #fecaca;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-}
-
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.22s ease;
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
-@media (max-width: 768px) {
-  .adm-header,
-  .adm-main { padding-left: 14px; padding-right: 14px; }
-  .adm-header { min-height: 72px; align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
-  .adm-header-right { align-items: flex-end; flex-direction: column; }
-  .adm-table { min-width: 980px; }
-}
 </style>
