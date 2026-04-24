@@ -185,8 +185,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  orderBy,
-  query,
   updateDoc
 } from 'firebase/firestore'
 import { db } from '../firebase'
@@ -205,12 +203,15 @@ const toggling = ref(null)
 const toast = ref('')
 const toastType = ref('success')
 
+/* =========================
+   ADMIN CHECK
+========================= */
 const isAdmin = computed(() =>
   ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase())
 )
 
 /* =========================
-   🔥 NORMALISATION FIX
+   NORMALIZE DATA (SAFE)
 ========================= */
 const normalizeOwner = (id, data = {}) => ({
   id,
@@ -218,10 +219,7 @@ const normalizeOwner = (id, data = {}) => ({
   email: data.email || '—',
   plan: data.plan || 'free',
   paye: Boolean(data.paye),
-
-  // ✅ FIX FINAL
   active: Boolean(data.active),
-
   createdAt: data.createdAt || null,
   expiry: data.expiry || null,
   publishedSlug: data.publishedSlug || '',
@@ -237,18 +235,25 @@ const replaceOwnerLocally = (updatedOwner) => {
 }
 
 /* =========================
-   🔥 LOAD USERS
+   🔥 LOAD USERS (FIXED)
 ========================= */
 const loadOwners = async () => {
   loading.value = true
+
   try {
-    const snap = await getDocs(
-      query(collection(db, 'users'), orderBy('createdAt', 'desc'))
-    )
+    console.log("🔥 Loading users...")
+
+    // ✅ FIX : PAS DE orderBy (évite blocage)
+    const snap = await getDocs(collection(db, 'users'))
+
+    console.log("✅ Users loaded:", snap.size)
+
     owners.value = snap.docs.map(d =>
       normalizeOwner(d.id, d.data())
     )
+
   } catch (e) {
+    console.error("❌ LOAD ERROR:", e)
     showToast('Erreur chargement : ' + e.message, 'error')
   } finally {
     loading.value = false
@@ -256,7 +261,7 @@ const loadOwners = async () => {
 }
 
 /* =========================
-   🔥 TOGGLE ULTRA STABLE
+   🔥 TOGGLE STABLE
 ========================= */
 const toggleActive = async (owner) => {
   const docId = resolveOwnerDocId(owner)
@@ -267,18 +272,19 @@ const toggleActive = async (owner) => {
   try {
     const newActive = !Boolean(owner.active)
 
-    // ✅ UPDATE FIRESTORE
+    console.log("TOGGLE:", owner.active, "→", newActive)
+
     await updateDoc(doc(db, 'users', docId), {
       active: newActive,
     })
 
-    // ✅ UPDATE UI IMMÉDIAT
+    // update UI immédiat
     replaceOwnerLocally({
       ...owner,
       active: newActive,
     })
 
-    // ✅ RESYNC FIRESTORE (anti bug)
+    // resync Firestore
     setTimeout(async () => {
       const fresh = await getDoc(doc(db, 'users', docId))
       if (fresh.exists()) {
@@ -293,15 +299,18 @@ const toggleActive = async (owner) => {
         ? `✅ ${owner.email} activé`
         : `🔴 ${owner.email} désactivé`
     )
+
   } catch (e) {
+    console.error("❌ TOGGLE ERROR:", e)
     showToast('Erreur : ' + e.message, 'error')
   } finally {
     toggling.value = null
   }
 }
 
-/* ========================= */
-
+/* =========================
+   FILTER
+========================= */
 const filteredOwners = computed(() => {
   let list = [...owners.value]
   const s = search.value.toLowerCase()
@@ -320,6 +329,9 @@ const filteredOwners = computed(() => {
   return list
 })
 
+/* =========================
+   HELPERS
+========================= */
 const formatDate = (v) => {
   if (!v) return '—'
   const d = typeof v.toDate === 'function' ? v.toDate() : new Date(v)
@@ -337,8 +349,9 @@ const logout = async () => {
   router.push('/')
 }
 
-/* ========================= */
-
+/* =========================
+   INIT
+========================= */
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     currentUser.value = user
