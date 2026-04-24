@@ -198,7 +198,9 @@ const toggling = ref(null)
 const toast = ref('')
 const toastType = ref('success')
 
-const isAdmin = computed(() => ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase()))
+const isAdmin = computed(() =>
+  ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase())
+)
 
 const filteredOwners = computed(() => {
   let list = [...owners.value]
@@ -207,7 +209,7 @@ const filteredOwners = computed(() => {
   if (s) {
     list = list.filter((o) =>
       (o.email || '').toLowerCase().includes(s) ||
-      (o.publishedSlug || '').toLowerCase().includes(s),
+      (o.publishedSlug || '').toLowerCase().includes(s)
     )
   }
 
@@ -218,62 +220,54 @@ const filteredOwners = computed(() => {
   return list
 })
 
-const timestampToMs = (value) => {
-  if (!value) return null
-  if (typeof value === 'number') return value
-  if (value instanceof Date) return value.getTime()
-  if (typeof value?.toMillis === 'function') return value.toMillis()
-  if (typeof value?.toDate === 'function') return value.toDate().getTime()
-  if (typeof value?.seconds === 'number') return value.seconds * 1000
-
-  const parsed = new Date(value).getTime()
-  return Number.isNaN(parsed) ? null : parsed
-}
-
+/* =========================
+   🔥 FIX IMPORTANT ICI
+========================= */
 const normalizeOwner = (id, data = {}) => ({
   id,
   uid: data.uid || data.userId || id,
   email: data.email || '—',
   plan: data.plan || 'free',
   paye: data.paye === true || (data.plan && data.plan !== 'free'),
-  active: data.active !== false,
+
+  // ✅ FIX BOOLÉEN PROPRE
+  active: typeof data.active === 'boolean' ? data.active : false,
+
   createdAt: data.createdAt || null,
   expiry: data.expiry || null,
   publishedSlug: data.publishedSlug || '',
   orderCount: Number(data.orderCount || 0),
 })
 
-const resolveOwnerDocId = (owner) => owner?.id || owner?.uid || owner?.ownerId || null
+const resolveOwnerDocId = (owner) =>
+  owner?.id || owner?.uid || owner?.ownerId || null
 
 const replaceOwnerLocally = (updatedOwner) => {
   const index = owners.value.findIndex((item) => item.id === updatedOwner.id)
-  if (index === -1) return
-  owners.value.splice(index, 1, updatedOwner)
-}
-
-const readOwnerBack = async (owner) => {
-  const docId = resolveOwnerDocId(owner)
-  if (!docId) return null
-
-  const snapshot = await getDoc(doc(db, 'users', docId))
-  if (!snapshot.exists()) return null
-
-  return normalizeOwner(snapshot.id, snapshot.data())
+  if (index !== -1) {
+    owners.value.splice(index, 1, updatedOwner)
+  }
 }
 
 const loadOwners = async () => {
   loading.value = true
-
   try {
-    const snapshot = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')))
-    owners.value = snapshot.docs.map((item) => normalizeOwner(item.id, item.data()))
+    const snapshot = await getDocs(
+      query(collection(db, 'users'), orderBy('createdAt', 'desc'))
+    )
+    owners.value = snapshot.docs.map((doc) =>
+      normalizeOwner(doc.id, doc.data())
+    )
   } catch (error) {
-    showToast('Erreur chargement : ' + (error?.message || error), 'error')
+    showToast('Erreur chargement : ' + error.message, 'error')
   } finally {
     loading.value = false
   }
 }
 
+/* =========================
+   🔥 TOGGLE CORRIGÉ
+========================= */
 const toggleActive = async (owner) => {
   const docId = resolveOwnerDocId(owner)
   if (!docId || toggling.value === owner.id) return
@@ -281,123 +275,46 @@ const toggleActive = async (owner) => {
   toggling.value = owner.id
 
   try {
-    const currentActive = owner.active !== false
-    const newActive = !currentActive
+    const newActive = !(owner.active === true)
 
-    await updateDoc(doc(db, 'users', docId), { active: newActive })
+    // 🔥 update Firestore
+    await updateDoc(doc(db, 'users', docId), {
+      active: newActive,
+    })
 
-    const freshOwner = await readOwnerBack(owner)
-    replaceOwnerLocally(freshOwner || { ...owner, active: newActive })
+    // 🔥 update UI instantanément
+    replaceOwnerLocally({
+      ...owner,
+      active: newActive,
+    })
 
-    showToast(newActive ? `✅ ${owner.email} activé` : `🔴 ${owner.email} désactivé`)
+    showToast(
+      newActive
+        ? `✅ ${owner.email} activé`
+        : `🔴 ${owner.email} désactivé`
+    )
   } catch (error) {
-    showToast('Erreur désactivation : ' + (error?.message || error), 'error')
+    showToast('Erreur : ' + error.message, 'error')
   } finally {
     toggling.value = null
   }
 }
 
-const changePlan = async (owner, newPlan) => {
-  if (!newPlan || owner.plan === newPlan) return
-
-  const docId = resolveOwnerDocId(owner)
-  if (!docId) return
-
-  try {
-    const currentExpiryMs = timestampToMs(owner.expiry)
-    const hasValidExpiry = currentExpiryMs && currentExpiryMs > Date.now()
-
-    const payload = {
-      plan: newPlan,
-      paye: newPlan !== 'free',
-      active: true,
-      expiry: newPlan === 'free' ? null : (hasValidExpiry ? currentExpiryMs : Date.now() + PLAN_DURATION_MS),
-    }
-
-    await updateDoc(doc(db, 'users', docId), payload)
-
-    const freshOwner = await readOwnerBack(owner)
-    replaceOwnerLocally(freshOwner || normalizeOwner(docId, { ...owner, ...payload }))
-
-    showToast(`✅ Plan de ${owner.email} → ${newPlan.toUpperCase()}`)
-  } catch (error) {
-    showToast('Erreur changement plan : ' + (error?.message || error), 'error')
-  }
-}
-
-const extendExpiry = async (owner, days) => {
-  const docId = resolveOwnerDocId(owner)
-  if (!docId) return
-
-  try {
-    const currentExpiryMs = timestampToMs(owner.expiry)
-    const base = currentExpiryMs && currentExpiryMs > Date.now() ? currentExpiryMs : Date.now()
-    const newExpiry = base + days * 24 * 60 * 60 * 1000
-
-    await updateDoc(doc(db, 'users', docId), { expiry: newExpiry })
-
-    const freshOwner = await readOwnerBack(owner)
-    replaceOwnerLocally(freshOwner || normalizeOwner(docId, { ...owner, expiry: newExpiry }))
-
-    showToast(`+${days}j pour ${owner.email} → expire le ${formatDate(newExpiry)}`)
-  } catch (error) {
-    showToast('Erreur expiration : ' + (error?.message || error), 'error')
-  }
-}
+/* ========================= */
 
 const formatDate = (value) => {
-  const ms = timestampToMs(value)
-  if (!ms) return '—'
-
-  return new Date(ms).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+  if (!value) return '—'
+  const date =
+    typeof value.toDate === 'function'
+      ? value.toDate()
+      : new Date(value)
+  return date.toLocaleDateString('fr-FR')
 }
 
-const isExpired = (value) => {
-  const ms = timestampToMs(value)
-  return !!ms && ms < Date.now()
-}
-
-const exportCSV = () => {
-  const rows = [
-    ['Email', 'Plan', 'Payé', 'Inscrit le', 'Expiration', 'Slug', 'Commandes', 'Actif'],
-    ...filteredOwners.value.map((o) => [
-      o.email,
-      o.plan,
-      o.paye ? 'oui' : 'non',
-      o.createdAt ? formatDate(o.createdAt) : '',
-      o.expiry ? formatDate(o.expiry) : '',
-      o.publishedSlug || '',
-      o.orderCount || 0,
-      o.active !== false ? 'oui' : 'non',
-    ]),
-  ]
-
-  const csv = rows
-    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `stores-${new Date().toISOString().slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-let toastTimer = null
-const showToast = (message, type = 'success') => {
-  toast.value = message
+const showToast = (msg, type = 'success') => {
+  toast.value = msg
   toastType.value = type
-
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toast.value = ''
-  }, 3200)
+  setTimeout(() => (toast.value = ''), 3000)
 }
 
 const logout = async () => {
@@ -409,12 +326,9 @@ onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     currentUser.value = user
 
-    if (!user) {
-      router.push('/')
-      return
-    }
+    if (!user) return router.push('/')
 
-    if (ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
+    if (isAdmin.value) {
       await loadOwners()
     } else {
       loading.value = false
@@ -422,6 +336,7 @@ onMounted(() => {
   })
 })
 </script>
+  
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
