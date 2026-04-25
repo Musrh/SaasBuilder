@@ -101,7 +101,7 @@ import {
   getDocs,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "@/firebase";
+import { db } from "../firebase";
 
 const owners = ref([]);
 const loading = ref(false);
