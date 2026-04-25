@@ -1,86 +1,66 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] px-4">
+  <div class="af-root">
+    <div class="af-card">
 
-    <!-- CARD -->
-    <div class="w-full max-w-md rounded-3xl p-8 bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-white">
-
-      <!-- EMOJI / TITLE -->
-      <div class="text-center mb-6">
-        <div class="text-5xl mb-2">👋</div>
-        <h2 class="text-2xl font-semibold">
-          Connexion / Inscription
-        </h2>
-        <p class="text-sm text-gray-300 mt-2">
-          Accédez à votre espace SaaS
-        </p>
+      <!-- Header -->
+      <div class="af-header">
+        <div class="af-emoji">👋</div>
+        <h2 class="af-title">Connexion / Inscription</h2>
+        <p class="af-sub">Accédez à votre espace SaasBuilder</p>
       </div>
 
-      <!-- PLAN -->
-      <div class="bg-white/10 border border-white/10 rounded-xl p-3 mb-6 text-center">
-        <p class="text-xs text-gray-300">Plan choisi</p>
-        <p class="text-lg font-bold capitalize text-purple-400">
-          {{ selectedPlan }}
-        </p>
+      <!-- Plan badge -->
+      <div class="af-plan-badge">
+        <span class="af-plan-label">Plan choisi</span>
+        <span class="af-plan-val">{{ selectedPlan === 'pro' ? '⚡ Pro' : '🆓 Gratuit' }}</span>
       </div>
 
-      <!-- EMAIL -->
-      <div class="mb-4">
+      <!-- Email -->
+      <div class="af-field">
+        <label class="af-label">Email</label>
         <input
           v-model="email"
           type="email"
           placeholder="votre@email.com"
-          class="w-full p-3 rounded-xl bg-white/10 border border-white/10 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          class="af-input"
+          autocomplete="email"
         />
       </div>
 
-      <!-- PASSWORD -->
-      <div class="mb-2">
+      <!-- Password -->
+      <div class="af-field">
+        <label class="af-label">Mot de passe</label>
         <input
           v-model="password"
           type="password"
           placeholder="••••••••"
-          class="w-full p-3 rounded-xl bg-white/10 border border-white/10 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          class="af-input"
+          autocomplete="current-password"
         />
       </div>
 
-      <!-- ERROR -->
-      <p v-if="errorMsg" class="text-red-400 text-sm mb-3 text-center">
-        {{ errorMsg }}
-      </p>
+      <!-- Erreurs -->
+      <div v-if="errorMsg" class="af-error">{{ errorMsg }}</div>
+      <div v-if="disabledMsg" class="af-disabled">🚫 {{ disabledMsg }}</div>
 
-      <!-- COMPTE DÉSACTIVÉ -->
-      <p v-if="disabledMsg" class="text-yellow-400 text-sm mb-3 text-center bg-yellow-400/10 border border-yellow-400/30 rounded-xl p-3">
-        🚫 {{ disabledMsg }}
-      </p>
+      <!-- Loading -->
+      <div v-if="loading" class="af-loading">
+        <div class="af-spinner"></div>
+        <span>Chargement...</span>
+      </div>
 
-      <!-- LOADING -->
-      <p v-if="loading" class="text-purple-400 text-sm mb-3 text-center">
-        Chargement...
-      </p>
+      <!-- Boutons -->
+      <div class="af-actions">
+        <button @click="login" :disabled="loading" class="af-btn af-btn-login">
+          🔑 Se connecter
+        </button>
+        <button @click="register" :disabled="loading" class="af-btn af-btn-register">
+          ✨ S'inscrire
+        </button>
+      </div>
 
-      <!-- LOGIN -->
-      <button
-        @click="login"
-        :disabled="loading"
-        class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 py-3 rounded-xl font-semibold mb-3 hover:opacity-90 transition disabled:opacity-50"
-      >
-        🔑 Se connecter
-      </button>
-
-      <!-- REGISTER -->
-      <button
-        @click="register"
-        :disabled="loading"
-        class="w-full bg-white/10 py-3 rounded-xl font-semibold hover:bg-white/20 transition disabled:opacity-50"
-      >
-        ✨ S'inscrire
-      </button>
-
-      <!-- RETOUR -->
-      <button
-        @click="goToPlans"
-        class="mt-4 w-full text-sm text-gray-400 hover:text-white transition"
-      >
+      <!-- Retour -->
+      <button @click="goToPlans" class="af-back">
         ← Retour au choix du plan
       </button>
 
@@ -96,126 +76,81 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
   signOut,
 } from "firebase/auth"
 
 const route  = useRoute()
 const router = useRouter()
 
-// ── État ──────────────────────────────────────────────────────
-const email       = ref("")
-const password    = ref("")
+const email        = ref("")
+const password     = ref("")
 const selectedPlan = ref("free")
-const loading     = ref(false)
-const errorMsg    = ref("")
-const disabledMsg = ref("")
+const loading      = ref(false)
+const errorMsg     = ref("")
+const disabledMsg  = ref("")
 
-const API_URL = "https://backendfinal-production-afd2.up.railway.app"
-
-// ── Emails admin — connexion redirige vers /#/admin ───────────
-// Ces comptes doivent exister dans Firebase Auth
-// Pas de document Firestore requis pour l'admin
+const API_URL     = "https://backendfinal-production-afd2.up.railway.app"
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
-// ── Chargement plan depuis query ou localStorage ───────────────
 onMounted(() => {
   selectedPlan.value =
     route.query.plan ||
     localStorage.getItem("planChoisi") ||
     "free"
-
-  // NE PAS rediriger automatiquement au chargement de /auth
-  // L'utilisateur doit cliquer sur "Se connecter" ou "S'inscrire"
-  // pour déclencher la redirection. Cela évite les redirections
-  // non désirées (ex: session admin persistante qui force /#/admin)
 })
 
-// ── Redirection selon le rôle ──────────────────────────────────
 const redirectUser = async (user) => {
   const emailLower = user.email?.toLowerCase() || ""
-
-  // 1. Admin → tableau de bord admin
   if (ADMIN_EMAILS.includes(emailLower)) {
     window.location.href = "https://musrh.github.io/SaasBuilder/#/admin"
     return
   }
-
-  // 2. Propriétaire de store → vérifier son statut dans Firestore
   try {
     const snap = await getDoc(doc(db, "users", user.uid))
-
-    if (!snap.exists()) {
-      // Nouveau compte sans document → rester sur auth
-      return
-    }
-
-    const data    = snap.data()
-    const plan    = data.plan    || "free"
-    const paye    = data.paye    || false
-    const expiry  = data.expiry  || 0
-    const active  = data.active  !== false   // true par défaut
-
-    // Compte désactivé par l'admin
+    if (!snap.exists()) { router.push("/dashboard"); return }
+    const data   = snap.data()
+    const active = data.active !== false
     if (!active) {
       disabledMsg.value = "Votre compte a été désactivé. Contactez l'administrateur."
       await signOut(auth)
       return
     }
-
-    const planExpired = expiry && expiry < Date.now()
-
-    // Tous les cas → Dashboard
-    // Le Dashboard affiche les boutons Stripe Connect, Renouveler, et Accéder au Builder
-    // Le propriétaire Pro peut ensuite cliquer "Accéder au Builder →" depuis le Dashboard
     router.push("/dashboard")
-
-  } catch (err) {
+  } catch(err) {
     console.error("redirectUser:", err.message)
     router.push("/dashboard")
   }
 }
 
-// ── Connexion ──────────────────────────────────────────────────
 const login = async () => {
-  errorMsg.value    = ""
-  disabledMsg.value = ""
-  loading.value     = true
+  errorMsg.value = ""; disabledMsg.value = ""; loading.value = true
   try {
     const cred = await signInWithEmailAndPassword(auth, email.value.trim(), password.value)
     await redirectUser(cred.user)
-  } catch (err) {
+  } catch(err) {
     const msgs = {
-      "auth/user-not-found":      "Email introuvable.",
-      "auth/wrong-password":      "Mot de passe incorrect.",
-      "auth/invalid-email":       "Email invalide.",
-      "auth/too-many-requests":   "Trop de tentatives. Réessayez plus tard.",
-      "auth/invalid-credential":  "Email ou mot de passe incorrect.",
+      "auth/user-not-found":     "Email introuvable.",
+      "auth/wrong-password":     "Mot de passe incorrect.",
+      "auth/invalid-email":      "Email invalide.",
+      "auth/too-many-requests":  "Trop de tentatives. Réessayez plus tard.",
+      "auth/invalid-credential": "Email ou mot de passe incorrect.",
     }
-    errorMsg.value = msgs[err.code] || ("Erreur connexion : " + err.message)
-  } finally {
-    loading.value = false
-  }
+    errorMsg.value = msgs[err.code] || ("Erreur : " + err.message)
+  } finally { loading.value = false }
 }
 
-// ── Inscription ────────────────────────────────────────────────
 const register = async () => {
-  errorMsg.value    = ""
-  disabledMsg.value = ""
-  loading.value     = true
+  errorMsg.value = ""; disabledMsg.value = ""; loading.value = true
   try {
-    // Bloquer l'inscription avec un email admin
     if (ADMIN_EMAILS.includes(email.value.trim().toLowerCase())) {
       errorMsg.value = "Cet email est réservé à l'administration."
       return
     }
-
     const cred = await createUserWithEmailAndPassword(auth, email.value.trim(), password.value)
     const user = cred.user
     const uid  = user.uid
 
-    // Créer le document propriétaire dans Firestore
-    const userData = {
+    await setDoc(doc(db, "users", uid), {
       uid,
       email:              user.email,
       role:               "owner",
@@ -228,54 +163,161 @@ const register = async () => {
       active:             true,
       createdAt:          serverTimestamp(),
       expiry:             null,
-    }
+    })
 
-    await setDoc(doc(db, "users", uid), userData)
-
-    localStorage.setItem("user", JSON.stringify({
-      uid,
-      email: user.email,
-      plan:  selectedPlan.value,
-    }))
+    localStorage.setItem("user", JSON.stringify({ uid, email: user.email, plan: selectedPlan.value }))
     localStorage.setItem("planChoisi", selectedPlan.value)
 
-    // Plan payant → rediriger vers Stripe
     if (selectedPlan.value === "pro" || selectedPlan.value === "basic") {
       const res  = await fetch(`${API_URL}/create-billing-session`, {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email:    user.email,
-          plan:     selectedPlan.value,
-          ownerUid: uid,
-        }),
+        body: JSON.stringify({ email: user.email, plan: selectedPlan.value, ownerUid: uid }),
       })
       const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-        return
-      }
+      if (data.url) { window.location.href = data.url; return }
       errorMsg.value = "Erreur paiement : impossible de créer la session Stripe."
       return
     }
-
-    // Plan FREE → dashboard directement
     router.push("/dashboard")
-
-  } catch (err) {
+  } catch(err) {
     const msgs = {
       "auth/email-already-in-use": "Email déjà utilisé. Connectez-vous.",
       "auth/weak-password":        "Mot de passe trop faible (min. 6 caractères).",
       "auth/invalid-email":        "Email invalide.",
     }
-    errorMsg.value = msgs[err.code] || ("Erreur inscription : " + err.message)
-  } finally {
-    loading.value = false
-  }
+    errorMsg.value = msgs[err.code] || ("Erreur : " + err.message)
+  } finally { loading.value = false }
 }
 
-// ── Retour aux plans ───────────────────────────────────────────
-const goToPlans = () => {
-  router.push("/")
-}
+const goToPlans = () => router.push("/")
 </script>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.af-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f0f1a 0%, #1a1040 50%, #0f0f1a 100%);
+  padding: 24px 16px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.af-card {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 36px 32px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+
+/* Header */
+.af-header { text-align: center; margin-bottom: 24px; }
+.af-emoji  { font-size: 48px; margin-bottom: 10px; }
+.af-title  { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.af-sub    { font-size: 14px; color: rgba(255,255,255,.55); }
+
+/* Plan badge */
+.af-plan-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(108,99,255,.2);
+  border: 1px solid rgba(108,99,255,.35);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 24px;
+}
+.af-plan-label { font-size: 12px; color: rgba(255,255,255,.55); text-transform: uppercase; letter-spacing: .5px; }
+.af-plan-val   { font-size: 15px; font-weight: 700; color: #a78bfa; }
+
+/* Champs */
+.af-field  { margin-bottom: 14px; }
+.af-label  { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.6); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
+.af-input  {
+  width: 100%;
+  padding: 13px 16px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 12px;
+  font-size: 15px;
+  color: #fff;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color .2s, background .2s;
+}
+.af-input::placeholder { color: rgba(255,255,255,.35); }
+.af-input:focus {
+  border-color: rgba(108,99,255,.7);
+  background: rgba(108,99,255,.12);
+}
+
+/* Messages */
+.af-error    { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.35); color: #fca5a5; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; text-align: center; }
+.af-disabled { background: rgba(234,179,8,.12);  border: 1px solid rgba(234,179,8,.3);  color: #fde68a; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; text-align: center; }
+
+/* Loading */
+.af-loading { display: flex; align-items: center; justify-content: center; gap: 10px; color: #a78bfa; font-size: 13px; margin-bottom: 14px; }
+.af-spinner { width: 18px; height: 18px; border: 2px solid rgba(167,139,250,.3); border-top-color: #a78bfa; border-radius: 50%; animation: af-spin .7s linear infinite; }
+@keyframes af-spin { to { transform: rotate(360deg); } }
+
+/* Boutons */
+.af-actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.af-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 13px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .2s;
+}
+.af-btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+.af-btn-login {
+  background: linear-gradient(135deg, #6c63ff, #4f46e5);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(108,99,255,.4);
+}
+.af-btn-login:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,99,255,.5); }
+
+.af-btn-register {
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.85);
+  border: 1px solid rgba(255,255,255,.15);
+}
+.af-btn-register:hover:not(:disabled) { background: rgba(255,255,255,.14); color: #fff; }
+
+/* Retour */
+.af-back {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.4);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  font-family: 'DM Sans', sans-serif;
+  padding: 8px;
+  transition: color .15s;
+}
+.af-back:hover { color: rgba(255,255,255,.75); }
+
+/* Responsive */
+@media (max-width: 480px) {
+  .af-card  { padding: 28px 20px; border-radius: 20px; }
+  .af-title { font-size: 20px; }
+  .af-emoji { font-size: 40px; }
+}
+</style>
