@@ -260,77 +260,53 @@ async function refreshOwner(owner) {
   }
 }
 
-async function changePlan(owner, newPlan) {
+const changePlan = async (owner, newPlan) => {
   try {
-    const userId = getOwnerDocId(owner);
+    const isPaid = newPlan !== "free"
+    const wasFree = (owner.plan || "free") === "free"
 
-    if (!userId) {
-      console.error("UID utilisateur introuvable :", owner);
-      alert("Impossible de modifier le plan : utilisateur introuvable.");
-      return;
-    }
-
-    const userRef = doc(db, "users", userId);
-
-    const updates = {
+    const update = {
       plan: newPlan,
-      updatedAt: Date.now(),
-    };
-
-    if (newPlan === "pro") {
-      const expiryDate = new Date(Date.now() + THIRTY_DAYS_MS);
-
-      updates.paye = true;
-      updates.active = true;
-      updates.subscriptionActive = true;
-
-      /**
-       * IMPORTANT :
-       * On force l'écriture du champ expiry dans Firestore.
-       * Le champ devient une vraie date Firestore.
-       */
-      updates.expiry = Timestamp.fromDate(expiryDate);
+      paye: isPaid,
+      subscriptionActive: isPaid,
     }
 
-    if (newPlan === "free") {
-      updates.paye = false;
-      updates.subscriptionActive = false;
-      updates.expiry = null;
+    if (isPaid) {
+      // ✅ CAS IMPORTANT : Free → Pro/Premium
+      if (wasFree) {
+        update.expiry = Date.now() + 30 * DAY_MS
+      } else {
+        // Déjà payant → on garde ou prolonge intelligemment
+        const currentExpiry = toMillis(owner.expiry)
+        update.expiry = currentExpiry && currentExpiry > Date.now()
+          ? currentExpiry
+          : Date.now() + 30 * DAY_MS
+      }
+
+      update.active = true
+    } else {
+      // Retour au free
+      update.expiry = null
+      update.active = true
     }
 
-    /**
-     * IMPORTANT :
-     * setDoc avec merge:true force l'ajout ou la modification du champ expiry,
-     * même si le document existe déjà.
-     */
-    await setDoc(userRef, updates, { merge: true });
+    await updateDoc(doc(db, "users", owner.id), update)
+    replaceOwnerLocally(owner.id, update)
+    await refreshOwnerFromFirestore(owner.id)
 
-    /**
-     * Vérification immédiate après écriture.
-     */
-    const freshSnap = await getDoc(userRef);
+    showToast(
+      "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
+      (update.expiry ? " (expire le " + formatDate(update.expiry) + ")" : "")
+    )
 
-    if (!freshSnap.exists()) {
-      throw new Error("Document utilisateur introuvable après update.");
-    }
-
-    const freshOwner = normalizeOwner(freshSnap.id, freshSnap.data());
-
-    console.log("Utilisateur après changement de plan :", freshOwner);
-    console.log("Expiry après update :", freshOwner.expiry);
-
-    replaceOwnerLocally(owner.id, freshOwner);
-
-    alert(
-      newPlan === "pro"
-        ? "Plan Pro activé avec expiration dans 30 jours."
-        : "Plan gratuit activé."
-    );
-  } catch (err) {
-    console.error("Erreur changement plan :", err);
-    alert("Erreur lors du changement de plan.");
+  } catch(e) {
+    showToast("Erreur changePlan : " + e.message, "error")
   }
 }
+
+
+
+  
 
 async function toggleActive(owner) {
   try {
