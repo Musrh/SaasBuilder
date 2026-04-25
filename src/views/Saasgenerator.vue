@@ -12,6 +12,31 @@ const site = ref({
   pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }]
 })
 
+// ── Pages légales du store ─────────────────────────────────
+const legalPages = ref({
+  privacy:     { title: "Politique de confidentialité", content: `Notre site respecte votre vie privée. Les données collectées (nom, email, adresse) sont utilisées uniquement pour traiter vos commandes et ne sont jamais revendues à des tiers.
+
+Conformément au RGPD, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ces droits, contactez-nous.` },
+  refund:      { title: "Politique de remboursement",   content: `Vous disposez de 14 jours après réception de votre commande pour demander un remboursement.
+
+Les articles retournés doivent être dans leur état d'origine. Les frais de retour sont à votre charge. Le remboursement est effectué sous 5 à 10 jours ouvrés.` },
+  mentions:    { title: "Mentions légales",              content: `Ce site est édité par [Nom de la société].
+Siège social : [Adresse]
+SIRET : [Numéro SIRET]
+Responsable de publication : [Nom]
+Email : [Email de contact]
+Hébergeur : GitHub Pages` },
+  conditions:  { title: "Conditions générales de vente", content: `En passant commande sur notre site, vous acceptez nos conditions générales de vente.
+
+Les prix sont indiqués TTC. Nous nous réservons le droit de modifier nos prix à tout moment. Toute commande validée engage le client au paiement.` },
+  confidentialite: { title: "Confidentialité", content: `Nous utilisons des cookies techniques nécessaires au bon fonctionnement du site. Aucun cookie publicitaire n'est utilisé sans votre consentement.
+
+Vos données de navigation restent sur votre appareil et ne sont pas partagées avec des tiers.` },
+})
+const showLegalModal = ref(false)
+const legalTab       = ref("privacy")
+const legalSaving    = ref(false)
+
 const mode = ref("edit")
 const currentPageIndex = ref(0)
 const activeSectionIndex = ref(null)
@@ -447,6 +472,22 @@ const saveDnsRecords = () => {
 }
 const publishInfo = ref(null)
 
+// ── Sauvegarder les pages légales ──────────────────────────
+const saveLegalPages = async () => {
+  if (!currentUser.value) { notify("Connectez-vous d'abord", "error"); return }
+  legalSaving.value = true
+  try {
+    const { doc: fd, setDoc: fset } = await import("firebase/firestore")
+    await fset(fd(db, "users", currentUser.value.uid), { legalPages: legalPages.value }, { merge: true })
+    notify("✅ Pages légales sauvegardées !", "success")
+    showLegalModal.value = false
+  } catch(e) {
+    notify("Erreur : " + e.message, "error")
+  } finally {
+    legalSaving.value = false
+  }
+}
+
 const publishSite = async () => {
   if (!publishAddress.value.trim()) { notify("Entrez une adresse pour le site.", "error"); return }
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
@@ -637,8 +678,9 @@ onMounted(() => {
       const snap = await getDoc(docRef)
       if (snap.exists()) {
         const d = snap.data()
-        if (d.siteName) siteName.value = d.siteName
-        if (d.siteLogo) siteLogo.value = d.siteLogo
+        if (d.siteName)   siteName.value   = d.siteName
+        if (d.siteLogo)   siteLogo.value   = d.siteLogo
+        if (d.legalPages) legalPages.value = { ...legalPages.value, ...d.legalPages }
 
         if (d.siteData) {
           // Utilisateur existant → charger son site sauvegardé
@@ -1282,6 +1324,8 @@ function openCart()       { document.getElementById('cart-overlay').style.displa
 function closeCart()      { document.getElementById('cart-overlay').style.display='none' }
 function checkout()       { alert('Intégrez votre solution de paiement (Stripe, PayPal...) dans cette section.') }
 function handleForm(e)    { e.preventDefault(); alert('Message envoyé ! (Configurez un endpoint email de votre côté)') }
+function showLegal(key)   { var m = document.getElementById('legal-'+key+'-modal'); if(m) m.style.display='flex'; }
+function closeLegal(key)  { var m = document.getElementById('legal-'+key+'-modal'); if(m) m.style.display='none'; }
 
 // ── Navigation ───────────────────────────────────────────────
 document.querySelectorAll('nav a').forEach(a => {
@@ -1336,8 +1380,22 @@ ${sectionsHtml}
 </main>
 ${cartHtml}
 <footer class="site-footer">
-  <p>© ${new Date().getFullYear()} ${name} — Créé avec SaasBuilder</p>
+  <p>© ${new Date().getFullYear()} ${name}</p>
+  <nav class="site-footer-links">
+    ${Object.entries(legalPagesData).map(([key, page]) =>
+      page.content ? `<a href="#legal-${key}" onclick="showLegal('${key}');return false">${page.title}</a>` : ''
+    ).join('')}
+  </nav>
 </footer>
+<!-- Modales légales -->
+${Object.entries(legalPagesData).map(([key, page]) => page.content ? `
+<div id="legal-${key}-modal" class="legal-modal" style="display:none">
+  <div class="legal-modal-box">
+    <button class="legal-modal-close" onclick="closeLegal('${key}')">✕</button>
+    <h2>${page.title}</h2>
+    <div class="legal-content">${page.content.replace(/\n/g,'<br/>')}</div>
+  </div>
+</div>` : '').join('')}
 ${scriptHtml}
 </body>
 </html>`
@@ -2052,6 +2110,7 @@ const setPageStyle = (type, value) => {
       </select>
       <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
+      <button class="btn-action icon-btn btn-legal" @click="showLegalModal=true" title="Pages légales">📋</button>
       <button class="btn-action icon-btn btn-theme-pick" @click="showThemeModal=true" title="Thème du site">🎨</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
@@ -2399,6 +2458,40 @@ const setPageStyle = (type, value) => {
     </div>
   </div>
 
+
+  <!-- ── MODAL PAGES LÉGALES ──────────────────────────────── -->
+  <div v-if="showLegalModal" class="modal-overlay" @click.self="showLegalModal=false">
+    <div class="modal-box legal-editor-modal">
+      <button class="modal-close" @click="showLegalModal=false">✕</button>
+      <h3 class="legal-modal-title">📋 Pages légales du store</h3>
+      <p class="legal-modal-sub">Ces pages apparaîtront dans le footer de votre site publié</p>
+
+      <!-- Onglets -->
+      <div class="legal-tabs">
+        <button v-for="(page, key) in legalPages" :key="key"
+          :class="['legal-tab', legalTab===key && 'active']"
+          @click="legalTab=key">
+          {{ page.title.split(' ').slice(0,2).join(' ') }}
+        </button>
+      </div>
+
+      <!-- Éditeur -->
+      <div v-for="(page, key) in legalPages" :key="key" v-show="legalTab===key" class="legal-editor">
+        <label class="legal-field-label">Titre</label>
+        <input v-model="legalPages[key].title" class="legal-input" placeholder="Titre de la page"/>
+        <label class="legal-field-label">Contenu</label>
+        <textarea v-model="legalPages[key].content" class="legal-textarea"
+          :placeholder="'Contenu de la page ' + page.title + '...'" rows="10"/>
+        <p class="legal-hint">💡 Laissez vide pour masquer ce lien dans le footer</p>
+      </div>
+
+      <!-- Bouton sauvegarder -->
+      <button @click="saveLegalPages" :disabled="legalSaving" class="legal-save-btn">
+        {{ legalSaving ? '⏳ Sauvegarde...' : '✅ Sauvegarder les pages légales' }}
+      </button>
+    </div>
+  </div>
+
 </template>
 
 <style>
@@ -2737,281 +2830,38 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
 
-/* ═══════════════════════════════════════════════════════════
-   MODE APERÇU PUBLIC — corrige logo/z-index/duplication
-   ═══════════════════════════════════════════════════════════ */
+/* ── Footer légal ────────────────────────────────────────── */
+.site-footer { text-align:center; padding:24px 16px 32px; font-size:13px; color:var(--text-sub,#6b7280); border-top:1px solid var(--nav-border,#e5e7eb); background:var(--bg-alt,#fafafa); }
+.site-footer-links { display:flex; flex-wrap:wrap; justify-content:center; gap:8px 20px; margin-top:10px; }
+.site-footer-links a { font-size:12px; color:var(--text-sub,#6b7280); text-decoration:none; border-bottom:1px solid currentColor; padding-bottom:1px; cursor:pointer; }
+.site-footer-links a:hover { color:var(--accent,#6c63ff); }
 
-/* 1. Overlay plein écran — COUVRE TOUT le builder */
-.public-preview-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 99999 !important;        /* au-dessus de TOUT */
-  background: #fff;
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-}
+/* Modales légales dans site exporté */
+.legal-modal { position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; padding:16px; }
+.legal-modal-box { background:#fff; border-radius:16px; padding:28px 24px; max-width:600px; width:100%; max-height:80vh; overflow-y:auto; position:relative; }
+.legal-modal-close { position:absolute; top:14px; right:14px; background:none; border:none; font-size:20px; cursor:pointer; color:#6b7280; }
+.legal-modal-box h2 { font-size:20px; font-weight:700; color:#1a1a2e; margin-bottom:16px; }
+.legal-content { font-size:14px; color:#374151; line-height:1.7; }
 
-/* 2. Bouton Fermer — fixé en haut */
-.pub-preview-close {
-  position: fixed;
-  top: 8px;
-  right: 10px;
-  z-index: 100000;
-  background: #ef4444;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,.3);
-  font-family: 'DM Sans', sans-serif;
-}
-.pub-preview-close:hover { background: #dc2626; }
+/* Bouton légal dans topbar builder */
+.btn-legal { background:linear-gradient(135deg,#0ea5e9,#0284c7) !important; color:#fff !important; }
+.btn-legal:hover { opacity:.9; }
 
-/* 3. Nav sticky — logo CONTRAINT */
-.pub-preview-nav {
-  position: sticky;
-  top: 0;
-  z-index: 9998;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  height: 54px;
-  gap: 12px;
-  box-shadow: 0 1px 6px rgba(0,0,0,.07);
-  flex-shrink: 0;
-}
-.pub-preview-brand-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  min-width: 0;
-  max-width: 160px;
-}
-
-/* ✅ FIX LOGO — taille max stricte */
-.pub-preview-logo {
-  height: 32px !important;
-  width: auto !important;
-  max-width: 120px !important;
-  max-height: 32px !important;
-  object-fit: contain !important;
-  border-radius: 6px;
-  flex-shrink: 0;
-  display: block;
-}
-.pub-preview-brand-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-}
-.pub-preview-brand-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a1a2e;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100px;
-}
-
-/* 4. Onglets pages */
-.pub-preview-tabs {
-  display: flex;
-  gap: 4px;
-  flex: 1;
-  overflow-x: auto;
-  scrollbar-width: none;
-  justify-content: center;
-}
-.pub-preview-tabs::-webkit-scrollbar { display: none; }
-.pub-preview-tab {
-  background: none;
-  border: none;
-  color: #6b7280;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 7px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: .15s;
-  font-family: 'DM Sans', sans-serif;
-}
-.pub-preview-tab.active,
-.pub-preview-tab:hover { background: #6c63ff; color: #fff; }
-
-/* Bouton panier */
-.pub-preview-cart {
-  background: #6c63ff;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-/* 5. Zone de contenu — toute la largeur */
-.pub-preview-content {
-  flex: 1;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* 6. Sections */
-.prev-hero {
-  padding: clamp(48px,8vw,100px) clamp(16px,5vw,60px);
-  background: linear-gradient(135deg,#f8f7ff,#ede9fe);
-  text-align: center;
-}
-.prev-hero-title {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(24px,4.5vw,52px);
-  font-weight: 600;
-  color: #1a1a2e;
-  line-height: 1.15;
-  white-space: pre-line;
-  margin-bottom: 14px;
-}
-.prev-hero-sub {
-  font-size: clamp(13px,2vw,18px);
-  color: #6b7280;
-  margin-bottom: 26px;
-}
-.prev-hero-cta {
-  background: #6c63ff;
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 12px 28px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.prev-text {
-  padding: clamp(20px,4vw,48px) clamp(16px,5vw,60px);
-}
-.prev-text p {
-  font-size: clamp(14px,2vw,16px);
-  line-height: 1.8;
-  color: #374151;
-  max-width: 720px;
-}
-.prev-image { padding: clamp(14px,3vw,32px) clamp(16px,5vw,60px); }
-.prev-img   { width: 100%; border-radius: 10px; display: block; }
-
-.prev-gallery { padding: clamp(18px,4vw,40px) clamp(16px,5vw,60px); }
-.prev-gallery-grid { display: grid; gap: 8px; }
-.prev-gallery-item img {
-  width: 100%; border-radius: 7px; object-fit: cover; aspect-ratio: 1; display: block;
-}
-.prev-video { padding: clamp(18px,4vw,36px) clamp(16px,5vw,60px); }
-.prev-video-title {
-  font-size: clamp(16px,2.5vw,22px); color: #1a1a2e; margin-bottom: 12px; text-align: center;
-}
-.prev-video-iframe {
-  width: 100%; height: clamp(200px,45vw,420px); border-radius: 10px; border: none; display: block;
-}
-.prev-products {
-  padding: clamp(20px,4vw,48px) clamp(12px,4vw,60px);
-  background: #fafafa;
-}
-.prev-products-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
-  gap: 14px;
-}
-.prev-product-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,.06);
-  transition: transform .2s;
-}
-.prev-product-card:hover { transform: translateY(-3px); }
-.prev-product-img-wrap { position: relative; }
-.prev-product-img      { width: 100%; height: 150px; object-fit: cover; display: block; }
-.prev-product-img-ph   {
-  width: 100%; height: 150px; background: #f3f4f6;
-  display: flex; align-items: center; justify-content: center; font-size: 32px;
-}
-.prev-product-badge {
-  position: absolute; top: 8px; left: 8px;
-  background: #fef3c7; color: #92400e;
-  font-size: 9px; font-weight: 700;
-  padding: 2px 8px; border-radius: 100px; text-transform: uppercase;
-}
-.prev-product-body    { padding: 12px; }
-.prev-product-name    { font-size: 13px; font-weight: 600; color: #111; margin-bottom: 4px; }
-.prev-product-desc    { font-size: 11px; color: #6b7280; line-height: 1.4; margin-bottom: 10px; }
-.prev-product-footer  { display: flex; align-items: center; justify-content: space-between; }
-.prev-product-price   { font-size: 15px; font-weight: 700; color: #6c63ff; }
-.prev-product-btn     {
-  background: #6c63ff; color: #fff; border: none;
-  border-radius: 7px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer;
-}
-.prev-features { padding: clamp(28px,5vw,60px) clamp(12px,5vw,60px); background: #fafafa; }
-.prev-features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
-  gap: 18px; max-width: 860px; margin: 0 auto;
-}
-.prev-feature-card {
-  background: #fff; border: 1px solid #e5e7eb;
-  border-radius: 12px; padding: 20px 16px; text-align: center;
-}
-.prev-feat-icon { font-size: 28px; display: block; margin-bottom: 8px; }
-.prev-feature-card strong { font-size: 14px; color: #111; display: block; margin-bottom: 4px; }
-.prev-feature-card p { font-size: 12px; color: #6b7280; line-height: 1.4; }
-
-.prev-form {
-  padding: clamp(28px,5vw,60px) clamp(12px,5vw,60px);
-  background: #f8f7ff; display: flex; flex-direction: column; align-items: center;
-}
-.prev-form h3 { font-size: clamp(18px,3vw,26px); margin-bottom: 16px; color: #1a1a2e; }
-.prev-form-field {
-  width: 100%; max-width: 460px; padding: 10px 14px;
-  border: 1px solid #e5e7eb; border-radius: 9px; font-size: 14px;
-  margin-bottom: 10px; background: #fff; color: #374151; display: block;
-}
-.prev-form-ta  { min-height: 90px; resize: none; }
-.prev-form-btn {
-  background: #6c63ff; color: #fff; border: none;
-  border-radius: 9px; padding: 11px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
-}
-.prev-payment {
-  padding: clamp(28px,5vw,60px) clamp(12px,5vw,60px);
-  background: linear-gradient(135deg,#f8f7ff,#ede9fe); text-align: center;
-}
-.prev-payment-title  { font-size: clamp(18px,3.5vw,30px); color: #1a1a2e; margin-bottom: 8px; }
-.prev-payment-amount { font-size: clamp(36px,7vw,58px); font-weight: 700; color: #6c63ff; margin-bottom: 24px; }
-.prev-pay-btn { padding: 11px 24px; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
-.prev-pay-btn.stripe-btn { background: #635bff; color: #fff; }
-.prev-pay-btn.paypal-btn { background: #ffc439; color: #003087; }
-
-.prev-divider      { padding: 6px clamp(12px,5vw,60px); }
-.prev-divider-line { border: none; border-top: 1px solid #e5e7eb; }
-
-/* 7. Responsive mobile */
-@media (max-width: 520px) {
-  .pub-preview-logo { height: 26px !important; max-width: 90px !important; }
-  .pub-preview-brand-name { max-width: 70px; font-size: 12px; }
-  .pub-preview-close { top: 6px; right: 6px; padding: 5px 9px; font-size: 11px; }
-  .prev-products-grid { grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); }
-  .prev-features-grid { grid-template-columns: 1fr; }
-}
+/* ── Modal éditeur légal ─────────────────────────────────── */
+.legal-editor-modal { max-width:560px; width:94%; max-height:90vh; overflow-y:auto; }
+.legal-modal-title  { font-size:17px; font-weight:700; color:var(--text); margin-bottom:4px; }
+.legal-modal-sub    { font-size:12px; color:var(--text2); margin-bottom:16px; }
+.legal-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.legal-tab  { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; font-weight:500; cursor:pointer; color:var(--text2); transition:.15s; font-family:'DM Sans',sans-serif; }
+.legal-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.legal-editor { display:flex; flex-direction:column; gap:8px; }
+.legal-field-label { font-size:11px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:.5px; }
+.legal-input  { width:100%; padding:9px 12px; border:1px solid var(--border2); border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif; background:var(--surface2); color:var(--text); outline:none; }
+.legal-input:focus { border-color:var(--accent); }
+.legal-textarea { width:100%; padding:10px 12px; border:1px solid var(--border2); border-radius:8px; font-size:13px; font-family:'DM Sans',sans-serif; background:var(--surface2); color:var(--text); outline:none; resize:vertical; min-height:180px; line-height:1.6; }
+.legal-textarea:focus { border-color:var(--accent); }
+.legal-hint     { font-size:11px; color:var(--text3); font-style:italic; }
+.legal-save-btn { width:100%; background:linear-gradient(135deg,#6c63ff,#4f46e5); color:#fff; border:none; border-radius:10px; padding:13px; font-size:14px; font-weight:700; cursor:pointer; margin-top:8px; font-family:'DM Sans',sans-serif; transition:.2s; }
+.legal-save-btn:hover:not(:disabled) { opacity:.9; }
+.legal-save-btn:disabled { opacity:.5; cursor:not-allowed; }
 </style>
