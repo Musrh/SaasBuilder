@@ -1,32 +1,45 @@
 <template>
   <div class="admin-page">
-    <h1>Panneau Admin</h1>
+    <h1>Administration</h1>
+
+    <div class="admin-header">
+      <input
+        v-model="search"
+        type="text"
+        placeholder="Rechercher par email..."
+        class="search-input"
+      />
+
+      <button class="refresh-btn" @click="loadOwners">
+        Actualiser
+      </button>
+    </div>
 
     <div v-if="loading" class="loading">
       Chargement...
     </div>
 
-    <div v-else-if="owners.length === 0" class="empty">
+    <div v-else-if="filteredOwners.length === 0" class="empty">
       Aucun utilisateur trouvé.
     </div>
 
     <div v-else class="table-wrapper">
-      <table>
+      <table class="admin-table">
         <thead>
           <tr>
             <th>Email</th>
             <th>Plan</th>
             <th>Payé</th>
             <th>Actif</th>
+            <th>Abonnement</th>
             <th>Expiration</th>
             <th>Commandes</th>
-            <th>Créé le</th>
             <th>Actions</th>
           </tr>
         </thead>
 
         <tbody>
-          <tr v-for="owner in owners" :key="owner.uid || owner.id">
+          <tr v-for="owner in filteredOwners" :key="owner.id">
             <td>
               {{ owner.email || "—" }}
             </td>
@@ -36,20 +49,26 @@
                 :value="owner.plan || 'free'"
                 @change="changePlan(owner, $event.target.value)"
               >
-                <option value="free">Gratuit</option>
+                <option value="free">Free</option>
                 <option value="pro">Pro</option>
               </select>
             </td>
 
             <td>
-              <span :class="owner.paye ? 'badge success' : 'badge muted'">
+              <span :class="owner.paye ? 'badge success' : 'badge danger'">
                 {{ owner.paye ? "Oui" : "Non" }}
               </span>
             </td>
 
             <td>
               <span :class="owner.active !== false ? 'badge success' : 'badge danger'">
-                {{ owner.active !== false ? "Actif" : "Désactivé" }}
+                {{ owner.active !== false ? "Oui" : "Non" }}
+              </span>
+            </td>
+
+            <td>
+              <span :class="owner.subscriptionActive ? 'badge success' : 'badge danger'">
+                {{ owner.subscriptionActive ? "Active" : "Inactive" }}
               </span>
             </td>
 
@@ -61,24 +80,13 @@
               {{ owner.orderCount || 0 }}
             </td>
 
-            <td>
-              {{ formatDate(owner.createdAt) }}
-            </td>
-
             <td class="actions">
-              <button
-                type="button"
-                @click="toggleActive(owner)"
-                :class="owner.active !== false ? 'danger-button' : 'success-button'"
-              >
+              <button @click="toggleActive(owner)">
                 {{ owner.active !== false ? "Désactiver" : "Activer" }}
               </button>
 
-              <button
-                type="button"
-                @click="refreshOwner(owner)"
-              >
-                Actualiser
+              <button @click="refreshOwner(owner)">
+                Sync
               </button>
             </td>
           </tr>
@@ -86,28 +94,50 @@
       </table>
     </div>
 
-    <p v-if="errorMessage" class="error">
-      {{ errorMessage }}
+    <p v-if="error" class="error">
+      {{ error }}
     </p>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import {
+  Timestamp,
   collection,
   doc,
   getDoc,
   getDocs,
-  updateDoc,
+  query,
+  setDoc,
+  where,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "@/firebase";
 
 const owners = ref([]);
 const loading = ref(false);
-const errorMessage = ref("");
+const error = ref("");
+const search = ref("");
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+const filteredOwners = computed(() => {
+  const term = search.value.trim().toLowerCase();
+
+  if (!term) {
+    return owners.value;
+  }
+
+  return owners.value.filter((owner) => {
+    return String(owner.email || "")
+      .toLowerCase()
+      .includes(term);
+  });
+});
+
+function getOwnerDocId(owner) {
+  return owner?.uid || owner?.id || owner?.ownerId || owner?.storeId || null;
+}
 
 function toMillis(value) {
   if (!value) return null;
@@ -120,54 +150,15 @@ function toMillis(value) {
     return value.getTime();
   }
 
-  if (typeof value === "object" && typeof value.toMillis === "function") {
-    return value.toMillis();
+  if (typeof value?.toDate === "function") {
+    return value.toDate().getTime();
   }
 
-  if (typeof value === "object" && typeof value.seconds === "number") {
+  if (typeof value?.seconds === "number") {
     return value.seconds * 1000;
   }
 
   return null;
-}
-
-function normalizeOwner(docSnap) {
-  const data = docSnap.data();
-
-  return {
-    id: docSnap.id,
-    uid: data.uid || docSnap.id,
-    ownerId: data.ownerId || docSnap.id,
-    email: data.email || "",
-    role: data.role || "",
-    plan: data.plan || "free",
-    paye: data.paye === true,
-    active: data.active !== false,
-    subscriptionActive: data.subscriptionActive === true,
-    expiry: toMillis(data.expiry),
-    createdAt: toMillis(data.createdAt),
-    updatedAt: toMillis(data.updatedAt),
-    orderCount: data.orderCount || 0,
-    storeId: data.storeId || "",
-    stripeAccountId: data.stripeAccountId || null,
-  };
-}
-
-function getOwnerDocId(owner) {
-  return owner.uid || owner.id || owner.ownerId;
-}
-
-function replaceOwnerLocally(ownerId, updates) {
-  const index = owners.value.findIndex((owner) => {
-    return owner.uid === ownerId || owner.id === ownerId || owner.ownerId === ownerId;
-  });
-
-  if (index !== -1) {
-    owners.value.splice(index, 1, {
-      ...owners.value[index],
-      ...updates,
-    });
-  }
 }
 
 function formatDate(value) {
@@ -178,25 +169,68 @@ function formatDate(value) {
   }
 
   return new Date(millis).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
     year: "numeric",
+    month: "long",
+    day: "numeric",
   });
+}
+
+function normalizeOwner(id, data) {
+  return {
+    id,
+    uid: data.uid || id,
+    ownerId: data.ownerId || data.uid || id,
+    storeId: data.storeId || data.ownerId || data.uid || id,
+    email: data.email || "",
+    role: data.role || "",
+    plan: data.plan || "free",
+    paye: Boolean(data.paye),
+    active: data.active !== false,
+    subscriptionActive: Boolean(data.subscriptionActive),
+    expiry: data.expiry ?? null,
+    createdAt: data.createdAt ?? null,
+    updatedAt: data.updatedAt ?? null,
+    stripeAccountId: data.stripeAccountId ?? null,
+    orderCount: data.orderCount || 0,
+    ...data,
+  };
+}
+
+function replaceOwnerLocally(ownerId, newData) {
+  const index = owners.value.findIndex((owner) => {
+    return owner.id === ownerId || owner.uid === ownerId;
+  });
+
+  if (index !== -1) {
+    owners.value.splice(index, 1, {
+      ...owners.value[index],
+      ...newData,
+    });
+  }
 }
 
 async function loadOwners() {
   loading.value = true;
-  errorMessage.value = "";
+  error.value = "";
 
   try {
-    const snap = await getDocs(collection(db, "users"));
+    const usersRef = collection(db, "users");
 
-    owners.value = snap.docs
-      .map(normalizeOwner)
-      .filter((user) => user.role === "owner" || user.ownerId || user.storeId);
-  } catch (error) {
-    console.error("Erreur chargement utilisateurs :", error);
-    errorMessage.value = "Erreur lors du chargement des utilisateurs.";
+    let snapshot;
+
+    try {
+      const ownersQuery = query(usersRef, where("role", "==", "owner"));
+      snapshot = await getDocs(ownersQuery);
+    } catch {
+      snapshot = await getDocs(usersRef);
+    }
+
+    owners.value = snapshot.docs.map((userDoc) => {
+      return normalizeOwner(userDoc.id, userDoc.data());
+    });
+  } catch (err) {
+    console.error("Erreur chargement owners :", err);
+    error.value = "Erreur lors du chargement des utilisateurs.";
   } finally {
     loading.value = false;
   }
@@ -204,53 +238,58 @@ async function loadOwners() {
 
 async function refreshOwner(owner) {
   try {
-    const ownerId = getOwnerDocId(owner);
+    const userId = getOwnerDocId(owner);
 
-    if (!ownerId) {
-      alert("Utilisateur introuvable.");
+    if (!userId) {
+      console.error("UID introuvable :", owner);
       return;
     }
 
-    const snap = await getDoc(doc(db, "users", ownerId));
+    const userRef = doc(db, "users", userId);
+    const snap = await getDoc(userRef);
 
     if (!snap.exists()) {
-      alert("Utilisateur introuvable dans Firestore.");
+      console.error("Utilisateur introuvable :", userId);
       return;
     }
 
-    const freshOwner = normalizeOwner(snap);
-    replaceOwnerLocally(ownerId, freshOwner);
-  } catch (error) {
-    console.error("Erreur actualisation utilisateur :", error);
-    alert("Erreur lors de l'actualisation.");
+    const freshOwner = normalizeOwner(snap.id, snap.data());
+    replaceOwnerLocally(owner.id, freshOwner);
+  } catch (err) {
+    console.error("Erreur synchronisation owner :", err);
   }
 }
 
 async function changePlan(owner, newPlan) {
   try {
-    const ownerId = getOwnerDocId(owner);
+    const userId = getOwnerDocId(owner);
 
-    if (!ownerId) {
-      alert("Utilisateur introuvable.");
+    if (!userId) {
+      console.error("UID utilisateur introuvable :", owner);
+      alert("Impossible de modifier le plan : utilisateur introuvable.");
       return;
     }
 
-    const now = Date.now();
+    const userRef = doc(db, "users", userId);
 
     const updates = {
       plan: newPlan,
-      updatedAt: now,
+      updatedAt: Date.now(),
     };
 
     if (newPlan === "pro") {
+      const expiryDate = new Date(Date.now() + THIRTY_DAYS_MS);
+
       updates.paye = true;
       updates.active = true;
       updates.subscriptionActive = true;
 
-      // Correction importante :
-      // chaque passage vers Pro ajoute une expiration à 30 jours
-      // à partir de la date du changement.
-      updates.expiry = now + THIRTY_DAYS_MS;
+      /**
+       * IMPORTANT :
+       * On force l'écriture du champ expiry dans Firestore.
+       * Le champ devient une vraie date Firestore.
+       */
+      updates.expiry = Timestamp.fromDate(expiryDate);
     }
 
     if (newPlan === "free") {
@@ -259,52 +298,66 @@ async function changePlan(owner, newPlan) {
       updates.expiry = null;
     }
 
-    await updateDoc(doc(db, "users", ownerId), updates);
+    /**
+     * IMPORTANT :
+     * setDoc avec merge:true force l'ajout ou la modification du champ expiry,
+     * même si le document existe déjà.
+     */
+    await setDoc(userRef, updates, { merge: true });
 
-    replaceOwnerLocally(ownerId, updates);
+    /**
+     * Vérification immédiate après écriture.
+     */
+    const freshSnap = await getDoc(userRef);
 
-    await refreshOwner({
-      ...owner,
-      ...updates,
-    });
+    if (!freshSnap.exists()) {
+      throw new Error("Document utilisateur introuvable après update.");
+    }
 
-    alert("Plan mis à jour avec succès.");
-  } catch (error) {
-    console.error("Erreur changement plan :", error);
+    const freshOwner = normalizeOwner(freshSnap.id, freshSnap.data());
+
+    console.log("Utilisateur après changement de plan :", freshOwner);
+    console.log("Expiry après update :", freshOwner.expiry);
+
+    replaceOwnerLocally(owner.id, freshOwner);
+
+    alert(
+      newPlan === "pro"
+        ? "Plan Pro activé avec expiration dans 30 jours."
+        : "Plan gratuit activé."
+    );
+  } catch (err) {
+    console.error("Erreur changement plan :", err);
     alert("Erreur lors du changement de plan.");
   }
 }
 
 async function toggleActive(owner) {
   try {
-    const ownerId = getOwnerDocId(owner);
+    const userId = getOwnerDocId(owner);
 
-    if (!ownerId) {
-      alert("Utilisateur introuvable.");
+    if (!userId) {
+      console.error("UID utilisateur introuvable :", owner);
+      alert("Impossible de modifier le statut : utilisateur introuvable.");
       return;
     }
 
     const currentActive = owner.active !== false;
-    const newActive = !currentActive;
+    const nextActive = !currentActive;
 
     const updates = {
-      active: newActive,
+      active: nextActive,
       updatedAt: Date.now(),
     };
 
-    await updateDoc(doc(db, "users", ownerId), updates);
+    const userRef = doc(db, "users", userId);
 
-    replaceOwnerLocally(ownerId, updates);
+    await setDoc(userRef, updates, { merge: true });
 
-    await refreshOwner({
-      ...owner,
-      ...updates,
-    });
-
-    alert(newActive ? "Compte activé." : "Compte désactivé.");
-  } catch (error) {
-    console.error("Erreur activation/désactivation :", error);
-    alert("Erreur lors de la modification de l'état du compte.");
+    replaceOwnerLocally(owner.id, updates);
+  } catch (err) {
+    console.error("Erreur activation/désactivation :", err);
+    alert("Erreur lors de la modification du statut.");
   }
 }
 
@@ -323,77 +376,79 @@ onMounted(() => {
 h1 {
   margin-bottom: 24px;
   font-size: 28px;
+  font-weight: 700;
+}
+
+.admin-header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.refresh-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  background: #1d4ed8;
 }
 
 .loading,
 .empty {
   padding: 24px;
-  background: #f5f5f5;
-  border-radius: 8px;
+  text-align: center;
+  color: #666;
 }
 
 .table-wrapper {
   overflow-x: auto;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
 }
 
-table {
+.admin-table {
   width: 100%;
   border-collapse: collapse;
-  background: #ffffff;
+  min-width: 900px;
 }
 
-th,
-td {
+.admin-table th,
+.admin-table td {
   padding: 12px;
   border-bottom: 1px solid #e5e5e5;
   text-align: left;
-  white-space: nowrap;
+  font-size: 14px;
 }
 
-th {
-  background: #f8f8f8;
-  font-weight: 600;
+.admin-table th {
+  background: #f7f7f7;
+  font-weight: 700;
 }
 
-select {
-  padding: 8px;
-  border: 1px solid #d0d0d0;
+.admin-table select {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
   border-radius: 6px;
-  background: white;
-}
-
-button {
-  padding: 8px 12px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  background: #2563eb;
-  color: white;
-  font-weight: 500;
-}
-
-button:hover {
-  opacity: 0.9;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-}
-
-.success-button {
-  background: #16a34a;
-}
-
-.danger-button {
-  background: #dc2626;
 }
 
 .badge {
   display: inline-block;
   padding: 4px 8px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -407,9 +462,21 @@ button:hover {
   color: #991b1b;
 }
 
-.badge.muted {
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.actions button {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+}
+
+.actions button:hover {
   background: #f3f4f6;
-  color: #4b5563;
 }
 
 .error {
@@ -420,16 +487,10 @@ button:hover {
 
 @media (max-width: 768px) {
   .admin-page {
-    padding: 12px;
+    padding: 16px;
   }
 
-  th,
-  td {
-    padding: 10px;
-    font-size: 14px;
-  }
-
-  .actions {
+  .admin-header {
     flex-direction: column;
   }
 }
