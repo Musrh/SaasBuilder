@@ -9,12 +9,6 @@
         <p class="af-sub">Accédez à votre espace SaasBuilder</p>
       </div>
 
-      <!-- Plan badge -->
-      <div class="af-plan-badge">
-        <span class="af-plan-label">Plan choisi</span>
-        <span class="af-plan-val">{{ selectedPlan === 'pro' ? '⚡ Pro' : '🆓 Gratuit' }}</span>
-      </div>
-
       <!-- Email -->
       <div class="af-field">
         <label class="af-label">Email</label>
@@ -201,10 +195,10 @@ const goToPlans = () => router.push("/")
 .af-root {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: linear-gradient(135deg, #0f0f1a 0%, #1a1040 50%, #0f0f1a 100%);
-  padding: 24px 16px;
+  padding: 32px 16px;
   font-family: 'DM Sans', sans-serif;
 }
 
@@ -225,19 +219,7 @@ const goToPlans = () => router.push("/")
 .af-title  { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 6px; }
 .af-sub    { font-size: 14px; color: rgba(255,255,255,.55); }
 
-/* Plan badge */
-.af-plan-badge {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(108,99,255,.2);
-  border: 1px solid rgba(108,99,255,.35);
-  border-radius: 12px;
-  padding: 10px 16px;
-  margin-bottom: 24px;
-}
-.af-plan-label { font-size: 12px; color: rgba(255,255,255,.55); text-transform: uppercase; letter-spacing: .5px; }
-.af-plan-val   { font-size: 15px; font-weight: 700; color: #a78bfa; }
+
 
 /* Champs */
 .af-field  { margin-bottom: 14px; }
