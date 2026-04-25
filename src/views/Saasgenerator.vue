@@ -410,6 +410,88 @@ const siteName = ref("WellShoppings")
 
 // ===== LOGO =====
 const siteLogo = ref("")
+
+
+// ===== PAGES LÉGALES (footer du site publié) =====
+const defaultLegalPages = [
+  {
+    key: "privacy",
+    title: "Privacy Policy",
+    enabled: true,
+    content: "Politique de confidentialité\n\nCette boutique collecte uniquement les informations nécessaires au traitement des commandes, au service client et à l'amélioration de l'expérience utilisateur. Les données ne sont jamais revendues à des tiers."
+  },
+  {
+    key: "refund",
+    title: "Remboursement",
+    enabled: true,
+    content: "Politique de remboursement\n\nLe client peut demander un remboursement selon les conditions commerciales affichées sur le site. Les demandes sont étudiées sous 30 jours après réception des informations nécessaires."
+  },
+  {
+    key: "confidentialite",
+    title: "Confidentialité",
+    enabled: true,
+    content: "Confidentialité\n\nLes informations personnelles sont traitées avec confidentialité et utilisées uniquement pour la gestion de la relation client, des commandes et des communications liées au store."
+  },
+  {
+    key: "mentions",
+    title: "Mentions légales",
+    enabled: true,
+    content: "Mentions légales\n\nÉditeur du site : à compléter par le propriétaire du store.\nContact : à compléter.\nHébergement : GitHub Pages / solution choisie par le propriétaire du store."
+  },
+  {
+    key: "conditions",
+    title: "Conditions générales",
+    enabled: true,
+    content: "Conditions générales\n\nToute commande passée sur ce site implique l'acceptation des présentes conditions générales. Le propriétaire du store doit adapter ce contenu à son activité, ses produits, ses délais et ses obligations légales."
+  },
+]
+
+const normalizeLegalPages = (pages) => {
+  const list = Array.isArray(pages) ? pages : Object.values(pages || {})
+  return defaultLegalPages.map((def) => {
+    const saved = list.find((p) => p.key === def.key || p.title === def.title) || {}
+    return {
+      ...def,
+      ...saved,
+      enabled: saved.enabled !== false,
+      content: saved.content || def.content,
+    }
+  })
+}
+
+const legalPages = ref(normalizeLegalPages())
+const showLegalPagesModal = ref(false)
+const activeLegalPageKey = ref("privacy")
+const activeLegalPage = computed(() => legalPages.value.find((p) => p.key === activeLegalPageKey.value) || legalPages.value[0])
+const visibleLegalPages = computed(() => legalPages.value.filter((p) => p.enabled))
+const legalPagesConfigured = computed(() => legalPages.value.some((p) => p.configuredAt))
+
+const openLegalPagesModal = () => {
+  activeLegalPageKey.value = legalPages.value[0]?.key || "privacy"
+  showLegalPagesModal.value = true
+}
+
+const saveLegalPages = async () => {
+  if (!currentUser.value) { notify("Connectez-vous d'abord.", "error"); return }
+  const now = new Date().toISOString()
+  legalPages.value = legalPages.value.map((p) => ({ ...p, configuredAt: p.configuredAt || now, updatedAt: now }))
+  try {
+    await setDoc(doc(db, "users", currentUser.value.uid), {
+      legalPages: legalPages.value,
+      legalPagesConfigured: true,
+      legalPagesConfiguredAt: now,
+      siteData: site.value,
+      siteName: siteName.value,
+      siteLogo: siteLogo.value,
+    }, { merge: true })
+    localStorage.setItem("legalPages", JSON.stringify(legalPages.value))
+    notify("✓ Pages légales sauvegardées — elles apparaîtront dans le footer du site publié")
+    showLegalPagesModal.value = false
+  } catch (e) {
+    console.error("Erreur pages légales:", e)
+    notify("Erreur de sauvegarde des pages légales.", "error")
+  }
+}
 const uploadLogo = (e) => {
   const file = e.target.files[0]; if (!file) return
   const reader = new FileReader()
@@ -447,18 +529,6 @@ const saveDnsRecords = () => {
 }
 const publishInfo = ref(null)
 
-const saveLegalPages = async () => {
-  if (!currentUser.value) { notify("Connectez-vous d'abord", "error"); return }
-  legalSaving.value = true
-  try {
-    const { doc: fd, setDoc: fset } = await import("firebase/firestore")
-    await fset(fd(db, "users", currentUser.value.uid), { legalPages: legalPages.value }, { merge: true })
-    notify("✅ Pages légales sauvegardées !", "success")
-    showLegalModal.value = false
-  } catch(e) { notify("Erreur : " + e.message, "error") }
-  finally { legalSaving.value = false }
-}
-
 const publishSite = async () => {
   if (!publishAddress.value.trim()) { notify("Entrez une adresse pour le site.", "error"); return }
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
@@ -479,6 +549,9 @@ const publishSite = async () => {
       siteData: site.value,
       siteName: siteName.value,
       siteLogo: siteLogo.value,
+      legalPages: legalPages.value,
+      legalPagesConfigured: legalPagesConfigured.value,
+      legalPagesConfiguredAt: legalPagesConfigured.value ? new Date().toISOString() : null,
       publishedSlug: slug,
       publishedAt: new Date().toISOString(),
       customDomain: domain || null,
@@ -579,8 +652,9 @@ const builtinThemes = [
   { name:"Vert Nature",    accent:"#059669", accentHover:"#047857", bg:"#f0fdf4", bgAlt:"#dcfce7", bgHero:"linear-gradient(135deg,#f0fdf4,#dcfce7)", text:"#14532d", textSub:"#4b7563", btnRadius:"8px", btnPadding:"13px 28px", cardRadius:"12px", cardShadow:"0 2px 12px rgba(5,150,105,.1)", heroFont:"'Playfair Display',serif", bodyFont:"'DM Sans',sans-serif", navBg:"#ffffff", navBorder:"#bbf7d0" },
 ]
 
-const applyThemeObj = (th) => {
+const applyThemeObj = async (th) => {
   currentTheme.value = th
+  // Appliquer les variables CSS sur le builder
   const r = document.documentElement
   r.style.setProperty("--theme-accent",      th.accent        || "#6c63ff")
   r.style.setProperty("--theme-accent-hover",th.accentHover   || "#4f46e5")
@@ -597,7 +671,23 @@ const applyThemeObj = (th) => {
   r.style.setProperty("--theme-body-font",   th.bodyFont      || "'DM Sans',sans-serif")
   r.style.setProperty("--theme-nav-bg",      th.navBg         || "#ffffff")
   r.style.setProperty("--theme-nav-border",  th.navBorder     || "#e5e7eb")
-  notify(`✅ Thème "${th.name}" appliqué !`, "success")
+
+  // ✅ Persister le thème dans Firestore ET localStorage
+  // SiteViewer le lira depuis users/{uid}/siteTheme
+  const themeData = { ...th, savedAt: new Date().toISOString() }
+  localStorage.setItem("siteTheme", JSON.stringify(themeData))
+
+  if (currentUser.value) {
+    try {
+      const { doc: fd, setDoc: fset } = await import("firebase/firestore")
+      await fset(fd(db, "users", currentUser.value.uid), { siteTheme: themeData }, { merge: true })
+      notify(`✅ Thème "${th.name}" appliqué et sauvegardé !`, "success")
+    } catch(e) {
+      notify(`✅ Thème "${th.name}" appliqué (local)`, "success")
+    }
+  } else {
+    notify(`✅ Thème "${th.name}" appliqué !`, "success")
+  }
   showThemeModal.value = false
 }
 
@@ -649,9 +739,9 @@ onMounted(() => {
       const snap = await getDoc(docRef)
       if (snap.exists()) {
         const d = snap.data()
-        if (d.siteName)   siteName.value   = d.siteName
-        if (d.siteLogo)   siteLogo.value   = d.siteLogo
-        if (d.legalPages) legalPages.value = { ...legalPages.value, ...d.legalPages }
+        if (d.siteName) siteName.value = d.siteName
+        if (d.siteLogo) siteLogo.value = d.siteLogo
+        if (d.legalPages) legalPages.value = normalizeLegalPages(d.legalPages)
 
         if (d.siteData) {
           // Utilisateur existant → charger son site sauvegardé
@@ -680,6 +770,22 @@ watch(siteName, (v) => { localStorage.setItem("siteName", v) })
 watch(siteLogo, (v) => { localStorage.setItem("siteLogo", v) })
 watch(currentPageIndex, () => { activeSectionIndex.value = null })
 
+// ── Connexion / Déconnexion ────────────────────────────────
+const logoutUser = async () => {
+  try {
+    await import("firebase/auth").then(m => m.signOut(auth))
+    currentUser.value = null
+    notify("Déconnecté avec succès", "success")
+    setTimeout(() => {
+      window.location.href = "https://musrh.github.io/SaasBuilder/#/auth"
+    }, 800)
+  } catch(e) { notify("Erreur déconnexion", "error") }
+}
+
+const goToLogin = () => {
+  window.location.href = "https://musrh.github.io/SaasBuilder/#/auth"
+}
+
 // Init Stripe Elements when payment modal opens on Stripe tab
 watch([() => showPaymentModal.value, () => paymentProvider.value], ([modalOpen, provider]) => {
   if (modalOpen && provider === 'stripe') {
@@ -699,8 +805,15 @@ const saveSite = async () => {
   isSaving.value = true
   try {
     const docRef = doc(db, "users", currentUser.value.uid)
-    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value }, { merge: true })
+    await setDoc(docRef, {
+      siteData: site.value,
+      siteName: siteName.value,
+      siteLogo: siteLogo.value,
+      legalPages: legalPages.value,
+      legalPagesConfigured: legalPagesConfigured.value,
+    }, { merge: true })
     localStorage.setItem("siteDataPro", JSON.stringify(site.value))
+    localStorage.setItem("legalPages", JSON.stringify(legalPages.value))
     isSaved.value = true
     notify(t.value.saved)
   } catch (e) {
@@ -1295,8 +1408,15 @@ function openCart()       { document.getElementById('cart-overlay').style.displa
 function closeCart()      { document.getElementById('cart-overlay').style.display='none' }
 function checkout()       { alert('Intégrez votre solution de paiement (Stripe, PayPal...) dans cette section.') }
 function handleForm(e)    { e.preventDefault(); alert('Message envoyé ! (Configurez un endpoint email de votre côté)') }
-function showLegal(k)  { var m=document.getElementById('lm-'+k); if(m){m.style.display='flex';} }
-function closeLegal(k) { var m=document.getElementById('lm-'+k); if(m){m.style.display='none';} }
+const legalPages = ${legalPagesJson};
+function openLegalPage(key) {
+  const page = legalPages.find(p => p.key === key);
+  if (!page) return;
+  document.getElementById('legal-modal-title').textContent = page.title;
+  document.getElementById('legal-modal-content').textContent = page.content || '';
+  document.getElementById('legal-modal').style.display = 'flex';
+}
+function closeLegalPage() { document.getElementById('legal-modal').style.display = 'none'; }
 
 // ── Navigation ───────────────────────────────────────────────
 document.querySelectorAll('nav a').forEach(a => {
@@ -1338,6 +1458,28 @@ updateCartUI()
     --nav-border:  ${navBorder};
   }
   body { background: var(--bg); color: var(--text); font-family: var(--body-font); }
+
+
+
+/* PAGES LÉGALES */
+.legal-top-btn{white-space:nowrap}
+.legal-modal{max-width:920px}
+.legal-editor-layout{display:grid;grid-template-columns:240px 1fr;gap:16px;min-height:420px}
+.legal-tabs{display:flex;flex-direction:column;gap:8px}
+.legal-tab{border:1px solid var(--border,#e5e7eb);background:var(--surface,#fff);border-radius:12px;padding:12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px;color:var(--text,#1a1a2e)}
+.legal-tab.active{border-color:var(--primary,#6c63ff);box-shadow:0 0 0 3px rgba(108,99,255,.12)}
+.legal-tab small{color:var(--text3,#6b7280);font-size:11px}
+.legal-editor-panel{display:flex;flex-direction:column;gap:10px}
+.legal-check{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2,#374151)}
+.legal-field-label{font-size:12px;font-weight:700;color:var(--text2,#374151)}
+.legal-textarea{min-height:300px;resize:vertical;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:14px;font-family:inherit;line-height:1.6;color:var(--text,#1a1a2e);background:var(--surface,#fff)}
+.legal-publish-status{border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;background:var(--surface2,#f8fafc);margin-bottom:12px}
+.legal-publish-status strong{font-size:13px;color:var(--text,#1a1a2e)}
+.legal-publish-status span{font-size:12px;color:var(--text3,#6b7280)}
+.legal-publish-status.ok{border-color:#22c55e;background:#f0fdf4}
+.legal-publish-status .btn-action{grid-row:1 / span 2;grid-column:2}
+@media(max-width:760px){.legal-editor-layout{grid-template-columns:1fr}.legal-tabs{max-height:180px;overflow:auto}.legal-publish-status{grid-template-columns:1fr}.legal-publish-status .btn-action{grid-row:auto;grid-column:auto}}
+
 </style>
 </head>
 <body>
@@ -1351,19 +1493,16 @@ ${sectionsHtml}
 </main>
 ${cartHtml}
 <footer class="site-footer">
-  <p>© ${new Date().getFullYear()} ${name}</p>
-  <nav class="site-footer-links">
-    ${Object.entries(legalPagesObj).filter(([,p])=>p.content).map(([key,p])=>`<a href="#" onclick="showLegal('${key}');return false">${p.title}</a>`).join('')}
-  </nav>
+  <div class="site-footer-links">${footerLegalLinks}</div>
+  <p>© ${new Date().getFullYear()} ${name} — Créé avec SaasBuilder</p>
 </footer>
-${Object.entries(legalPagesObj).filter(([,p])=>p.content).map(([key,p])=>`
-<div id="lm-${key}" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px">
-  <div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;position:relative">
-    <button onclick="closeLegal('${key}')" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:20px;cursor:pointer">✕</button>
-    <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin-bottom:16px">${p.title}</h2>
-    <div style="font-size:14px;color:#374151;line-height:1.7">${p.content.replace(/\n/g,'<br/>')}</div>
+<div id="legal-modal" class="legal-modal-overlay" onclick="if(event.target===this)closeLegalPage()" style="display:none">
+  <div class="legal-modal-box">
+    <button class="legal-modal-close" onclick="closeLegalPage()">✕</button>
+    <h2 id="legal-modal-title"></h2>
+    <div id="legal-modal-content" class="legal-modal-content"></div>
   </div>
-</div>`).join('')}
+</div>
 ${scriptHtml}
 </body>
 </html>`
@@ -1475,7 +1614,15 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 .cart-checkout-btn:hover{background:var(--accent-h)}
 
 /* FOOTER */
-.site-footer{text-align:center;padding:24px;font-size:13px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt)}
+.site-footer{text-align:center;padding:28px 18px;font-size:13px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt);display:flex;flex-direction:column;align-items:center;gap:16px}
+.site-footer-links{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:360px}
+.legal-footer-link{width:100%;background:transparent;border:0;color:var(--text);font:inherit;font-weight:600;cursor:pointer;padding:8px 10px;border-radius:8px;text-align:center}
+.legal-footer-link:hover{background:var(--bg);color:var(--accent)}
+.legal-modal-overlay{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:18px}
+.legal-modal-box{background:var(--bg);color:var(--text);width:min(680px,100%);max-height:86vh;overflow:auto;border-radius:16px;padding:26px;position:relative;box-shadow:0 24px 70px rgba(0,0,0,.24)}
+.legal-modal-close{position:absolute;top:12px;right:12px;border:0;background:var(--bg-alt);color:var(--text);width:32px;height:32px;border-radius:50%;cursor:pointer}
+.legal-modal-box h2{font-family:var(--hero-font);margin-bottom:14px}
+.legal-modal-content{white-space:pre-line;line-height:1.7;color:var(--text-sub)}
 
 /* RESPONSIVE */
 @media(max-width:600px){
@@ -1779,6 +1926,52 @@ const setPageStyle = (type, value) => {
     </div>
   </Transition>
 
+
+
+  <!-- PAGES LÉGALES MODAL -->
+  <Transition name="modal">
+    <div v-if="showLegalPagesModal" class="modal-overlay" @click.self="showLegalPagesModal=false">
+      <div class="modal-box legal-modal">
+        <button class="modal-close" @click="showLegalPagesModal=false">✕</button>
+        <div class="modal-header">
+          <span class="modal-icon">⚖</span>
+          <h2>Pages du footer</h2>
+          <p class="modal-desc">Modifiez les contenus par défaut. Les pages activées apparaissent dans le footer du site publié.</p>
+        </div>
+
+        <div class="legal-editor-layout">
+          <div class="legal-tabs">
+            <button
+              v-for="p in legalPages"
+              :key="p.key"
+              :class="['legal-tab', { active: activeLegalPageKey === p.key }]"
+              @click="activeLegalPageKey = p.key"
+            >
+              <span>{{ p.title }}</span>
+              <small>{{ p.enabled ? 'Visible footer' : 'Masquée' }}</small>
+            </button>
+          </div>
+
+          <div v-if="activeLegalPage" class="legal-editor-panel">
+            <label class="legal-check">
+              <input type="checkbox" v-model="activeLegalPage.enabled" />
+              Afficher cette page dans le footer du site publié
+            </label>
+            <label class="legal-field-label">Titre affiché</label>
+            <input v-model="activeLegalPage.title" class="pub-input" />
+            <label class="legal-field-label">Contenu de la page</label>
+            <textarea v-model="activeLegalPage.content" class="legal-textarea" spellcheck="true"></textarea>
+          </div>
+        </div>
+
+        <div class="config-modal-actions">
+          <button class="btn-action" @click="showLegalPagesModal=false">Annuler</button>
+          <button class="btn-action primary" @click="saveLegalPages">✓ Valider les modifications</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
   <!-- PUBLISH MODAL -->
   <Transition name="modal">
     <div v-if="showPublishModal" class="modal-overlay" @click.self="showPublishModal=false" :dir="isRtl?'rtl':'ltr'">
@@ -1791,6 +1984,11 @@ const setPageStyle = (type, value) => {
         </div>
 
         <div v-if="publishStatus !== 'published'" class="publish-form">
+          <div class="legal-publish-status" :class="{ ok: legalPagesConfigured }">
+            <strong>⚖ Pages du footer</strong>
+            <span>{{ legalPagesConfigured ? 'Déjà configurées ✓' : 'Configuration par défaut active' }}</span>
+            <button type="button" class="btn-action small" @click="openLegalPagesModal">Modifier</button>
+          </div>
           <div class="pub-field">
             <label>{{ t.siteAddress }}</label>
             <div class="pub-url-wrap">
@@ -2078,8 +2276,8 @@ const setPageStyle = (type, value) => {
       </select>
       <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
-      <button class="btn-action icon-btn btn-legal" @click="showLegalModal=true" title="Pages légales">📋</button>
       <button class="btn-action icon-btn btn-theme-pick" @click="showThemeModal=true" title="Thème du site">🎨</button>
+      <button class="btn-action legal-top-btn" @click="openLegalPagesModal" title="Pages du footer">⚖ Pages légales</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -2092,6 +2290,17 @@ const setPageStyle = (type, value) => {
       <button class="btn-action primary" @click="mode=mode==='preview'?'edit':'preview'">
         {{ mode==='preview' ? t.edit : t.preview }}
       </button>
+
+      <!-- Bouton connexion/déconnexion -->
+      <div class="topbar-user">
+        <span v-if="currentUser" class="topbar-user-email">{{ currentUser.email?.split('@')[0] }}</span>
+        <button v-if="currentUser" class="btn-action btn-logout" @click="logoutUser" title="Se déconnecter">
+          🚪
+        </button>
+        <button v-else class="btn-action btn-login" @click="goToLogin" title="Se connecter">
+          🔑 Connexion
+        </button>
+      </div>
     </div>
   </header>
 
@@ -2423,32 +2632,6 @@ const setPageStyle = (type, value) => {
         <span>Thème actuel : <strong>{{ currentTheme?.name || 'Défaut' }}</strong></span>
         <button class="tpm-export-btn" @click="exportCurrentTheme">📤 Exporter .json</button>
       </div>
-    </div>
-  </div>
-
-
-  <!-- ── MODAL PAGES LÉGALES ──────────────────────────────── -->
-  <div v-if="showLegalModal" class="modal-overlay" @click.self="showLegalModal=false">
-    <div class="modal-box legal-editor-modal">
-      <button class="modal-close" @click="showLegalModal=false">✕</button>
-      <h3 class="legal-modal-title">📋 Pages légales</h3>
-      <p class="legal-modal-sub">Ces pages apparaîtront dans le footer de votre site publié</p>
-      <div class="legal-tabs">
-        <button v-for="(page, key) in legalPages" :key="key"
-          :class="['legal-tab', legalTab===key && 'active']"
-          @click="legalTab=key">
-          {{ page.title.split(' ')[0] }}
-        </button>
-      </div>
-      <div v-for="(page, key) in legalPages" :key="'e'+key" v-show="legalTab===key" class="legal-editor">
-        <label class="legal-field-label">Titre</label>
-        <input v-model="legalPages[key].title" class="legal-input" placeholder="Titre"/>
-        <label class="legal-field-label">Contenu <span style="color:var(--text3);font-weight:400">(laisser vide pour masquer dans le footer)</span></label>
-        <textarea v-model="legalPages[key].content" class="legal-textarea" rows="10"/>
-      </div>
-      <button @click="saveLegalPages" :disabled="legalSaving" class="legal-save-btn">
-        {{ legalSaving ? '⏳ Sauvegarde...' : '✅ Sauvegarder' }}
-      </button>
     </div>
   </div>
 
@@ -2790,90 +2973,39 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
 
-/* ══ MODE APERÇU PUBLIC ══════════════════════════════════════
-   CRITIQUE : position:fixed + z-index:99999 couvre TOUT
-   ══════════════════════════════════════════════════════════ */
-.public-preview-overlay{position:fixed!important;inset:0!important;z-index:99999!important;background:#fff;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column}
-.pub-preview-close{position:fixed;top:8px;right:10px;z-index:100000;background:#ef4444;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.pub-preview-close:hover{background:#dc2626}
-.pub-preview-nav{position:sticky;top:0;z-index:9998;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:0 16px;height:54px;gap:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);flex-shrink:0}
-.pub-preview-brand-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0;max-width:160px}
-.pub-preview-logo{height:32px!important;width:auto!important;max-width:120px!important;max-height:32px!important;object-fit:contain!important;border-radius:6px;flex-shrink:0;display:block}
-.pub-preview-brand-icon{font-size:20px;flex-shrink:0}
-.pub-preview-brand-name{font-size:14px;font-weight:700;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
-.pub-preview-tabs{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none;justify-content:center}
-.pub-preview-tabs::-webkit-scrollbar{display:none}
-.pub-preview-tab{background:none;border:none;color:#6b7280;font-size:13px;font-weight:500;padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:.15s}
-.pub-preview-tab.active,.pub-preview-tab:hover{background:#6c63ff;color:#fff}
-.pub-preview-cart{background:#6c63ff;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
-.pub-preview-content{flex:1;width:100%;max-width:100%;overflow-x:hidden}
+/* ══ MODAL THÈME ═══════════════════════════════════════════ */
+.theme-pick-modal{max-width:500px;width:93%;max-height:88vh;overflow-y:auto}
+.tpm-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px}
+.tpm-sub{font-size:13px;color:var(--text2);margin-bottom:14px}
+.tpm-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;display:block}
+.tpm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:6px}
+.tpm-card{background:var(--surface2);border:2px solid var(--border);border-radius:12px;padding:10px;cursor:pointer;text-align:left;transition:.2s;display:flex;flex-direction:column;gap:6px;position:relative}
+.tpm-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tpm-card.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.2)}
+.tpm-preview{border-radius:7px;overflow:hidden;height:60px;border:1px solid var(--border)}
+.tpm-prev-bg{height:100%;display:flex;flex-direction:column;gap:3px;padding:4px}
+.tpm-prev-nav{height:12px;border-radius:3px;flex-shrink:0}
+.tpm-prev-hero{flex:1;border-radius:3px}
+.tpm-prev-btn{height:10px;width:36%;border-radius:4px;margin-top:2px}
+.tpm-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tpm-dot{width:10px;height:10px;border-radius:50%;position:absolute;top:9px;right:9px;border:2px solid var(--border)}
+.tpm-hint{font-size:11px;color:var(--text2);margin-bottom:10px;padding:9px 11px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent);line-height:1.6}
+.tpm-hint code{font-family:monospace;color:var(--accent2);font-size:10px}
+.tpm-drop-zone{display:flex;align-items:center;justify-content:center;gap:8px;padding:18px;border:2px dashed var(--border2);border-radius:10px;cursor:pointer;transition:.2s;color:var(--text2);text-align:center;margin-bottom:10px;font-size:13px}
+.tpm-drop-zone:hover{border-color:var(--accent);background:rgba(108,99,255,.06);color:var(--accent)}
+.tpm-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:9px 13px;font-size:12px;color:#ef4444;margin-bottom:10px}
+.tpm-export-row{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--text2)}
+.tpm-export-btn{background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+.tpm-export-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-theme-pick{background:linear-gradient(135deg,#a78bfa,#6c63ff)!important;color:#fff!important}
+.btn-theme-pick:hover{background:linear-gradient(135deg,#6c63ff,#4f46e5)!important}
 
-/* Sections aperçu */
-.prev-hero{padding:clamp(48px,8vw,100px) clamp(16px,5vw,60px);background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
-.prev-hero-title{font-family:'Playfair Display',serif;font-size:clamp(24px,4.5vw,52px);font-weight:600;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:14px}
-.prev-hero-sub{font-size:clamp(13px,2vw,18px);color:#6b7280;margin-bottom:26px}
-.prev-hero-cta{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:12px 28px;font-size:15px;font-weight:600;cursor:pointer}
-.prev-text{padding:clamp(20px,4vw,48px) clamp(16px,5vw,60px)}
-.prev-text p{font-size:clamp(14px,2vw,16px);line-height:1.8;color:#374151;max-width:720px}
-.prev-image{padding:clamp(14px,3vw,32px) clamp(16px,5vw,60px)}.prev-img{width:100%;border-radius:10px;display:block}
-.prev-gallery{padding:clamp(18px,4vw,40px) clamp(16px,5vw,60px)}.prev-gallery-grid{display:grid;gap:8px}
-.prev-gallery-item img{width:100%;border-radius:7px;object-fit:cover;aspect-ratio:1;display:block}
-.prev-video{padding:clamp(18px,4vw,36px) clamp(16px,5vw,60px)}.prev-video-title{font-size:clamp(16px,2.5vw,22px);color:#1a1a2e;margin-bottom:12px;text-align:center}
-.prev-video-iframe{width:100%;height:clamp(200px,45vw,420px);border-radius:10px;border:none;display:block}
-.prev-products{padding:clamp(20px,4vw,48px) clamp(12px,4vw,60px);background:#fafafa}
-.prev-products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
-.prev-product-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);transition:transform .2s}
-.prev-product-card:hover{transform:translateY(-3px)}
-.prev-product-img-wrap{position:relative}.prev-product-img{width:100%;height:150px;object-fit:cover;display:block}
-.prev-product-img-ph{width:100%;height:150px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:32px}
-.prev-product-badge{position:absolute;top:8px;left:8px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase}
-.prev-product-body{padding:12px}.prev-product-name{font-size:13px;font-weight:600;color:#111;margin-bottom:4px}
-.prev-product-desc{font-size:11px;color:#6b7280;line-height:1.4;margin-bottom:10px}
-.prev-product-footer{display:flex;align-items:center;justify-content:space-between}
-.prev-product-price{font-size:15px;font-weight:700;color:#6c63ff}
-.prev-product-btn{background:#6c63ff;color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer}
-.prev-features{padding:clamp(28px,5vw,60px) clamp(12px,5vw,60px);background:#fafafa}
-.prev-features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px;max-width:860px;margin:0 auto}
-.prev-feature-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px 16px;text-align:center}
-.prev-feat-icon{font-size:28px;display:block;margin-bottom:8px}
-.prev-feature-card strong{font-size:14px;color:#111;display:block;margin-bottom:4px}
-.prev-feature-card p{font-size:12px;color:#6b7280;line-height:1.4}
-.prev-form{padding:clamp(28px,5vw,60px) clamp(12px,5vw,60px);background:#f8f7ff;display:flex;flex-direction:column;align-items:center}
-.prev-form h3{font-size:clamp(18px,3vw,26px);margin-bottom:16px;color:#1a1a2e}
-.prev-form-field{width:100%;max-width:460px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:9px;font-size:14px;margin-bottom:10px;background:#fff;color:#374151;display:block}
-.prev-form-ta{min-height:90px;resize:none}
-.prev-form-btn{background:#6c63ff;color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer}
-.prev-divider{padding:6px clamp(12px,5vw,60px)}.prev-divider-line{border:none;border-top:1px solid #e5e7eb}
-@media(max-width:520px){
-  .pub-preview-logo{height:26px!important;max-width:90px!important}
-  .pub-preview-brand-name{max-width:70px;font-size:12px}
-  .pub-preview-close{top:6px;right:6px;padding:5px 9px;font-size:11px}
-  .prev-products-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
-  .prev-features-grid{grid-template-columns:1fr}
-}
+/* ══ BOUTONS LOGIN / LOGOUT ══════════════════════════════════ */
+.topbar-user{display:flex;align-items:center;gap:6px;border-left:1px solid var(--border);padding-left:10px;flex-shrink:0}
+.topbar-user-email{font-size:11px;color:var(--text3);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-logout{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.25)!important;color:#ef4444!important;font-size:16px!important;padding:6px 8px!important}
+.btn-logout:hover{background:rgba(239,68,68,.25)!important}
+.btn-login{background:linear-gradient(135deg,#6c63ff,#4f46e5)!important;color:#fff!important;font-size:12px!important;padding:6px 10px!important}
+.btn-login:hover{opacity:.9}
 
-/* ══ FOOTER LÉGAL ════════════════════════════════════════════ */
-.site-footer{text-align:center;padding:24px 16px 32px;font-size:13px;color:var(--text-sub,#6b7280);border-top:1px solid var(--nav-border,#e5e7eb);background:var(--bg-alt,#fafafa)}
-.site-footer-links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 20px;margin-top:10px}
-.site-footer-links a{font-size:12px;color:var(--text-sub,#6b7280);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:1px;cursor:pointer}
-.site-footer-links a:hover{color:var(--accent,#6c63ff)}
-
-/* ══ BOUTON LÉGAL TOPBAR ══════════════════════════════════════ */
-.btn-legal{background:linear-gradient(135deg,#0ea5e9,#0284c7)!important;color:#fff!important}
-
-/* ══ MODAL ÉDITEUR LÉGAL ═════════════════════════════════════ */
-.legal-editor-modal{max-width:560px;width:94%;max-height:90vh;overflow-y:auto}
-.legal-modal-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px}
-.legal-modal-sub{font-size:12px;color:var(--text2);margin-bottom:16px}
-.legal-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
-.legal-tab{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;color:var(--text2);transition:.15s;font-family:'DM Sans',sans-serif}
-.legal-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.legal-editor{display:flex;flex-direction:column;gap:8px}
-.legal-field-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
-.legal-input{width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--text);outline:none}
-.legal-input:focus{border-color:var(--accent)}
-.legal-textarea{width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--text);outline:none;resize:vertical;min-height:180px;line-height:1.6}
-.legal-textarea:focus{border-color:var(--accent)}
-.legal-save-btn{width:100%;background:linear-gradient(135deg,#6c63ff,#4f46e5);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;font-family:'DM Sans',sans-serif}
-.legal-save-btn:disabled{opacity:.5;cursor:not-allowed}
 </style>
