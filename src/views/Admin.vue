@@ -260,35 +260,54 @@ async function refreshOwner(owner) {
   }
 }
 
+
+    const DAY_MS = 24 * 60 * 60 * 1000
+
+// 🔥 Fonction principale corrigée
 const changePlan = async (owner, newPlan) => {
   try {
+    const ref = doc(db, "users", owner.id)
+
     const isPaid = newPlan !== "free"
 
-    const update = {
+    // ✅ Toujours recalculer expiry si payant
+    let expiryValue = null
+    if (isPaid) {
+      expiryValue = Date.now() + 30 * DAY_MS
+    }
+
+    const updateData = {
       plan: newPlan,
       paye: isPaid,
       subscriptionActive: isPaid,
       active: true,
+      expiry: expiryValue,
+      updatedAt: Date.now(),
     }
 
-    if (isPaid) {
-      // ✅ FORCER TOUJOURS UNE EXPIRATION
-      update.expiry = Date.now() + 30 * 24 * 60 * 60 * 1000
-    } else {
-      update.expiry = null
+    console.log("🔥 UPDATE ENVOYÉ :", updateData)
+
+    // ✅ UN SEUL updateDoc (important)
+    await updateDoc(ref, updateData)
+
+    // ✅ Vérification directe Firestore (debug)
+    const snap = await getDoc(ref)
+    console.log("📦 FIRESTORE APRÈS UPDATE :", snap.data())
+
+    // ✅ Mise à jour locale PROPRE (sans écraser expiry)
+    if (typeof replaceOwnerLocally === "function") {
+      replaceOwnerLocally(owner.id, updateData)
     }
 
-    console.log("UPDATE SENT:", update) // 🔍 DEBUG
+    // ❌ IMPORTANT : éviter refresh immédiat qui écrase
+    // await refreshOwnerFromFirestore(owner.id)
 
-    await updateDoc(doc(db, "users", owner.id), update)
-
-    console.log("UPDATED OK")
+    console.log("✅ PLAN MIS À JOUR AVEC SUCCÈS")
 
   } catch (e) {
-    console.error(e)
+    console.error("❌ ERREUR changePlan :", e)
   }
 }
-  
 
 
 
