@@ -76,28 +76,6 @@ const resolvedUid  = ref("")
 const siteMeta     = ref({})          // { name, logo }
 const currentPageIndex = ref(0)
 
-
-// ── Pages légales affichées dans le footer ───────────────────
-const defaultLegalPages = [
-  { key:"privacy", title:"Privacy Policy", enabled:true, content:"Politique de confidentialité\n\nCette boutique collecte uniquement les informations nécessaires au traitement des commandes et du service client." },
-  { key:"refund", title:"Remboursement", enabled:true, content:"Politique de remboursement\n\nLes demandes sont étudiées selon les conditions commerciales du store." },
-  { key:"confidentialite", title:"Confidentialité", enabled:true, content:"Confidentialité\n\nLes données personnelles sont traitées de manière confidentielle." },
-  { key:"mentions", title:"Mentions légales", enabled:true, content:"Mentions légales\n\nInformations légales à compléter par le propriétaire du store." },
-  { key:"conditions", title:"Conditions générales", enabled:true, content:"Conditions générales\n\nToute commande implique l'acceptation des conditions générales du store." },
-]
-const normalizeLegalPages = (pages) => {
-  const list = Array.isArray(pages) ? pages : Object.values(pages || {})
-  return defaultLegalPages.map((def) => {
-    const saved = list.find((p) => p.key === def.key || p.title === def.title) || {}
-    return { ...def, ...saved, enabled: saved.enabled !== false, content: saved.content || def.content }
-  })
-}
-const legalPages = ref(normalizeLegalPages())
-const visibleLegalPages = computed(() => legalPages.value.filter((p) => p.enabled))
-const showLegalPage = ref(false)
-const activeLegalPage = ref(null)
-const openLegalPage = (page) => { activeLegalPage.value = page; showLegalPage.value = true }
-
 // ── Config paiement du store ──────────────────────────────────
 const storePayConfig = ref({ stripe: null, paypal: null })
 
@@ -258,7 +236,6 @@ const loadSite = async () => {
       if (data.siteData) {
         // ✅ UID direct avec siteData
         site.value           = data.siteData
-        legalPages.value     = normalizeLegalPages(data.legalPages || data.siteData?.legalPages)
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false }
@@ -297,7 +274,6 @@ const loadSite = async () => {
         // ✅ Slug résolu avec succès
         const rd             = realSnap.data()
         site.value           = rd.siteData
-        legalPages.value     = normalizeLegalPages(rd.legalPages || rd.siteData?.legalPages)
         siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
         resolvedUid.value    = realUid
         storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false }
@@ -587,8 +563,7 @@ const svSignOut = async () => {
   svOrdersLoaded.value = false
 }
 
-// Charger commandes du client — SANS orderBy pour éviter les index Firestore
-// Le tri se fait côté client après récupération
+
 const svLoadOrders = async (user) => {
   if (svLoadingOrders.value) return
   svLoadingOrders.value = true
@@ -1178,32 +1153,6 @@ const saveOrder = async (provider, transactionId) => {
       </template>
     </main>
 
-    <!-- FOOTER PAGES LÉGALES -->
-    <footer v-if="visibleLegalPages.length" class="sv-footer-legal">
-      <button
-        v-for="page in visibleLegalPages"
-        :key="page.key"
-        type="button"
-        class="sv-footer-link"
-        @click="openLegalPage(page)"
-      >
-        {{ page.title }}
-      </button>
-    </footer>
-
-    <Transition name="sv-modal">
-      <div v-if="showLegalPage && activeLegalPage" class="sv-modal-overlay sv-legal-overlay" @click.self="showLegalPage=false">
-        <div class="sv-modal-box sv-legal-box">
-          <button class="sv-modal-close" @click="showLegalPage=false">✕</button>
-          <div class="sv-modal-header">
-            <span>⚖</span>
-            <h2>{{ activeLegalPage.title }}</h2>
-          </div>
-          <div class="sv-legal-content">{{ activeLegalPage.content }}</div>
-        </div>
-      </div>
-    </Transition>
-
     <!-- ── MODAL PANIER 2 ÉTAPES (panier → livraison → paiement) -->
     <Transition name="sv-modal">
       <div v-if="showCart" class="sv-modal-overlay sv-cart-overlay"
@@ -1362,79 +1311,6 @@ const saveOrder = async (provider, transactionId) => {
             <div class="svp-name">{{ svCurrentUser.displayName || "Client" }}</div>
             <div class="svp-email">{{ svCurrentUser.email }}</div>
             <span class="svp-badge">🛍 Client du store</span>
-          </div>
-        </div>
-
-        <!-- Stats rapides ──────────────────────────────────── -->
-        <div class="svp-stats">
-          <div class="svp-stat">
-            <span class="svp-stat-val">{{ svClientOrders.length }}</span>
-            <span class="svp-stat-label">Commandes</span>
-          </div>
-          <div class="svp-stat">
-            <span class="svp-stat-val">
-              {{ svClientOrders.filter(o=>o.status==='paid'||o.status==='delivered').length }}
-            </span>
-            <span class="svp-stat-label">Payées</span>
-          </div>
-          <div class="svp-stat">
-            <span class="svp-stat-val">
-              {{ svClientOrders.reduce((s,o)=>s+parseFloat(o.total||0),0).toFixed(2) }}{{ svClientOrders[0]?.currency||'€' }}
-            </span>
-            <span class="svp-stat-label">Total dépensé</span>
-          </div>
-        </div>
-
-        <!-- Commandes ──────────────────────────────────────── -->
-        <div class="svp-orders-section">
-          <div class="svp-orders-title">
-            📦 Mes commandes
-            <span v-if="svLoadingOrders" class="svp-loading">chargement...</span>
-            <span v-else class="svp-orders-count">{{ svClientOrders.length }}</span>
-          </div>
-
-          <!-- Chargement -->
-          <div v-if="svLoadingOrders" class="svp-orders-loader">
-            <div class="svp-spinner"></div>
-          </div>
-
-          <!-- Vide -->
-          <div v-else-if="!svClientOrders.length" class="svp-orders-empty">
-            <span>🛍️</span>
-            <p>Aucune commande pour le moment.</p>
-            <button class="svp-shop-btn" @click="svShowProfile=false">Découvrir les produits →</button>
-          </div>
-
-          <!-- Liste des commandes -->
-          <div v-else class="svp-orders-list">
-            <div v-for="order in svClientOrders" :key="order.id" class="svp-order-card">
-              <!-- Ligne principale -->
-              <div class="svp-order-top">
-                <div class="svp-order-left">
-                  <span class="svp-order-id">#{{ (order.id||'').slice(0,8).toUpperCase() }}</span>
-                  <span class="svp-order-date">{{ (order.createdAt||'').slice(0,10) }}</span>
-                </div>
-                <div class="svp-order-right">
-                  <span class="svp-order-total">
-                    {{ parseFloat(order.total||0).toFixed(2) }}{{ order.currency||'€' }}
-                  </span>
-                  <span class="svp-order-status" :class="'svp-s-'+(order.status||'pending')">
-                    {{ {paid:'✓ Payée',pending:'⏳ En attente',shipped:'🚚 Expédiée',
-                        delivered:'✅ Livrée',cancelled:'✗ Annulée'}[order.status] || order.status }}
-                  </span>
-                </div>
-              </div>
-              <!-- Articles -->
-              <div v-if="order.items?.length" class="svp-order-items">
-                <span v-for="item in order.items" :key="item.id" class="svp-order-item-tag">
-                  {{ item.name }} ×{{ item.qty }}
-                </span>
-              </div>
-              <!-- Adresse livraison -->
-              <div v-if="order.customerAddress || order.adresseLivraison" class="svp-order-addr">
-                📍 {{ order.customerAddress || order.adresseLivraison }}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1653,15 +1529,6 @@ const saveOrder = async (provider, transactionId) => {
 /* DIVIDER */
 .sv-divider hr{border:none;border-top:1px solid #e5e7eb;margin:8px 60px}
 
-
-/* FOOTER PAGES LÉGALES */
-.sv-footer-legal{border-top:1px solid #e5e7eb;background:#fafafa;padding:28px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
-.sv-footer-link{width:100%;max-width:360px;background:white;border:1px solid #e5e7eb;border-radius:10px;padding:11px 14px;color:#374151;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;white-space:normal;overflow-wrap:anywhere}
-.sv-footer-link:hover{border-color:#6c63ff;color:#6c63ff;background:#f8f7ff}
-.sv-legal-box{max-width:680px}
-.sv-legal-content{white-space:pre-line;color:#374151;line-height:1.75;font-size:15px}
-@media(max-width:480px){.sv-footer-legal{padding:22px 12px}.sv-footer-link{font-size:13px;padding:10px 12px}}
-
 /* MODALS */
 .sv-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:16px 20px;overflow-y:auto}
 .sv-modal-box{background:white;border-radius:16px;padding:32px;position:relative;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.18)}
@@ -1812,43 +1679,43 @@ const saveOrder = async (provider, transactionId) => {
 .svp-badge{display:inline-block;background:rgba(255,255,255,.2);color:white;font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;margin-top:5px;border:1px solid rgba(255,255,255,.3)}
 
 /* Stats */
-.svp-stats{display:grid;grid-template-columns:repeat(3,1fr);padding:12px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;flex-shrink:0;gap:4px}
-.svp-stat{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;background:white;border-radius:8px;border:1px solid #e5e7eb}
-.svp-stat-val{font-size:15px;font-weight:800;color:#6c63ff}
-.svp-stat-label{font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.3px;text-align:center}
+
+
+
+
 
 /* Section commandes */
-.svp-orders-section{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
-.svp-orders-title{font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.4px;padding:12px 16px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6;flex-shrink:0}
-.svp-loading{font-size:11px;color:#9ca3af;font-weight:400;margin-left:auto}
-.svp-orders-count{background:#6c63ff;color:white;font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;margin-left:auto}
-.svp-orders-loader{display:flex;justify-content:center;padding:24px}
-.svp-spinner{width:24px;height:24px;border:3px solid #e5e7eb;border-top-color:#6c63ff;border-radius:50%;animation:svp-spin .6s linear infinite}
+
+
+
+
+
+
 @keyframes svp-spin{to{transform:rotate(360deg)}}
-.svp-orders-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 16px;text-align:center;color:#6b7280;font-size:14px}
-.svp-orders-empty span{font-size:36px}
-.svp-shop-btn{background:#6c63ff;color:white;border:none;border-radius:9px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;margin-top:4px}
+
+
+
 .svp-shop-btn:hover{background:#5b52ee}
-.svp-orders-list{overflow-y:auto;flex:1;padding:8px 12px;display:flex;flex-direction:column;gap:8px;max-height:400px}
+
 
 /* Carte commande */
-.svp-order-card{background:white;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;transition:border-color .15s}
+
 .svp-order-card:hover{border-color:#6c63ff}
-.svp-order-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.svp-order-left{display:flex;flex-direction:column;gap:2px}
-.svp-order-id{font-size:12px;font-weight:700;color:#374151;font-family:monospace}
-.svp-order-date{font-size:10px;color:#9ca3af}
-.svp-order-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-.svp-order-total{font-size:14px;font-weight:800;color:#6c63ff}
-.svp-order-status{font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px}
-.svp-s-paid{background:#ecfdf5;color:#059669}
-.svp-s-pending{background:#fefce8;color:#d97706}
-.svp-s-shipped{background:#eff6ff;color:#2563eb}
+
+
+
+
+
+
+
+
+
+
 .svp-s-delivered{background:#f0fdf4;color:#15803d}
 .svp-s-cancelled{background:#fef2f2;color:#dc2626}
-.svp-order-items{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
-.svp-order-item-tag{background:#f3f4f6;border:1px solid #e5e7eb;color:#6b7280;font-size:10px;padding:2px 7px;border-radius:5px}
-.svp-order-addr{font-size:10px;color:#9ca3af;margin-top:2px}
+
+
+
 
 /* Déconnexion */
 .svp-signout-btn{width:calc(100% - 32px);margin:10px 16px 14px;padding:11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center;flex-shrink:0}
