@@ -101,7 +101,7 @@
           </thead>
           <tbody>
             <tr v-if="filteredOwners.length === 0">
-              <td colspan="7" class="adm-empty">Aucun propriétaire trouvé.</td>
+              <td colspan="8" class="adm-empty">Aucun propriétaire trouvé.</td>
             </tr>
             <tr
               v-for="owner in filteredOwners"
@@ -148,6 +148,11 @@
                   <span class="adm-ext">↗</span>
                 </a>
                 <span v-else class="adm-no-slug">Non publié</span>
+              </td>
+
+              <!-- Commandes -->
+              <td class="adm-td-orders">
+                <span class="adm-orders-badge">{{ owner.orderCount || 0 }}</span>
               </td>
 
               <!-- Statut -->
@@ -240,24 +245,56 @@ const filteredOwners = computed(() => {
   return list
 })
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const toMillis = (value) => {
+  if (!value) return null
+  if (typeof value === "number") return value
+  if (typeof value === "string") {
+    const ms = new Date(value).getTime()
+    return Number.isNaN(ms) ? null : ms
+  }
+  if (value?.toMillis) return value.toMillis()
+  if (value?.toDate) return value.toDate().getTime()
+  if (value instanceof Date) return value.getTime()
+  return null
+}
+
+const normalizeOwner = (docSnap) => {
+  const data = docSnap.data() || {}
+  return {
+    id: docSnap.id,
+    ...data,
+    email: data.email || "—",
+    plan: data.plan || "free",
+    paye: data.paye === true,
+    active: data.active !== false,
+    subscriptionActive: data.subscriptionActive === true,
+    createdAt: data.createdAt || null,
+    expiry: toMillis(data.expiry),
+    publishedSlug: data.publishedSlug || "",
+    orderCount: data.orderCount || 0,
+  }
+}
+
+const replaceOwnerLocally = (ownerId, patch) => {
+  const index = owners.value.findIndex(o => o.id === ownerId)
+  if (index !== -1) {
+    owners.value.splice(index, 1, { ...owners.value[index], ...patch })
+  }
+}
+
+const refreshOwnerFromFirestore = async (ownerId) => {
+  const snap = await getDoc(doc(db, "users", ownerId))
+  if (snap.exists()) replaceOwnerLocally(ownerId, normalizeOwner(snap))
+}
+
 // ── Chargement des propriétaires ─────────────────────────────
 const loadOwners = async () => {
   loading.value = true
   try {
     const snap = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc")))
-    owners.value = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      // Normaliser les champs manquants
-      email:         d.data().email         || "—",
-      plan:          d.data().plan          || "free",
-      paye:          d.data().paye          || false,
-      active:        d.data().active        !== false, // true par défaut
-      subscriptionActive: d.data().subscriptionActive === true,
-      createdAt:     d.data().createdAt     || null,
-      expiry:        d.data().expiry        || null,
-      publishedSlug: d.data().publishedSlug || "",
-    }))
+    owners.value = snap.docs.map(normalizeOwner)
   } catch(e) {
     showToast("Erreur chargement : " + e.message, "error")
   } finally {
@@ -268,15 +305,13 @@ const loadOwners = async () => {
 // ── Activer / Désactiver un propriétaire ──────────────────────
 // Bascule le champ `active` : false → true, true → false (et undefined → false car compté actif)
 const toggleActive = async (owner) => {
-  if (toggling.value === owner.id) return  // éviter double-clic
+  if (toggling.value === owner.id) return
   toggling.value = owner.id
   try {
-    // État actuel considéré actif si != false (y compris undefined)
-    const isCurrentlyActive = owner.active !== false
-    const newActive = !isCurrentlyActive   // inverse strict
+    const newActive = owner.active === false
     await updateDoc(doc(db, "users", owner.id), { active: newActive })
-    // Mettre à jour l'objet local après succès → re-render Vue
-    owner.active = newActive
+    replaceOwnerLocally(owner.id, { active: newActive })
+    await refreshOwnerFromFirestore(owner.id)
     showToast(
       newActive
         ? "✅ " + owner.email + " activé"
@@ -296,33 +331,34 @@ const toggleActive = async (owner) => {
 //   • active=true (réactive le compte)
 // Lorsqu'on revient à Free : plan=free, paye=false, subscriptionActive=false, expiry=null
 const changePlan = async (owner, newPlan) => {
-  // On ne bloque PAS si le plan est identique : permet de "réparer"
-  // un compte Pro où expiry serait null/expiré.
   try {
-    const isPaid    = newPlan !== "free"
-    const newExpiry = isPaid
-      ? Date.now() + 30 * 24 * 60 * 60 * 1000   // +30 jours en ms
-      : null                                       // Free → pas d'expiry
-
+    const isPaid = newPlan !== "free"
+    const currentExpiry = toMillis(owner.expiry)
     const update = {
-      plan:               newPlan,
-      paye:               isPaid,
-      subscriptionActive: isPaid,    // ← cohérence avec le champ utilisé côté app
-      expiry:             newExpiry, // ← jamais laissé vide pour un plan payant
-      active:             true,      // réactive si désactivé
+      plan: newPlan,
+      paye: isPaid,
+      subscriptionActive: isPaid,
     }
-    await updateDoc(doc(db, "users", owner.id), update)
 
-    // Mettre à jour tous les champs locaux pour forcer le re-render Vue
-    owner.plan               = newPlan
-    owner.paye               = isPaid
-    owner.subscriptionActive = isPaid
-    owner.expiry             = newExpiry
-    owner.active             = true
+    if (isPaid) {
+      // Passage Free → Pro/Premium : si expiry était vide ou expiré, on ajoute 30 jours.
+      update.expiry = currentExpiry && currentExpiry > Date.now()
+        ? currentExpiry
+        : Date.now() + 30 * DAY_MS
+      update.active = true
+    } else {
+      // Retour au plan gratuit : expiration supprimée.
+      update.expiry = null
+      update.active = true
+    }
+
+    await updateDoc(doc(db, "users", owner.id), update)
+    replaceOwnerLocally(owner.id, update)
+    await refreshOwnerFromFirestore(owner.id)
 
     showToast(
       "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
-      (newExpiry ? " (expire le " + formatDate(newExpiry) + ")" : "")
+      (update.expiry ? " (expire le " + formatDate(update.expiry) + ")" : "")
     )
   } catch(e) {
     showToast("Erreur changePlan : " + e.message, "error")
@@ -332,10 +368,12 @@ const changePlan = async (owner, newPlan) => {
 // ── Prolonger l'expiration ────────────────────────────────────
 const extendExpiry = async (owner, days) => {
   try {
-    const base   = (owner.expiry && owner.expiry > Date.now()) ? owner.expiry : Date.now()
-    const newExp = base + days * 24 * 60 * 60 * 1000
+    const currentExpiry = toMillis(owner.expiry)
+    const base = currentExpiry && currentExpiry > Date.now() ? currentExpiry : Date.now()
+    const newExp = base + days * DAY_MS
     await updateDoc(doc(db, "users", owner.id), { expiry: newExp })
-    owner.expiry = newExp
+    replaceOwnerLocally(owner.id, { expiry: newExp })
+    await refreshOwnerFromFirestore(owner.id)
     showToast(`+${days}j pour ${owner.email} → expire le ${formatDate(newExp)}`)
   } catch(e) {
     showToast("Erreur : " + e.message, "error")
@@ -368,12 +406,16 @@ const exportCSV = () => {
 }
 
 const formatDate = (ts) => {
-  if (!ts) return "—"
-  const d = typeof ts === "number" ? new Date(ts) : ts?.toDate?.() || new Date(ts)
+  const ms = toMillis(ts)
+  if (!ms) return "—"
+  const d = new Date(ms)
   return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" })
 }
 
-const isExpired = (expiry) => expiry && expiry < Date.now()
+const isExpired = (expiry) => {
+  const ms = toMillis(expiry)
+  return !!ms && ms < Date.now()
+}
 
 let toastTimer = null
 const showToast = (msg, type = "success") => {
