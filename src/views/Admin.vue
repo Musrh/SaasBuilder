@@ -263,46 +263,32 @@ async function refreshOwner(owner) {
 const changePlan = async (owner, newPlan) => {
   try {
     const isPaid = newPlan !== "free"
-    const wasFree = (owner.plan || "free") === "free"
 
     const update = {
       plan: newPlan,
       paye: isPaid,
       subscriptionActive: isPaid,
+      active: true,
     }
 
     if (isPaid) {
-      // ✅ CAS IMPORTANT : Free → Pro/Premium
-      if (wasFree) {
-        update.expiry = Date.now() + 30 * DAY_MS
-      } else {
-        // Déjà payant → on garde ou prolonge intelligemment
-        const currentExpiry = toMillis(owner.expiry)
-        update.expiry = currentExpiry && currentExpiry > Date.now()
-          ? currentExpiry
-          : Date.now() + 30 * DAY_MS
-      }
-
-      update.active = true
+      // ✅ FORCER TOUJOURS UNE EXPIRATION
+      update.expiry = Date.now() + 30 * 24 * 60 * 60 * 1000
     } else {
-      // Retour au free
       update.expiry = null
-      update.active = true
     }
 
+    console.log("UPDATE SENT:", update) // 🔍 DEBUG
+
     await updateDoc(doc(db, "users", owner.id), update)
-    replaceOwnerLocally(owner.id, update)
-    await refreshOwnerFromFirestore(owner.id)
 
-    showToast(
-      "✅ Plan de " + owner.email + " → " + newPlan.toUpperCase() +
-      (update.expiry ? " (expire le " + formatDate(update.expiry) + ")" : "")
-    )
+    console.log("UPDATED OK")
 
-  } catch(e) {
-    showToast("Erreur changePlan : " + e.message, "error")
+  } catch (e) {
+    console.error(e)
   }
 }
+  
 
 
 
