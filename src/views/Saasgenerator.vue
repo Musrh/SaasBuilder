@@ -652,87 +652,42 @@ const builtinThemes = [
   { name:"Vert Nature",    accent:"#059669", accentHover:"#047857", bg:"#f0fdf4", bgAlt:"#dcfce7", bgHero:"linear-gradient(135deg,#f0fdf4,#dcfce7)", text:"#14532d", textSub:"#4b7563", btnRadius:"8px", btnPadding:"13px 28px", cardRadius:"12px", cardShadow:"0 2px 12px rgba(5,150,105,.1)", heroFont:"'Playfair Display',serif", bodyFont:"'DM Sans',sans-serif", navBg:"#ffffff", navBorder:"#bbf7d0" },
 ]
 
-const DEFAULT_THEME = builtinThemes[0]
-const THEME_KEYS = ["name","accent","accentHover","bg","bgAlt","bgHero","text","textSub","btnRadius","btnPadding","cardRadius","cardShadow","heroFont","bodyFont","navBg","navBorder"]
-
-const normalizeTheme = (raw = {}) => {
-  const theme = { ...DEFAULT_THEME }
-  THEME_KEYS.forEach((key) => {
-    if (raw[key] !== undefined && raw[key] !== null && raw[key] !== "") theme[key] = raw[key]
-  })
-  theme.name = theme.name || "Thème importé"
-  return theme
-}
-
-const themeToCssVars = (raw = currentTheme.value) => {
-  const th = normalizeTheme(raw || {})
-  return {
-    "--theme-accent": th.accent,
-    "--theme-accent-hover": th.accentHover,
-    "--theme-bg": th.bg,
-    "--theme-bg-alt": th.bgAlt,
-    "--theme-bg-hero": th.bgHero,
-    "--theme-text": th.text,
-    "--theme-text-sub": th.textSub,
-    "--theme-btn-radius": th.btnRadius,
-    "--theme-btn-padding": th.btnPadding,
-    "--theme-card-radius": th.cardRadius,
-    "--theme-card-shadow": th.cardShadow,
-    "--theme-hero-font": th.heroFont,
-    "--theme-body-font": th.bodyFont,
-    "--theme-nav-bg": th.navBg,
-    "--theme-nav-border": th.navBorder,
-    "--accent": th.accent,
-    "--accent-h": th.accentHover,
-    "--bg": th.bg,
-    "--bg-alt": th.bgAlt,
-    "--bg-hero": th.bgHero,
-    "--text": th.text,
-    "--text-sub": th.textSub,
-    "--btn-radius": th.btnRadius,
-    "--btn-pad": th.btnPadding,
-    "--card-radius": th.cardRadius,
-    "--card-shadow": th.cardShadow,
-    "--hero-font": th.heroFont,
-    "--body-font": th.bodyFont,
-    "--nav-bg": th.navBg,
-    "--nav-border": th.navBorder,
-  }
-}
-
-const applyThemeVars = (theme) => {
+const applyThemeObj = async (th) => {
+  currentTheme.value = th
+  // Appliquer les variables CSS sur le builder
   const r = document.documentElement
-  const vars = themeToCssVars(theme)
-  Object.entries(vars).forEach(([key, value]) => r.style.setProperty(key, value))
-}
+  r.style.setProperty("--theme-accent",      th.accent        || "#6c63ff")
+  r.style.setProperty("--theme-accent-hover",th.accentHover   || "#4f46e5")
+  r.style.setProperty("--theme-bg",          th.bg            || "#ffffff")
+  r.style.setProperty("--theme-bg-alt",      th.bgAlt         || "#fafafa")
+  r.style.setProperty("--theme-bg-hero",     th.bgHero        || "linear-gradient(135deg,#f8f7ff,#ede9fe)")
+  r.style.setProperty("--theme-text",        th.text          || "#1a1a2e")
+  r.style.setProperty("--theme-text-sub",    th.textSub       || "#6b7280")
+  r.style.setProperty("--theme-btn-radius",  th.btnRadius     || "10px")
+  r.style.setProperty("--theme-btn-padding", th.btnPadding    || "14px 32px")
+  r.style.setProperty("--theme-card-radius", th.cardRadius    || "16px")
+  r.style.setProperty("--theme-card-shadow", th.cardShadow    || "0 2px 12px rgba(0,0,0,.06)")
+  r.style.setProperty("--theme-hero-font",   th.heroFont      || "'Playfair Display',serif")
+  r.style.setProperty("--theme-body-font",   th.bodyFont      || "'DM Sans',sans-serif")
+  r.style.setProperty("--theme-nav-bg",      th.navBg         || "#ffffff")
+  r.style.setProperty("--theme-nav-border",  th.navBorder     || "#e5e7eb")
 
-const activeSiteTheme = computed(() => normalizeTheme(currentTheme.value || site.value?.theme || DEFAULT_THEME))
-const siteThemeVars = computed(() => themeToCssVars(activeSiteTheme.value))
-
-const applyThemeObj = async (rawTheme, options = {}) => {
-  const th = normalizeTheme(rawTheme)
+  // ✅ Persister le thème dans Firestore ET localStorage
+  // SiteViewer le lira depuis users/{uid}/siteTheme
   const themeData = { ...th, savedAt: new Date().toISOString() }
-
-  currentTheme.value = themeData
-  site.value = { ...site.value, theme: themeData }
-  applyThemeVars(themeData)
   localStorage.setItem("siteTheme", JSON.stringify(themeData))
 
   if (currentUser.value) {
     try {
-      await setDoc(doc(db, "users", currentUser.value.uid), {
-        siteTheme: themeData,
-        siteData: site.value,
-      }, { merge: true })
-      if (!options.silent) notify(`✅ Thème "${th.name}" appliqué au site et sauvegardé !`, "success")
+      const { doc: fd, setDoc: fset } = await import("firebase/firestore")
+      await fset(fd(db, "users", currentUser.value.uid), { siteTheme: themeData }, { merge: true })
+      notify(`✅ Thème "${th.name}" appliqué et sauvegardé !`, "success")
     } catch(e) {
-      console.error("Erreur sauvegarde thème :", e)
-      if (!options.silent) notify(`✅ Thème "${th.name}" appliqué au site (local)`, "success")
+      notify(`✅ Thème "${th.name}" appliqué (local)`, "success")
     }
-  } else if (!options.silent) {
-    notify(`✅ Thème "${th.name}" appliqué au site !`, "success")
+  } else {
+    notify(`✅ Thème "${th.name}" appliqué !`, "success")
   }
-
   showThemeModal.value = false
 }
 
@@ -744,12 +699,11 @@ const importThemeFile = (event) => {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result)
-      const themeFieldCount = THEME_KEYS.filter(k => Object.prototype.hasOwnProperty.call(data, k)).length
-      if (data._saasbuilder !== "theme" && themeFieldCount < 2) {
+      if (!data.accent && !data.bg && !data.text) {
         themeImportError.value = "Format invalide. Attendu : { name, accent, bg, text, ... }"
         return
       }
-      applyThemeObj({ name: data.name || file.name.replace(/\.json$/i, "") || "Thème importé", ...data })
+      applyThemeObj({ name: data.name || "Thème importé", ...data })
     } catch(err) {
       themeImportError.value = "Fichier JSON invalide : " + err.message
     }
@@ -759,8 +713,8 @@ const importThemeFile = (event) => {
 }
 
 const exportCurrentTheme = () => {
-  const th   = activeSiteTheme.value
-  const blob = new Blob([JSON.stringify({ _saasbuilder: "theme", ...th }, null, 2)], { type: "application/json" })
+  const th   = currentTheme.value || builtinThemes[0]
+  const blob = new Blob([JSON.stringify(th, null, 2)], { type: "application/json" })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement("a")
   a.href     = url
@@ -796,15 +750,6 @@ onMounted(() => {
           // Nouvelle inscription → site VIDE, pas d'héritage localStorage
           site.value = { pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }] }
           localStorage.removeItem("siteDataPro")
-        }
-
-        const savedTheme = d.siteTheme || site.value?.theme
-        if (savedTheme) {
-          const restoredTheme = normalizeTheme(savedTheme)
-          currentTheme.value = restoredTheme
-          site.value = { ...site.value, theme: restoredTheme }
-          applyThemeVars(restoredTheme)
-          localStorage.setItem("siteTheme", JSON.stringify(restoredTheme))
         }
       } else {
         // Compte sans document Firestore → site VIDE
@@ -860,11 +805,8 @@ const saveSite = async () => {
   isSaving.value = true
   try {
     const docRef = doc(db, "users", currentUser.value.uid)
-    const themeData = activeSiteTheme.value
-    site.value = { ...site.value, theme: themeData }
     await setDoc(docRef, {
       siteData: site.value,
-      siteTheme: themeData,
       siteName: siteName.value,
       siteLogo: siteLogo.value,
       legalPages: legalPages.value,
@@ -931,86 +873,6 @@ const sectionDefaults = {
 
 const addSection = (key) => {
   currentPage.value.sections.push({ id: Date.now(), ...JSON.parse(JSON.stringify(sectionDefaults[key])) })
-}
-
-// ── Import sections depuis un fichier JSON ──────────────────
-const importJsonError  = ref("")
-const importJsonTarget = ref("page")  // "page" | "site"
-
-const importSectionsFromJson = (event) => {
-  const file = event.target.files?.[0]
-  if (!file) return
-  importJsonError.value = ""
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result)
-      const IMPORT_THEME_KEYS = THEME_KEYS
-
-      // ── THÈME en priorité ──────────────────────────────────
-      // Détecté si : marqueur _saasbuilder:"theme" OU au moins 2 propriétés thème
-      const isTheme = data._saasbuilder === "theme"
-        || IMPORT_THEME_KEYS.filter(k => Object.prototype.hasOwnProperty.call(data, k)).length >= 2
-
-      if (isTheme) {
-        const th = { name: data.name || file.name.replace(/\.json$/i, "") || "Thème importé" }
-        IMPORT_THEME_KEYS.forEach(k => { if (data[k] !== undefined && data[k] !== null && data[k] !== "") th[k] = data[k] })
-        applyThemeObj(th)
-        event.target.value = ""
-        return
-      }
-
-      // ── SECTIONS ───────────────────────────────────────────
-      // Format 1 : { sections: [...] }
-      if (Array.isArray(data.sections)) {
-        applyImportedSections(data.sections); event.target.value = ""; return
-      }
-      // Format 2 : tableau direct [{ type, ... }, ...]
-      if (Array.isArray(data)) {
-        applyImportedSections(data); event.target.value = ""; return
-      }
-      // Format 3 : { pages: [...] }
-      if (data.pages && Array.isArray(data.pages)) {
-        if (importJsonTarget.value === "site") {
-          site.value = { pages: data.pages.map((p, i) => ({
-            ...p, id: p.id || Date.now() + i,
-            sections: (p.sections || []).map(s => ({ ...s, id: Date.now() + Math.random() }))
-          })) }
-          notify("✅ Site importé (" + data.pages.length + " pages)", "success")
-        } else {
-          applyImportedSections(data.pages[0]?.sections || [])
-        }
-        event.target.value = ""; return
-      }
-      // Format 4 : une seule section { type, content, ... }
-      if (data.type && typeof data.type === "string") {
-        applyImportedSections([data]); event.target.value = ""; return
-      }
-
-      importJsonError.value = "Format non reconnu. Fichier sections : { sections:[...] } ou thème : { accent, bg, ... }"
-    } catch(err) {
-      importJsonError.value = "JSON invalide : " + err.message
-    }
-    event.target.value = ""
-  }
-  reader.readAsText(file)
-}
-
-const applyImportedSections = (sections) => {
-  if (!sections.length) { importJsonError.value = "Aucune section trouvée dans le fichier."; return }
-  const newSections = sections.map(s => ({
-    ...s,
-    id: Date.now() + Math.random(),   // nouveaux IDs pour éviter les conflits
-  }))
-  if (importJsonTarget.value === "site") {
-    site.value.pages.forEach(p => {
-      p.sections = [...p.sections, ...JSON.parse(JSON.stringify(newSections))]
-    })
-    notify("✅ " + newSections.length + " section(s) ajoutée(s) à toutes les pages", "success")
-  } else {
-    currentPage.value.sections.push(...newSections)
-    notify("✅ " + newSections.length + " section(s) ajoutée(s) à cette page", "success")
-  }
 }
 const deleteSection = (i) => { currentPage.value.sections.splice(i, 1); activeSectionIndex.value = null }
 const moveSection = (i, dir) => {
@@ -1450,7 +1312,7 @@ const buildSectionHtml2 = (s) => {
 }
 
 const generateHtml = (pageIndex = 0) => {
-  const th = activeSiteTheme.value || site.value?.theme || builtinThemes[0]
+  const th = currentTheme.value || builtinThemes[0]
   const accent     = th.accent     || '#6c63ff'
   const accentH    = th.accentHover|| '#4f46e5'
   const bg         = th.bg         || '#ffffff'
@@ -2295,7 +2157,7 @@ const setPageStyle = (type, value) => {
 
   <!-- PUBLIC PREVIEW (plein écran, sans barre d'outils) -->
   <Transition name="modal">
-    <div v-if="showPublicPreview" class="public-preview-overlay" :style="siteThemeVars">
+    <div v-if="showPublicPreview" class="public-preview-overlay">
       <button class="pub-preview-close" @click="showPublicPreview=false">✕ Fermer l'aperçu</button>
       <!-- Navigation du site -->
       <nav class="pub-preview-nav">
@@ -2453,32 +2315,6 @@ const setPageStyle = (type, value) => {
       </div>
       <div v-if="sidebarTab==='sections'" class="sidebar-content">
         <p class="sidebar-label">{{ t.addSection }}</p>
-
-        <!-- Import depuis JSON -->
-        <div class="import-json-box">
-          <div class="import-json-row">
-            <span class="import-json-title">📂 Importer via .json</span>
-            <select v-model="importJsonTarget" class="import-target-sel">
-              <option value="page">Cette page</option>
-              <option value="site">Tout le site</option>
-            </select>
-          </div>
-          <label class="import-json-btn" title="Charger un fichier JSON de sections">
-            ＋ Charger un fichier .json
-            <input type="file" accept=".json,application/json" style="display:none"
-              @change="importSectionsFromJson"/>
-          </label>
-          <p v-if="importJsonError" class="import-json-error">⚠ {{ importJsonError }}</p>
-          <p class="import-json-hint">
-            Formats sections :<br/>
-            <code>{ "sections": [...] }</code><br/>
-            <code>[{ "type":"hero", ... }]</code><br/>
-            <code>{ "pages": [...] }</code><br/>
-            Ou fichier thème :<br/>
-            <code>{ "accent":"#ff0066", "bg":"#fff", ... }</code>
-          </p>
-        </div>
-
         <div class="section-grid">
           <button v-for="st in sectionTypes" :key="st.key" class="section-card" @click="addSection(st.key)">
             <span class="sc-icon">{{ st.icon }}</span>
@@ -2538,7 +2374,7 @@ const setPageStyle = (type, value) => {
     </aside>
 
     <!-- CANVAS -->
-    <main class="canvas" :class="{preview:mode==='preview'}" :style="mode==='preview' ? siteThemeVars : null">
+    <main class="canvas" :class="{preview:mode==='preview'}">
       <div class="canvas-inner" :style="currentPage?.style">
         <template v-if="mode==='edit'">
           <div v-if="!currentPage.sections.length" class="empty-page">
@@ -2680,7 +2516,7 @@ const setPageStyle = (type, value) => {
 
         <!-- PREVIEW -->
         <template v-else>
-          <div class="preview-mode" :style="siteThemeVars">
+          <div class="preview-mode">
             <div v-for="s in currentPage.sections" :key="s.id">
               <div v-if="s.type==='hero'" class="prev-hero" :style="s.style">
                 <h1 class="prev-hero-title">{{ s.content }}</h1>
@@ -2914,9 +2750,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .color-input{width:40px;height:30px;border:1px solid var(--border2);border-radius:4px;cursor:pointer;background:none;padding:2px}
 .prop-select{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:13px;padding:7px 10px;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif}
 .canvas{flex:1;background:#0a0a0c;padding:32px;display:flex;justify-content:center;overflow-y:auto}
-.canvas.preview{padding:0;background:var(--bg,#fff);color:var(--text,#1a1a2e)}
+.canvas.preview{padding:0;background:white}
 .canvas-inner{width:100%;max-width:900px;min-height:600px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.6)}
-.canvas.preview .canvas-inner{background:var(--bg,#fff);color:var(--text,#1a1a2e);font-family:var(--body-font,'DM Sans',sans-serif)}
 .canvas.preview .canvas-inner{max-width:100%;border-radius:0;min-height:100vh;box-shadow:none}
 .empty-page{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;color:#999;text-align:center;gap:8px}
 .empty-page span{font-size:32px;opacity:.4}
@@ -2931,12 +2766,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .section-actions button.del-btn:hover{background:#fef2f2;color:var(--red);border-color:#fecaca}
 .section-actions button:disabled{opacity:.3;cursor:default}
 .sec-type-label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}
-.sec-hero{padding:60px 40px;background:var(--bg-hero,linear-gradient(135deg,#f8f7ff 0%,#ede9fe 100%));display:flex;flex-direction:column;gap:12px;align-items:flex-start}
-.hero-title-input{width:100%;font-family:var(--hero-font,'Playfair Display',serif);font-size:42px;font-weight:600;color:var(--text,#1a1a2e);border:none;background:transparent;resize:none;line-height:1.2;outline:none;min-height:100px}
-.hero-sub-input{width:100%;font-size:18px;color:var(--text-sub,#555);background:transparent;border:none;outline:none;border-bottom:1px dashed color-mix(in srgb,var(--accent,#6c63ff) 45%,transparent);padding-bottom:4px}
-.hero-cta-input{font-size:14px;background:var(--accent,#6c63ff);color:white;border:none;outline:none;border-radius:var(--btn-radius,8px);padding:10px 24px;font-weight:600;font-family:var(--body-font,'DM Sans',sans-serif);margin-top:8px;cursor:text}
+.sec-hero{padding:60px 40px;background:linear-gradient(135deg,#f8f7ff 0%,#ede9fe 100%);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.hero-title-input{width:100%;font-family:'Playfair Display',serif;font-size:42px;font-weight:600;color:#1a1a2e;border:none;background:transparent;resize:none;line-height:1.2;outline:none;min-height:100px}
+.hero-sub-input{width:100%;font-size:18px;color:#555;background:transparent;border:none;outline:none;border-bottom:1px dashed rgba(108,99,255,.4);padding-bottom:4px}
+.hero-cta-input{font-size:14px;background:#6c63ff;color:white;border:none;outline:none;border-radius:8px;padding:10px 24px;font-weight:600;font-family:'DM Sans',sans-serif;margin-top:8px;cursor:text}
 .sec-text{padding:32px 40px}
-.text-input{width:100%;min-height:120px;resize:vertical;border:1px dashed var(--nav-border,#d1d5db);border-radius:6px;padding:12px;font-size:16px;line-height:1.7;color:var(--text,#374151);outline:none;background:var(--bg-alt,#fafafa);font-family:var(--body-font,'DM Sans',sans-serif);transition:border-color .15s}
+.text-input{width:100%;min-height:120px;resize:vertical;border:1px dashed #d1d5db;border-radius:6px;padding:12px;font-size:16px;line-height:1.7;color:#374151;outline:none;background:#fafafa;font-family:'DM Sans',sans-serif;transition:border-color .15s}
 .text-input:focus{border-color:var(--accent);background:white}
 .sec-image{padding:20px 40px}
 .img-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed #d1d5db;border-radius:12px;padding:50px 20px;cursor:pointer;color:#9ca3af;transition:all .15s}
@@ -2986,7 +2821,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .feat-icon-input{font-size:24px;background:transparent;border:none;outline:none;width:40px}
 .feat-title-input{font-weight:600;font-size:15px;background:transparent;border:none;border-bottom:1px dashed #d1d5db;outline:none;color:#1a1a2e;font-family:'DM Sans',sans-serif;padding-bottom:4px}
 .feat-desc-input{font-size:13px;color:#6b7280;background:transparent;border:none;outline:none;font-family:'DM Sans',sans-serif}
-.sec-payment{padding:32px 40px;background:var(--bg-hero,linear-gradient(135deg,#f8f7ff,#ede9fe))}
+.sec-payment{padding:32px 40px;background:linear-gradient(135deg,#f8f7ff,#ede9fe)}
 .payment-edit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
 .pay-providers-badge{display:flex;gap:6px}
 .badge-stripe{background:var(--stripe);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px}
@@ -3138,21 +2973,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
 
-
-/* PUBLIC PREVIEW — thème externe appliqué */
-.public-preview-overlay{background:var(--bg,#fff);color:var(--text,#1a1a2e);font-family:var(--body-font,'DM Sans',sans-serif)}
-.pub-preview-nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7eb)}
-.pub-preview-brand-name{color:var(--text,#1a1a2e);font-family:var(--hero-font,'Playfair Display',serif)}
-.pub-preview-tab{color:var(--text-sub,#6b7280)}
-.pub-preview-tab.active,.pub-preview-tab:hover{background:var(--accent,#6c63ff);color:#fff}
-.pub-preview-content{background:var(--bg,#fff);color:var(--text,#1a1a2e)}
-.prev-hero{background:var(--bg-hero,linear-gradient(135deg,#f8f7ff,#ede9fe));color:var(--text,#1a1a2e)}
-.prev-hero-title,.prev-video-title{font-family:var(--hero-font,'Playfair Display',serif);color:var(--text,#1a1a2e)}
-.prev-hero-sub,.prev-text p,.feature-card p,.product-desc{color:var(--text-sub,#6b7280)}
-.prev-hero-cta,.form-submit,.preview-mode .product-btn{background:var(--accent,#6c63ff);color:#fff;border-radius:var(--btn-radius,10px);padding:var(--btn-pad,14px 32px);font-family:var(--body-font,'DM Sans',sans-serif)}
-.preview-mode .product-card,.preview-mode .feature-card{background:var(--bg,#fff);border-color:var(--nav-border,#e5e7eb);border-radius:var(--card-radius,16px);box-shadow:var(--card-shadow,0 2px 12px rgba(0,0,0,.06))}
-.preview-mode .sec-products,.preview-mode .sec-features,.preview-mode .sec-form{background:var(--bg-alt,#fafafa)}
-
 /* ══ MODAL THÈME ═══════════════════════════════════════════ */
 .theme-pick-modal{max-width:500px;width:93%;max-height:88vh;overflow-y:auto}
 .tpm-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px}
@@ -3177,8 +2997,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .tpm-export-row{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--text2)}
 .tpm-export-btn{background:var(--surface);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
 .tpm-export-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
-.btn-theme-pick{background:linear-gradient(135deg,var(--theme-accent-hover,#a78bfa),var(--theme-accent,#6c63ff))!important;color:#fff!important}
-.btn-theme-pick:hover{background:linear-gradient(135deg,var(--theme-accent,#6c63ff),var(--theme-accent-hover,#4f46e5))!important}
+.btn-theme-pick{background:linear-gradient(135deg,#a78bfa,#6c63ff)!important;color:#fff!important}
+.btn-theme-pick:hover{background:linear-gradient(135deg,#6c63ff,#4f46e5)!important}
 
 /* ══ BOUTONS LOGIN / LOGOUT ══════════════════════════════════ */
 .topbar-user{display:flex;align-items:center;gap:6px;border-left:1px solid var(--border);padding-left:10px;flex-shrink:0}
@@ -3189,14 +3009,69 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .btn-login:hover{opacity:.9}
 
 
-/* ── Import JSON sections ─────────────────────────────────── */
-.import-json-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px}
-.import-json-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px}
-.import-json-title{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap}
-.import-target-sel{font-size:11px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:4px 6px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;max-width:100px}
-.import-json-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:9px;background:linear-gradient(135deg,#6c63ff,#4f46e5);color:#fff;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:.15s;margin-bottom:8px}
-.import-json-btn:hover{opacity:.9}
-.import-json-error{font-size:11px;color:#ef4444;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 8px;margin-bottom:6px}
-.import-json-hint{font-size:10px;color:var(--text3);line-height:1.7}
-.import-json-hint code{font-family:monospace;color:var(--accent2,#10b981);font-size:10px}
+/* ══ MODE APERÇU PUBLIC ══════════════════════════════════════
+   CRITIQUE : couvre tout le builder avec position:fixed
+   ══════════════════════════════════════════════════════════ */
+.public-preview-overlay{position:fixed!important;inset:0!important;z-index:99999!important;background:#fff;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column}
+.pub-preview-close{position:fixed;top:8px;right:10px;z-index:100000;background:#ef4444;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:'DM Sans',sans-serif}
+.pub-preview-close:hover{background:#dc2626}
+.pub-preview-nav{position:sticky;top:0;z-index:9998;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:0 16px;height:54px;gap:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);flex-shrink:0}
+.pub-preview-brand-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0;max-width:160px}
+.pub-preview-logo{height:32px!important;width:auto!important;max-width:120px!important;max-height:32px!important;object-fit:contain!important;border-radius:6px;flex-shrink:0;display:block}
+.pub-preview-brand-icon{font-size:20px;flex-shrink:0}
+.pub-preview-brand-name{font-size:14px;font-weight:700;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
+.pub-preview-tabs{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none;justify-content:center}
+.pub-preview-tabs::-webkit-scrollbar{display:none}
+.pub-preview-tab{background:none;border:none;color:#6b7280;font-size:13px;font-weight:500;padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:.15s;font-family:'DM Sans',sans-serif}
+.pub-preview-tab.active,.pub-preview-tab:hover{background:#6c63ff;color:#fff}
+.pub-preview-cart{background:#6c63ff;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
+.pub-preview-content{flex:1;width:100%;max-width:100%;overflow-x:hidden}
+
+/* Sections preview */
+.prev-hero{padding:clamp(48px,8vw,100px) clamp(16px,5vw,60px);background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
+.prev-hero-title{font-family:'Playfair Display',serif;font-size:clamp(24px,4.5vw,52px);font-weight:600;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:14px}
+.prev-hero-sub{font-size:clamp(13px,2vw,18px);color:#6b7280;margin-bottom:26px}
+.prev-hero-cta{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:12px 28px;font-size:15px;font-weight:600;cursor:pointer}
+.prev-text{padding:clamp(20px,4vw,48px) clamp(16px,5vw,60px)}
+.prev-text p{font-size:clamp(14px,2vw,16px);line-height:1.8;color:#374151;max-width:720px}
+.prev-image{padding:clamp(14px,3vw,32px) clamp(16px,5vw,60px)}.prev-img{width:100%;border-radius:10px;display:block}
+.prev-gallery{padding:clamp(18px,4vw,40px) clamp(16px,5vw,60px)}.prev-gallery-grid{display:grid;gap:8px}
+.prev-gallery-item img{width:100%;border-radius:7px;object-fit:cover;aspect-ratio:1;display:block}
+.prev-video{padding:clamp(18px,4vw,36px) clamp(16px,5vw,60px)}
+.prev-video-title{font-size:clamp(16px,2.5vw,22px);color:#1a1a2e;margin-bottom:12px;text-align:center}
+.prev-video-iframe{width:100%;height:clamp(200px,45vw,420px);border-radius:10px;border:none;display:block}
+.prev-products{padding:clamp(20px,4vw,48px) clamp(12px,4vw,60px);background:#fafafa}
+.prev-products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.prev-product-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);transition:transform .2s}
+.prev-product-card:hover{transform:translateY(-3px)}
+.prev-product-img-wrap{position:relative}
+.prev-product-img{width:100%;height:150px;object-fit:cover;display:block}
+.prev-product-img-ph{width:100%;height:150px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:32px}
+.prev-product-badge{position:absolute;top:8px;left:8px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase}
+.prev-product-body{padding:12px}
+.prev-product-name{font-size:13px;font-weight:600;color:#111;margin-bottom:4px}
+.prev-product-desc{font-size:11px;color:#6b7280;line-height:1.4;margin-bottom:10px}
+.prev-product-footer{display:flex;align-items:center;justify-content:space-between}
+.prev-product-price{font-size:15px;font-weight:700;color:#6c63ff}
+.prev-product-btn{background:#6c63ff;color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer}
+.prev-features{padding:clamp(28px,5vw,60px) clamp(12px,5vw,60px);background:#fafafa}
+.prev-features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px;max-width:860px;margin:0 auto}
+.prev-feature-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px 16px;text-align:center}
+.prev-feat-icon{font-size:28px;display:block;margin-bottom:8px}
+.prev-feature-card strong{font-size:14px;color:#111;display:block;margin-bottom:4px}
+.prev-feature-card p{font-size:12px;color:#6b7280;line-height:1.4}
+.prev-form{padding:clamp(28px,5vw,60px) clamp(12px,5vw,60px);background:#f8f7ff;display:flex;flex-direction:column;align-items:center}
+.prev-form h3{font-size:clamp(18px,3vw,26px);margin-bottom:16px;color:#1a1a2e}
+.prev-form-field{width:100%;max-width:460px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:9px;font-size:14px;margin-bottom:10px;background:#fff;color:#374151;display:block}
+.prev-form-ta{min-height:90px;resize:none}
+.prev-form-btn{background:#6c63ff;color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer}
+.prev-divider{padding:6px clamp(12px,5vw,60px)}
+.prev-divider-line{border:none;border-top:1px solid #e5e7eb}
+@media(max-width:520px){
+  .pub-preview-logo{height:26px!important;max-width:90px!important}
+  .pub-preview-brand-name{max-width:70px;font-size:12px}
+  .pub-preview-close{top:6px;right:6px;padding:5px 9px;font-size:11px}
+  .prev-products-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .prev-features-grid{grid-template-columns:1fr}
+}
 </style>
