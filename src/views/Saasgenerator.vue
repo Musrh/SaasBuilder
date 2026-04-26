@@ -874,6 +874,75 @@ const sectionDefaults = {
 const addSection = (key) => {
   currentPage.value.sections.push({ id: Date.now(), ...JSON.parse(JSON.stringify(sectionDefaults[key])) })
 }
+
+// ── Import sections depuis un fichier JSON ──────────────────
+const importJsonError  = ref("")
+const importJsonTarget = ref("page")  // "page" | "site"
+
+const importSectionsFromJson = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  importJsonError.value = ""
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result)
+
+      // Format 1 : { sections: [...] }
+      if (Array.isArray(data.sections)) {
+        applyImportedSections(data.sections)
+        return
+      }
+      // Format 2 : tableau direct [{ type, ... }, ...]
+      if (Array.isArray(data)) {
+        applyImportedSections(data)
+        return
+      }
+      // Format 3 : { pages: [{ sections: [...] }] }
+      if (data.pages && Array.isArray(data.pages)) {
+        if (importJsonTarget.value === "site") {
+          // Remplacer toutes les pages
+          site.value = { pages: data.pages.map((p, i) => ({
+            ...p,
+            id: p.id || Date.now() + i,
+            sections: (p.sections || []).map(s => ({ ...s, id: Date.now() + Math.random() }))
+          })) }
+          notify("✅ Site importé depuis JSON (" + data.pages.length + " pages)", "success")
+        } else {
+          applyImportedSections(data.pages[0]?.sections || [])
+        }
+        return
+      }
+      // Format 4 : une seule section { type, content, ... }
+      if (data.type && typeof data.type === "string") {
+        applyImportedSections([data])
+        return
+      }
+      importJsonError.value = "Format non reconnu. Attendu : { sections:[...] } ou [...] ou { pages:[...] }"
+    } catch(err) {
+      importJsonError.value = "JSON invalide : " + err.message
+    }
+    event.target.value = ""
+  }
+  reader.readAsText(file)
+}
+
+const applyImportedSections = (sections) => {
+  if (!sections.length) { importJsonError.value = "Aucune section trouvée dans le fichier."; return }
+  const newSections = sections.map(s => ({
+    ...s,
+    id: Date.now() + Math.random(),   // nouveaux IDs pour éviter les conflits
+  }))
+  if (importJsonTarget.value === "site") {
+    site.value.pages.forEach(p => {
+      p.sections = [...p.sections, ...JSON.parse(JSON.stringify(newSections))]
+    })
+    notify("✅ " + newSections.length + " section(s) ajoutée(s) à toutes les pages", "success")
+  } else {
+    currentPage.value.sections.push(...newSections)
+    notify("✅ " + newSections.length + " section(s) ajoutée(s) à cette page", "success")
+  }
+}
 const deleteSection = (i) => { currentPage.value.sections.splice(i, 1); activeSectionIndex.value = null }
 const moveSection = (i, dir) => {
   const arr = currentPage.value.sections; const j = i + dir
@@ -2315,6 +2384,30 @@ const setPageStyle = (type, value) => {
       </div>
       <div v-if="sidebarTab==='sections'" class="sidebar-content">
         <p class="sidebar-label">{{ t.addSection }}</p>
+
+        <!-- Import depuis JSON -->
+        <div class="import-json-box">
+          <div class="import-json-row">
+            <span class="import-json-title">📂 Importer via .json</span>
+            <select v-model="importJsonTarget" class="import-target-sel">
+              <option value="page">Cette page</option>
+              <option value="site">Tout le site</option>
+            </select>
+          </div>
+          <label class="import-json-btn" title="Charger un fichier JSON de sections">
+            ＋ Charger un fichier .json
+            <input type="file" accept=".json,application/json" style="display:none"
+              @change="importSectionsFromJson"/>
+          </label>
+          <p v-if="importJsonError" class="import-json-error">⚠ {{ importJsonError }}</p>
+          <p class="import-json-hint">
+            Formats acceptés :<br/>
+            <code>{ "sections": [...] }</code><br/>
+            <code>[{ "type":"hero", ... }]</code><br/>
+            <code>{ "pages": [...] }</code>
+          </p>
+        </div>
+
         <div class="section-grid">
           <button v-for="st in sectionTypes" :key="st.key" class="section-card" @click="addSection(st.key)">
             <span class="sc-icon">{{ st.icon }}</span>
@@ -3009,69 +3102,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .btn-login:hover{opacity:.9}
 
 
-/* ══ MODE APERÇU PUBLIC ══════════════════════════════════════
-   CRITIQUE : couvre tout le builder avec position:fixed
-   ══════════════════════════════════════════════════════════ */
-.public-preview-overlay{position:fixed!important;inset:0!important;z-index:99999!important;background:#fff;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column}
-.pub-preview-close{position:fixed;top:8px;right:10px;z-index:100000;background:#ef4444;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:'DM Sans',sans-serif}
-.pub-preview-close:hover{background:#dc2626}
-.pub-preview-nav{position:sticky;top:0;z-index:9998;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:0 16px;height:54px;gap:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);flex-shrink:0}
-.pub-preview-brand-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0;max-width:160px}
-.pub-preview-logo{height:32px!important;width:auto!important;max-width:120px!important;max-height:32px!important;object-fit:contain!important;border-radius:6px;flex-shrink:0;display:block}
-.pub-preview-brand-icon{font-size:20px;flex-shrink:0}
-.pub-preview-brand-name{font-size:14px;font-weight:700;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
-.pub-preview-tabs{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none;justify-content:center}
-.pub-preview-tabs::-webkit-scrollbar{display:none}
-.pub-preview-tab{background:none;border:none;color:#6b7280;font-size:13px;font-weight:500;padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:.15s;font-family:'DM Sans',sans-serif}
-.pub-preview-tab.active,.pub-preview-tab:hover{background:#6c63ff;color:#fff}
-.pub-preview-cart{background:#6c63ff;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0}
-.pub-preview-content{flex:1;width:100%;max-width:100%;overflow-x:hidden}
-
-/* Sections preview */
-.prev-hero{padding:clamp(48px,8vw,100px) clamp(16px,5vw,60px);background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
-.prev-hero-title{font-family:'Playfair Display',serif;font-size:clamp(24px,4.5vw,52px);font-weight:600;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:14px}
-.prev-hero-sub{font-size:clamp(13px,2vw,18px);color:#6b7280;margin-bottom:26px}
-.prev-hero-cta{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:12px 28px;font-size:15px;font-weight:600;cursor:pointer}
-.prev-text{padding:clamp(20px,4vw,48px) clamp(16px,5vw,60px)}
-.prev-text p{font-size:clamp(14px,2vw,16px);line-height:1.8;color:#374151;max-width:720px}
-.prev-image{padding:clamp(14px,3vw,32px) clamp(16px,5vw,60px)}.prev-img{width:100%;border-radius:10px;display:block}
-.prev-gallery{padding:clamp(18px,4vw,40px) clamp(16px,5vw,60px)}.prev-gallery-grid{display:grid;gap:8px}
-.prev-gallery-item img{width:100%;border-radius:7px;object-fit:cover;aspect-ratio:1;display:block}
-.prev-video{padding:clamp(18px,4vw,36px) clamp(16px,5vw,60px)}
-.prev-video-title{font-size:clamp(16px,2.5vw,22px);color:#1a1a2e;margin-bottom:12px;text-align:center}
-.prev-video-iframe{width:100%;height:clamp(200px,45vw,420px);border-radius:10px;border:none;display:block}
-.prev-products{padding:clamp(20px,4vw,48px) clamp(12px,4vw,60px);background:#fafafa}
-.prev-products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
-.prev-product-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);transition:transform .2s}
-.prev-product-card:hover{transform:translateY(-3px)}
-.prev-product-img-wrap{position:relative}
-.prev-product-img{width:100%;height:150px;object-fit:cover;display:block}
-.prev-product-img-ph{width:100%;height:150px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:32px}
-.prev-product-badge{position:absolute;top:8px;left:8px;background:#fef3c7;color:#92400e;font-size:9px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase}
-.prev-product-body{padding:12px}
-.prev-product-name{font-size:13px;font-weight:600;color:#111;margin-bottom:4px}
-.prev-product-desc{font-size:11px;color:#6b7280;line-height:1.4;margin-bottom:10px}
-.prev-product-footer{display:flex;align-items:center;justify-content:space-between}
-.prev-product-price{font-size:15px;font-weight:700;color:#6c63ff}
-.prev-product-btn{background:#6c63ff;color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer}
-.prev-features{padding:clamp(28px,5vw,60px) clamp(12px,5vw,60px);background:#fafafa}
-.prev-features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px;max-width:860px;margin:0 auto}
-.prev-feature-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px 16px;text-align:center}
-.prev-feat-icon{font-size:28px;display:block;margin-bottom:8px}
-.prev-feature-card strong{font-size:14px;color:#111;display:block;margin-bottom:4px}
-.prev-feature-card p{font-size:12px;color:#6b7280;line-height:1.4}
-.prev-form{padding:clamp(28px,5vw,60px) clamp(12px,5vw,60px);background:#f8f7ff;display:flex;flex-direction:column;align-items:center}
-.prev-form h3{font-size:clamp(18px,3vw,26px);margin-bottom:16px;color:#1a1a2e}
-.prev-form-field{width:100%;max-width:460px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:9px;font-size:14px;margin-bottom:10px;background:#fff;color:#374151;display:block}
-.prev-form-ta{min-height:90px;resize:none}
-.prev-form-btn{background:#6c63ff;color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer}
-.prev-divider{padding:6px clamp(12px,5vw,60px)}
-.prev-divider-line{border:none;border-top:1px solid #e5e7eb}
-@media(max-width:520px){
-  .pub-preview-logo{height:26px!important;max-width:90px!important}
-  .pub-preview-brand-name{max-width:70px;font-size:12px}
-  .pub-preview-close{top:6px;right:6px;padding:5px 9px;font-size:11px}
-  .prev-products-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
-  .prev-features-grid{grid-template-columns:1fr}
-}
+/* ── Import JSON sections ─────────────────────────────────── */
+.import-json-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px}
+.import-json-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px}
+.import-json-title{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap}
+.import-target-sel{font-size:11px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:4px 6px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;max-width:100px}
+.import-json-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:9px;background:linear-gradient(135deg,#6c63ff,#4f46e5);color:#fff;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-align:center;transition:.15s;margin-bottom:8px}
+.import-json-btn:hover{opacity:.9}
+.import-json-error{font-size:11px;color:#ef4444;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:6px 8px;margin-bottom:6px}
+.import-json-hint{font-size:10px;color:var(--text3);line-height:1.7}
+.import-json-hint code{font-family:monospace;color:var(--accent2,#10b981);font-size:10px}
 </style>
