@@ -918,7 +918,15 @@ const importSectionsFromJson = (event) => {
         applyImportedSections([data])
         return
       }
-      importJsonError.value = "Format non reconnu. Attendu : { sections:[...] } ou [...] ou { pages:[...] }"
+      // Format 5 : fichier THÈME { accent, bg, text, ... } ou { _saasbuilder:"theme", ... }
+      const themeKeys = ["accent", "bg", "text", "bgHero", "navBg", "heroFont", "bodyFont", "btnRadius"]
+      const hasThemeProps = themeKeys.filter(k => data[k]).length >= 2
+      if (hasThemeProps || data._saasbuilder === "theme") {
+        applyThemeObj({ name: data.name || "Thème importé", ...data })
+        importJsonError.value = ""
+        return
+      }
+      importJsonError.value = "Format non reconnu. Attendu : { sections:[...] } ou [...] ou { pages:[...] } ou fichier thème { accent, bg, ... }"
     } catch(err) {
       importJsonError.value = "JSON invalide : " + err.message
     }
@@ -2401,10 +2409,12 @@ const setPageStyle = (type, value) => {
           </label>
           <p v-if="importJsonError" class="import-json-error">⚠ {{ importJsonError }}</p>
           <p class="import-json-hint">
-            Formats acceptés :<br/>
+            Formats sections :<br/>
             <code>{ "sections": [...] }</code><br/>
             <code>[{ "type":"hero", ... }]</code><br/>
-            <code>{ "pages": [...] }</code>
+            <code>{ "pages": [...] }</code><br/>
+            Ou fichier thème :<br/>
+            <code>{ "accent":"#ff0066", "bg":"#fff", ... }</code>
           </p>
         </div>
 
