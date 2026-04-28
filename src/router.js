@@ -92,12 +92,12 @@ const routes = [
   {
     path: "/payment-success",
     name: "payment-success",
-    component: () => import("./views/PaymentSuccess.vue"),
+    component: () => import("./views/Paymentsuccess.vue"),
   },
   {
     path: "/payment-cancel",
     name: "payment-cancel",
-    component: () => import("./views/PaymentCancel.vue"),
+    component: () => import("./views/Paymentcancel.vue"),
   },
 
   // Retour Stripe pour abonnement SaasBuilder
@@ -136,19 +136,19 @@ const routes = [
   },
 
   // Catalogue produits (propriétaire)
-  {
-    path: "/products",
-    name: "products",
-    component: () => import("./views/ListeProducts.vue"),
-    meta: { requiresAuth: true },
-  },
+  //{
+    //path: "/products",
+    //name: "products",
+   // component: () => import("./views/ListeProducts.vue"),
+   // meta: { requiresAuth: true },
+//  },
 
   // Plans tarifaires (page marketing)
-  {
-    path: "/plans",
-    name: "plans",
-    component: () => import("./views/Plans.vue"),
-  },
+  //{
+   // path: "/plans",
+    //name: "plans",
+    //component: () => import("./views/Plans.vue"),
+  //},
 
   // Panier (ancien flow)
   {
