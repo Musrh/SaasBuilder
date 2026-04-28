@@ -1,16 +1,120 @@
-import { createRouter, createWebHashHistory } from "vue-router";
+// ============================================================
+//  SaasBuilder/src/router.js — ROUTER COMPLET FINAL
+//
+//  Toutes les routes de l'application SaasBuilder :
+//  - App principale : Plans → Auth → Dashboard → Builder
+//  - Sites publiés  : /site/:uid (SiteViewer public)
+//  - Admin          : /admin (réservé aux admins)
+//  - Paiements      : /payment-success, /payment-cancel
+// ============================================================
+import { createRouter, createWebHashHistory } from "vue-router"
+import { getAuth }    from "firebase/auth"
+import { getFirestore, doc, getDoc } from "firebase/firestore"
 
-import PlanSelection from "./views/PlanSelection.vue";
-import AuthForm from "./views/AuthForm.vue";
-import Dashboard from "./views/Dashboard.vue";
-import Checkout from "./views/Checkout.vue";
-import PrivacyPolicy from "./views/PrivacyPolicy.vue";
-import Remboursement from "./views/Remboursement.vue";
-import Mentions from "./views/Mentions.vue";
-import Confidentialite from "./views/Confidentialite.vue";
-import Conditions from "./views/Conditions.vue";
+// ── Imports statiques (chargés au démarrage) ──────────────────
+import PlanSelection from "./views/PlanSelection.vue"
+import SlugSetup    from "./views/SlugSetup.vue"
+import AuthForm      from "./views/AuthForm.vue"
+import Dashboard     from "./views/Dashboard.vue"
+import SiteViewer    from "./views/SiteViewer.vue"
+import NotFound      from "./views/NotFound.vue"
+
+// ── Emails admin (même liste que AuthForm.vue) ────────────────
+const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
+
 const routes = [
-  // ── APP SAAS ─────────────────────────────
+
+  // ════════════════════════════════════════════════════════════
+  //  APP PRINCIPALE — Funnel Plans → Auth → Dashboard → Builder
+  // ════════════════════════════════════════════════════════════
+
+  // Choix du plan (page d'accueil)
+  {
+    path: "/",
+    name: "home",
+    component: PlanSelection,
+  },
+
+  // Connexion / Inscription
+  {
+    path: "/auth",
+    name: "auth",
+    component: AuthForm,
+  },
+
+  // Choix du slug (affiché une fois avant le builder)
+  {
+    path: "/slug-setup",
+    name: "slug-setup",
+    component: SlugSetup,
+    meta: { requiresAuth: true },
+  },
+
+  // Dashboard propriétaire (plan FREE ou en attente)
+  {
+    path: "/dashboard",
+    name: "dashboard",
+    component: Dashboard,
+    meta: { requiresAuth: true },
+  },
+
+  // Builder SaasGenerator (plan Pro + payé)
+  {
+    path: "/saasgenerator",
+    name: "saasgenerator",
+    component: () => import("./views/SaasGenerator.vue"),
+    meta: { requiresAuth: true },
+  },
+
+  // ════════════════════════════════════════════════════════════
+  //  SITES PUBLIÉS — accessibles par tous (public)
+  // ════════════════════════════════════════════════════════════
+
+  // Store public : /site/mrstore  ou  /site/<uid>
+  {
+    path: "/site/:uid",
+    name: "site",
+    component: SiteViewer,
+    props: true,
+  },
+
+  // Auth client du store (inscription/connexion visiteur)
+  {
+    path: "/store-auth",
+    name: "store-auth",
+    component: () => import("./views/StoreAuth.vue"),
+  },
+
+  // ════════════════════════════════════════════════════════════
+  //  PAIEMENTS — retour Stripe après achat
+  // ════════════════════════════════════════════════════════════
+
+  {
+    path: "/payment-success",
+    name: "payment-success",
+    component: () => import("./views/PaymentSuccess.vue"),
+  },
+  {
+    path: "/payment-cancel",
+    name: "payment-cancel",
+    component: () => import("./views/PaymentCancel.vue"),
+  },
+
+  // Retour Stripe pour abonnement SaasBuilder
+  {
+    path: "/success",
+    name: "success",
+    component: () => import("./views/Success.vue"),
+  },
+  {
+    path: "/cancel",
+    name: "cancel",
+    component: () => import("./views/Cancel.vue"),
+  },
+
+  // ════════════════════════════════════════════════════════════
+  //  ADMIN — réservé aux emails admins
+  // ════════════════════════════════════════════════════════════
 
   {
     path: "/admin",
@@ -18,110 +122,131 @@ const routes = [
     component: () => import("./views/Admin.vue"),
     meta: { requiresAdmin: true },
   },
-  
+
+  // ════════════════════════════════════════════════════════════
+  //  AUTRES PAGES
+  // ════════════════════════════════════════════════════════════
+
+  // Commandes du store (propriétaire connecté)
   {
-    path: "/connection",
-    name: "Connexion",
-    component: () => import("./views/Connexion.vue"),
-    
+    path: "/orders",
+    name: "orders",
+    component: () => import("./views/Orders.vue"),
+    meta: { requiresAuth: true },
   },
-  
-  { path: "/", component: PlanSelection },
-  { path: "/auth", component: AuthForm },
-  { path: "/dashboard", component: Dashboard },
 
-  { path: "/panier", component: () => import("./views/Panier.vue") },
-  { path: "/checkout", name: "Checkout", component: Checkout },
-
-  { path: "/success", component: () => import("./views/Success.vue") },
-  { path: "/cancel", component: () => import("./views/Cancel.vue") },
-
-  { path: "/orders", component: () => import("./views/Orders.vue") },
-
+  // Catalogue produits (propriétaire)
   {
-    path: "/privacy-policy",
-    name: "PrivacyPolicy",
-    component: PrivacyPolicy
+    path: "/products",
+    name: "products",
+    component: () => import("./views/ListeProducts.vue"),
+    meta: { requiresAuth: true },
   },
 
-{
-    path: "/remboursement",
-    name: "Remboursement",
-    component: Remboursement
+  // Plans tarifaires (page marketing)
+  {
+    path: "/plans",
+    name: "plans",
+    component: () => import("./views/Plans.vue"),
   },
 
+  // Panier (ancien flow)
   {
-    path: "/mentions",
-    name: "MentionsLegales",
-    component: Mentions
-  },
-  {
-    path: "/confidentialite",
-    name: "Confidentialite",
-    component: Confidentialite
-  },
-  {
-    path: "/conditions",
-    name: "Conditions",
-    component: Conditions
+    path: "/panier",
+    name: "panier",
+    component: () => import("./views/Panier.vue"),
   },
 
-  
-  {
-    path: "/connection",
-    name: "Connection",
-    component: () => import("./views/Connexion.vue")
-  },
-
-  // ── BUILDER (fusionné ici) ─────────────────
-
-  // 👉 Page principale builder
-  {
-    path: "/saasgenerator",
-    name: "Saasgenerator",
-    component: () => import("./views/Saasgenerator.vue") // ancien Home du builder
-  },
-
-  // 👉 Cart
-  {
-    path: "/cart",
-    name: "Cart",
-    component: () => import("./views/Cart.vue")
-  },
-
-  // 👉 Site public
-  {
-    path: "/site/:uid",
-    name: "SiteViewer",
-    component: () => import("./views/Siteviewer.vue"),
-    props: true
-  },
-
-  // 👉 Auth client store
-  {
-    path: "/store-auth",
-    name: "StoreAuth",
-    component: () => import("./views/Storeauth.vue")
-  },
-
-  // 👉 Paiement client store
-  {
-    path: "/payment-success",
-    component: () => import("./views/Paymentsuccess.vue")
-  },
-  {
-    path: "/payment-cancel",
-    component: () => import("./views/Paymentcancel.vue")
-  },
-
-  // ── 404 ─────────────────────────────────
+  // 404
   {
     path: "/:pathMatch(.*)*",
-    component: () => import("./views/NotFound.vue")
-  }
-];
+    name: "not-found",
+    component: NotFound,
+  },
+]
 
-export default createRouter({
+const router = createRouter({
   history: createWebHashHistory(),
   routes,
-});
+  scrollBehavior: () => ({ top: 0 }),
+})
+
+// ════════════════════════════════════════════════════════════
+//  GUARD GLOBAL — Protection des routes
+// ════════════════════════════════════════════════════════════
+router.beforeEach(async (to, from, next) => {
+  const auth = getAuth()
+  const user = auth.currentUser
+
+  // ── Route admin : vérifier email ──────────────────────────
+  if (to.meta.requiresAdmin) {
+    if (!user) {
+      next({ name: "auth" })
+      return
+    }
+    if (!ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
+      next({ name: "not-found" })
+      return
+    }
+    next()
+    return
+  }
+
+  // ── Routes protégées : connexion requise ──────────────────
+  if (to.meta.requiresAuth) {
+    if (!user) {
+      next({ name: "auth", query: { redirect: to.fullPath } })
+      return
+    }
+
+    // Sur /dashboard ou /saasgenerator : vérifier le statut du compte
+    if (to.name === "dashboard" || to.name === "saasgenerator") {
+      try {
+        const db   = getFirestore()
+        const snap = await getDoc(doc(db, "users", user.uid))
+        if (snap.exists()) {
+          const d      = snap.data()
+          const active = d.active !== false   // true par défaut
+
+          // Compte désactivé → retour auth
+          if (!active) {
+            await auth.signOut()
+            next({ name: "auth" })
+            return
+          }
+
+          // Vérifier que le slug est configuré avant le builder
+          if (to.name === "saasgenerator" || to.name === "slug-setup") {
+            // Si pas encore de slug → forcer slug-setup
+            if (to.name === "saasgenerator" && !d.publishedSlug) {
+              next({ name: "slug-setup" })
+              return
+            }
+          }
+
+          // /saasgenerator réservé aux plans Pro payés et non expirés
+          if (to.name === "saasgenerator") {
+            const isPro      = d.plan !== "free"
+            const isPaid     = d.paye === true
+            const exp        = d.expiry
+            const notExpired = !exp || exp === 0 || exp > Date.now()
+            if (!isPro || !isPaid || !notExpired) {
+              next({ name: "dashboard" })
+              return
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Router guard:", e.message)
+      }
+    }
+
+    next()
+    return
+  }
+
+  // Route publique → toujours accessible
+  next()
+})
+
+export default router
