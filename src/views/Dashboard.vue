@@ -472,9 +472,10 @@ const orderFilter   = ref("")
 const planExpired = computed(() => {
   if (!userData.value) return false
   if (userData.value.plan === "free") return false
-  // Si expiry est null/absent → pas expiré (ex: passage Free→Pro sans expiry défini)
-  if (!userData.value.expiry) return false
-  return userData.value.expiry < Date.now()
+  // expiry null/0/absent = pas expiré (webhook Stripe peut ne pas l'écrire)
+  const exp = userData.value.expiry
+  if (!exp || exp === 0 || exp === null) return false
+  return exp < Date.now()
 })
 
 const canAccessBuilder = computed(() => {
@@ -605,8 +606,13 @@ const openStore = () => {
   window.open(`https://musrh.github.io/SaasBuilder/#/site/${userData.value.publishedSlug}`, "_blank")
 }
 
-const goToBuilder = () => {
-  window.location.href = "https://musrh.github.io/SaasBuilder/#/saasgenerator"
+const goToBuilder = async () => {
+  // Vérifier si le slug est configuré
+  if (userData.value?.publishedSlug) {
+    window.location.href = "https://musrh.github.io/SaasBuilder/#/saasgenerator"
+  } else {
+    router.push("/slug-setup")
+  }
 }
 
 const goToPlans = () => { showPlanModal.value = true }
