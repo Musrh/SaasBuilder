@@ -13,10 +13,10 @@ import { getFirestore, doc, getDoc } from "firebase/firestore"
 
 // ── Imports statiques (chargés au démarrage) ──────────────────
 import PlanSelection from "./views/PlanSelection.vue"
-import SlugSetup    from "./views/SlugSetup.vue"
+import SlugSetup    from "./views/Slugsetup.vue"
 import AuthForm      from "./views/AuthForm.vue"
 import Dashboard     from "./views/Dashboard.vue"
-import SiteViewer    from "./views/SiteViewer.vue"
+import SiteViewer    from "./views/Siteviewer.vue"
 import NotFound      from "./views/NotFound.vue"
 
 // ── Emails admin (même liste que AuthForm.vue) ────────────────
@@ -62,7 +62,7 @@ const routes = [
   {
     path: "/saasgenerator",
     name: "saasgenerator",
-    component: () => import("./views/SaasGenerator.vue"),
+    component: () => import("./views/Saasgenerator.vue"),
     meta: { requiresAuth: true },
   },
 
@@ -82,7 +82,7 @@ const routes = [
   {
     path: "/store-auth",
     name: "store-auth",
-    component: () => import("./views/StoreAuth.vue"),
+    component: () => import("./views/Storeauth.vue"),
   },
 
   // ════════════════════════════════════════════════════════════
