@@ -109,7 +109,13 @@ const redirectUser = async (user) => {
       await signOut(auth)
       return
     }
-    router.push("/dashboard")
+    // ✅ Utiliser le redirect query param si présent (ex: /saasgenerator)
+    const redirectTo = route.query.redirect
+    if (redirectTo && !String(redirectTo).includes("/auth")) {
+      router.push(String(redirectTo))
+    } else {
+      router.push("/dashboard")
+    }
   } catch(err) {
     console.error("redirectUser:", err.message)
     router.push("/dashboard")
