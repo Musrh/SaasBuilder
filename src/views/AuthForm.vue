@@ -96,7 +96,7 @@ onMounted(() => {
 const redirectUser = async (user) => {
   const emailLower = user.email?.toLowerCase() || ""
   if (ADMIN_EMAILS.includes(emailLower)) {
-    window.location.href = "https://musrh.github.io/SaasBuilder/#/admin"
+    window.location.href = "https://mronlinestores.com/#/admin"
     return
   }
   try {
