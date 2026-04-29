@@ -9,7 +9,7 @@ import PlanSelection from "./views/PlanSelection.vue"
 import SlugSetup     from "./views/SlugSetup.vue"
 import AuthForm      from "./views/AuthForm.vue"
 import Dashboard     from "./views/Dashboard.vue"
-import SiteViewer    from "./views/SiteViewer.vue"
+import SiteViewer    from "./views/Siteviewer.vue"
 import NotFound      from "./views/NotFound.vue"
 
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
@@ -30,17 +30,17 @@ const routes = [
   {
     path: "/saasgenerator",
     name: "saasgenerator",
-    component: () => import("./views/SaasGenerator.vue"),
+    component: () => import("./views/Saasgenerator.vue"),
     meta: { requiresAuth: true },
   },
 
   // ── Sites publiés ───────────────────────────────────────────
   { path: "/site/:uid",    name: "site",            component: SiteViewer, props: true },
-  { path: "/store-auth",   name: "store-auth",      component: () => import("./views/StoreAuth.vue") },
+  { path: "/store-auth",   name: "store-auth",      component: () => import("./views/Storeauth.vue") },
 
   // ── Paiements ───────────────────────────────────────────────
-  { path: "/payment-success", name: "payment-success", component: () => import("./views/PaymentSuccess.vue") },
-  { path: "/payment-cancel",  name: "payment-cancel",  component: () => import("./views/PaymentCancel.vue") },
+  { path: "/payment-success", name: "payment-success", component: () => import("./views/Paymentsuccess.vue") },
+  { path: "/payment-cancel",  name: "payment-cancel",  component: () => import("./views/Paymentcancel.vue") },
   { path: "/success",         name: "success",         component: () => import("./views/Success.vue") },
   { path: "/cancel",          name: "cancel",          component: () => import("./views/Cancel.vue") },
 
@@ -50,7 +50,7 @@ const routes = [
   // ── Autres ──────────────────────────────────────────────────
   { path: "/orders",       name: "orders",          component: () => import("./views/Orders.vue"),        meta: { requiresAuth: true } },
   { path: "/products",     name: "products",        component: () => import("./views/ListeProducts.vue"), meta: { requiresAuth: true } },
-  { path: "/plans",        name: "plans",           component: () => import("./views/Plans.vue") },
+ // { path: "/plans",        name: "plans",           component: () => import("./views/Plans.vue") },
   { path: "/panier",       name: "panier",          component: () => import("./views/Panier.vue") },
   { path: "/:pathMatch(.*)*", name: "not-found",    component: NotFound },
 ]
