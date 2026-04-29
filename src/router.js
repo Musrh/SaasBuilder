@@ -6,7 +6,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getFirestore, doc, getDoc } from "firebase/firestore"
 
 import PlanSelection from "./views/PlanSelection.vue"
-import SlugSetup     from "./views/SlugSetup.vue"
+import SlugSetup     from "./views/Slugsetup.vue"
 import AuthForm      from "./views/AuthForm.vue"
 import Dashboard     from "./views/Dashboard.vue"
 import SiteViewer    from "./views/Siteviewer.vue"
@@ -49,7 +49,7 @@ const routes = [
 
   // ── Autres ──────────────────────────────────────────────────
   { path: "/orders",       name: "orders",          component: () => import("./views/Orders.vue"),        meta: { requiresAuth: true } },
-  { path: "/products",     name: "products",        component: () => import("./views/ListeProducts.vue"), meta: { requiresAuth: true } },
+//  { path: "/products",     name: "products",        component: () => import("./views/ListeProducts.vue"), meta: { requiresAuth: true } },
  // { path: "/plans",        name: "plans",           component: () => import("./views/Plans.vue") },
   { path: "/panier",       name: "panier",          component: () => import("./views/Panier.vue") },
   { path: "/:pathMatch(.*)*", name: "not-found",    component: NotFound },
