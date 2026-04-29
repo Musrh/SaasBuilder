@@ -2,7 +2,7 @@
 //  SaasBuilder/src/main.js
 //
 //  PROBLÈME STRIPE :
-//  Stripe redirige vers https://musrh.github.io/SaasBuilder/?stripe=ok&slug=mrstore
+//  Stripe redirige vers https://mronlinestores.com/?stripe=ok&slug=mrstore
 //  Le # est absent → Vue Router charge la route "/" (home)
 //  et non "#/payment-success"
 //
