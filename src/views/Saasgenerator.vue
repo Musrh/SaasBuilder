@@ -92,11 +92,9 @@ const translations = {
     cartTitle: "Mon panier", cartEmpty: "Votre panier est vide", cartTotal: "Total", cartCheckout: "Finaliser la commande", cartRemove: "Supprimer", cartContinue: "Continuer les achats", cartAdd: "Ajouter au panier",
     siteUrlLabel: "URL de votre site",
     publishNoteFile: "Le fichier publier.txt a été téléchargé avec tous les détails.",
-    // Section labels
     sHero: "Titre + CTA", sText: "Paragraphe libre", sImage: "Photo / illustration",
     sGallery: "Grille d'images", sVideo: "YouTube / Vimeo", sProducts: "Catalogue",
     sFeatures: "Grille avantages", sPayment: "Stripe & PayPal", sForm: "Formulaire", sDivider: "Ligne décorative",
-    // Section edit labels
     heroTitlePh: "Titre principal...", heroSubPh: "Sous-titre...", heroCtaPh: "Bouton CTA...",
     textPh: "Votre texte ici...",
     imgUploadHint: "Cliquer pour charger une image", imgChange: "Changer", imgAltPh: "Texte alt...",
@@ -113,13 +111,11 @@ const translations = {
     testStripe: "💳 Tester Stripe", testPaypal: "🅿 Tester PayPal",
     contactLabel: "Formulaire de contact", namePh: "Nom complet", emailPh: "Adresse email",
     msgPh: "Votre message...", sendBtn: "Envoyer →",
-    // Preview labels
     prevContactTitle: "Contactez-nous", prevNamePh: "Nom complet", prevEmailPh: "Email",
     prevMsgPh: "Message...", prevSendBtn: "Envoyer →",
     prevPayStripe: "💳 Payer avec Stripe", prevPayPaypal: "🅿 Payer avec PayPal",
     prevImgEmpty: "Image non définie", prevGalleryEmpty: "Galerie vide", prevVideoEmpty: "URL vidéo non définie",
     prevBuyBtn: "Acheter",
-    // Default font options
     fontDefault: "Par défaut", fontGeorgia: "Georgia", fontCourier: "Courier New",
     fontTrebuchet: "Trebuchet", fontVerdana: "Verdana",
     colOption2: "2 colonnes", colOption3: "3 colonnes", colOption4: "4 colonnes",
@@ -390,7 +386,6 @@ const cartCurrency = computed(() => cart.value[0]?.currency || '€')
 
 const checkoutCart = () => {
   showCart.value = false
-  // Ouvrir la modale de paiement avec les totaux du panier
   paymentModalSection.value = {
     title: t.value.cartCheckout || 'Finaliser la commande',
     description: `${cartCount.value} article(s)`,
@@ -436,7 +431,7 @@ const defaultLegalPages = [
     key: "mentions",
     title: "Mentions légales",
     enabled: true,
-    content: "Mentions légales\n\nÉditeur du site : à compléter par le propriétaire du store.\nContact : à compléter.\nHébergement : GitHub Pages / solution choisie par le propriétaire du store."
+    content: "Mentions légales\n\nÉditeur du site : à compléter par le propriétaire du store.\nContact : à compléter.\nHébergement : mronlinestores.com / solution choisie par le propriétaire du store."
   },
   {
     key: "conditions",
@@ -522,13 +517,21 @@ const saveDnsRecords = () => {
   if (customDns.value.ns4) txt += `NS4: ${customDns.value.ns4}\n`
   txt += `\nURL du site: ${publishInfo.value?.urlSlug}\n`
   const blob = new Blob([txt], { type: "text/plain" })
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob)
-  a.download = "dns-config.txt"; a.click()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
+  a.download = "dns-config.txt"
+  a.style.display = "none"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
   notify("Configuration DNS sauvegardée ✓")
   showDnsInput.value = false
 }
 const publishInfo = ref(null)
 
+// ── FIX 2 : URLs adaptées à mronlinestores.com ─────────────
 const publishSite = async () => {
   if (!publishAddress.value.trim()) { notify("Entrez une adresse pour le site.", "error"); return }
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
@@ -537,13 +540,11 @@ const publishSite = async () => {
   const slug   = publishAddress.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-")
   const domain = publishDomain.value.trim()
 
-  // URL principale : /site/{uid} — route Vue Router dans SaasBuilder
-  // URL slug (alias convivial) : /site/{slug} → résolu via collection slugs
-  const urlUid  = `https://musrh.github.io/SaasBuilder/#/site/${uid}`
-  const urlSlug = `https://musrh.github.io/SaasBuilder/#/site/${slug}`
+  // ✅ CORRIGÉ : URLs propres sans hash, sur mronlinestores.com
+  const urlUid  = `https://mronlinestores.com/site/${uid}`
+  const urlSlug = `https://mronlinestores.com/${slug}`
 
   try {
-    // 1. Sauvegarder siteData + slug dans le document de l'utilisateur
     const userRef = doc(db, "users", uid)
     await setDoc(userRef, {
       siteData: site.value,
@@ -557,8 +558,6 @@ const publishSite = async () => {
       customDomain: domain || null,
     }, { merge: true })
 
-    // 2. Créer l'entrée dans la collection publique slugs/{slug} → uid
-    //    Cela permet à SaasBuilder de résoudre /#/nomchoisi → uid → siteData
     const slugRef = doc(db, "slugs", slug)
     await setDoc(slugRef, {
       uid,
@@ -568,15 +567,14 @@ const publishSite = async () => {
       createdAt: new Date().toISOString(),
     })
 
-    // 3. Mettre à jour isSaved
     localStorage.setItem("siteDataPro", JSON.stringify(site.value))
     isSaved.value = true
 
     publishInfo.value = { slug, urlUid, urlSlug, domain, uid }
     publishStatus.value = "published"
 
-    // 4. Générer publier.txt
-    let txt = `=== WellShoppings — Publication du site ===\n`
+    // Générer publier.txt
+    let txt = `=== MrOnlineStores — Publication du site ===\n`
     txt += `Date       : ${new Date().toLocaleString()}\n`
     txt += `Nom du site: ${siteName.value}\n`
     txt += `Slug       : ${slug}\n`
@@ -591,25 +589,28 @@ const publishSite = async () => {
       txt += `Type    Nom    Valeur\n`
       txt += `A       @      185.199.108.153\n`
       txt += `A       @      185.199.109.153\n`
-      txt += `CNAME   www    musrh.github.io\n`
+      txt += `CNAME   www    mronlinestores.com\n`
       txt += `TXT     @      saas-verify=${slug}\n`
     }
     txt += `\n=== Comment ça fonctionne ===\n`
     txt += `- Firestore: users/${uid}/siteData contient votre site\n`
     txt += `- Firestore: slugs/${slug} → pointe vers uid "${uid}"\n`
-    txt += `- SaasBuilder résout /#/${slug} en chargeant slugs/${slug} → siteData\n`
+    txt += `- mronlinestores.com/${slug} est résolu en chargeant slugs/${slug} → siteData\n`
     txt += `- Les deux URLs ci-dessus donnent accès au même site\n`
     txt += `\n=== Règles Firestore requises ===\n`
     txt += `match /slugs/{slug} { allow read: if true; allow write: if request.auth != null; }\n`
 
     const blob = new Blob([txt], { type: "text/plain" })
-    const a = document.createElement("a")
-    a.href = URL.createObjectURL(blob)
+    const a    = document.createElement("a")
+    a.href     = URL.createObjectURL(blob)
     a.download = "publier.txt"
+    a.style.display = "none"
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(a.href)
 
     notify(t.value.publishSuccess)
-    // Ouvrir l'aperçu public après publication
     setTimeout(() => {
       showPublishModal.value = false
       showPublicPreview.value = true
@@ -622,12 +623,13 @@ const publishSite = async () => {
 
 
 const copyDnsRecords = () => {
+  // ✅ CORRIGÉ : CNAME pointe vers mronlinestores.com
   const text = [
     `A       @    185.199.108.153`,
     `A       @    185.199.109.153`,
     `A       @    185.199.110.153`,
     `A       @    185.199.111.153`,
-    `CNAME   www  musrh.github.io`,
+    `CNAME   www  mronlinestores.com`,
   ].join("\n")
   navigator.clipboard.writeText(text)
   dnsCopied.value = true
@@ -636,9 +638,6 @@ const copyDnsRecords = () => {
 
 const currentPage = computed(() => site.value.pages[currentPageIndex.value] || site.value.pages[0])
 const activeSection = computed(() => currentPage.value?.sections?.[activeSectionIndex.value])
-
-// ── (ancien générateur HTML supprimé — voir generateHtml plus bas) ──
-
 
 // ── Import thème JSON externe ─────────────────────────────────
 const showThemeModal   = ref(false)
@@ -654,7 +653,6 @@ const builtinThemes = [
 
 const applyThemeObj = async (th) => {
   currentTheme.value = th
-  // Appliquer les variables CSS sur le builder
   const r = document.documentElement
   r.style.setProperty("--theme-accent",      th.accent        || "#6c63ff")
   r.style.setProperty("--theme-accent-hover",th.accentHover   || "#4f46e5")
@@ -672,42 +670,29 @@ const applyThemeObj = async (th) => {
   r.style.setProperty("--theme-nav-bg",      th.navBg         || "#ffffff")
   r.style.setProperty("--theme-nav-border",  th.navBorder     || "#e5e7eb")
 
-  // ✅ Persister le thème dans Firestore ET localStorage
-  // SiteViewer le lira depuis users/{uid}/siteTheme
-  const themeData = { ...th, savedAt: new Date().toISOString() }
-  localStorage.setItem("siteTheme", JSON.stringify(themeData))
-
-  if (currentUser.value) {
-    try {
-      const { doc: fd, setDoc: fset } = await import("firebase/firestore")
-      await fset(fd(db, "users", currentUser.value.uid), { siteTheme: themeData }, { merge: true })
-      notify(`✅ Thème "${th.name}" appliqué et sauvegardé !`, "success")
-    } catch(e) {
-      notify(`✅ Thème "${th.name}" appliqué (local)`, "success")
+  try {
+    const { doc: fd, setDoc: fset } = await import("firebase/firestore")
+    if (currentUser.value) {
+      await fset(fd(db, "users", currentUser.value.uid), { currentTheme: th }, { merge: true })
     }
-  } else {
-    notify(`✅ Thème "${th.name}" appliqué !`, "success")
-  }
+  } catch(e) { console.warn("Theme save:", e) }
+  localStorage.setItem("currentTheme", JSON.stringify(th))
+  notify(`✓ Thème "${th.name}" appliqué`)
   showThemeModal.value = false
 }
 
-const importThemeFile = (event) => {
-  const file = event.target.files?.[0]
-  if (!file) return
+const importThemeFile = (e) => {
+  const file = e.target.files[0]; if (!file) return
   themeImportError.value = ""
   const reader = new FileReader()
-  reader.onload = (e) => {
+  reader.onload = (ev) => {
     try {
-      const data = JSON.parse(e.target.result)
-      if (!data.accent && !data.bg && !data.text) {
-        themeImportError.value = "Format invalide. Attendu : { name, accent, bg, text, ... }"
-        return
-      }
-      applyThemeObj({ name: data.name || "Thème importé", ...data })
+      const th = JSON.parse(ev.target.result)
+      if (!th.accent && !th.bg) throw new Error("Fichier invalide — champs manquants (accent, bg)")
+      applyThemeObj({ name: th.name || "Thème importé", ...th })
     } catch(err) {
       themeImportError.value = "Fichier JSON invalide : " + err.message
     }
-    event.target.value = ""
   }
   reader.readAsText(file)
 }
@@ -719,13 +704,15 @@ const exportCurrentTheme = () => {
   const a    = document.createElement("a")
   a.href     = url
   a.download = `theme-${(th.name||"theme").replace(/\s+/g,"-").toLowerCase()}.json`
+  a.style.display = "none"
+  document.body.appendChild(a)
   a.click()
+  document.body.removeChild(a)
   URL.revokeObjectURL(url)
   notify("✅ Thème exporté !", "success")
 }
 
 onMounted(() => {
-  // Restaurer depuis localStorage immédiatement (avant Firestore)
   const sn = localStorage.getItem("siteName")
   const sl = localStorage.getItem("siteLogo")
   if (sn) siteName.value = sn
@@ -744,15 +731,12 @@ onMounted(() => {
         if (d.legalPages) legalPages.value = normalizeLegalPages(d.legalPages)
 
         if (d.siteData) {
-          // Utilisateur existant → charger son site sauvegardé
           site.value = d.siteData
         } else {
-          // Nouvelle inscription → site VIDE, pas d'héritage localStorage
           site.value = { pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }] }
           localStorage.removeItem("siteDataPro")
         }
       } else {
-        // Compte sans document Firestore → site VIDE
         site.value = { pages: [{ id: 1, name: "Accueil", style: {}, sections: [] }] }
         localStorage.removeItem("siteDataPro")
       }
@@ -771,19 +755,20 @@ watch(siteLogo, (v) => { localStorage.setItem("siteLogo", v) })
 watch(currentPageIndex, () => { activeSectionIndex.value = null })
 
 // ── Connexion / Déconnexion ────────────────────────────────
+// ✅ CORRIGÉ : redirections vers mronlinestores.com
 const logoutUser = async () => {
   try {
     await import("firebase/auth").then(m => m.signOut(auth))
     currentUser.value = null
     notify("Déconnecté avec succès", "success")
     setTimeout(() => {
-      window.location.href = "https://musrh.github.io/SaasBuilder/#/auth"
+      window.location.href = "https://mronlinestores.com/#/auth"
     }, 800)
   } catch(e) { notify("Erreur déconnexion", "error") }
 }
 
 const goToLogin = () => {
-  window.location.href = "https://musrh.github.io/SaasBuilder/#/auth"
+  window.location.href = "https://mronlinestores.com/#/auth"
 }
 
 // Init Stripe Elements when payment modal opens on Stripe tab
@@ -845,7 +830,6 @@ const sectionTypes = computed(() => [
   { key: "video",    label: t.value.videoLabel,   icon: "▶️", desc: t.value.sVideo },
   { key: "products", label: t.value.productsLabel.split(" ")[0], icon: "🛍️", desc: t.value.sProducts },
   { key: "features", label: "Features",    icon: "✦",   desc: t.value.sFeatures },
-  // { key: "payment", ... } masqué — Stripe Connect
   { key: "form",     label: t.value.contactLabel.split(" ")[0], icon: "✉️", desc: t.value.sForm },
   { key: "divider",  label: t.value.publish==="نشر"?"فاصل":"Séparateur", icon: "—", desc: t.value.sDivider },
 ])
@@ -935,7 +919,6 @@ const initStripeElements = async () => {
     stripeInstance.value = stripe
     const elements = stripe.elements()
     stripeElements.value = elements
-    // Mount card element after DOM is ready
     await new Promise(r => setTimeout(r, 100))
     const cardEl = document.getElementById("stripe-card-element")
     if (cardEl && !stripeCardMounted.value) {
@@ -965,7 +948,6 @@ const processStripePayment = async () => {
   paymentProcessing.value = true
   try {
     const cfg = liveStripeConfig.value
-    // If no real key configured, show error
     if (!cfg.publishableKey || cfg.publishableKey.includes("VOTRE_CLE")) {
       notify("⚠️ Configurez votre clé Stripe (stripe.js)", "error")
       paymentProcessing.value = false; return
@@ -980,9 +962,7 @@ const processStripePayment = async () => {
       notify("Stripe non initialisé", "error")
       paymentProcessing.value = false; return
     }
-    // 1. Create PaymentIntent on backend
     const amount = Math.round(parseFloat(paymentModalSection.value?.amount || "0") * 100)
-    // Construire les items du panier pour le backend
     const orderItems = cart.value.length > 0
       ? cart.value.map(i => ({ nom: i.name, prix: parseFloat(i.price), quantity: i.qty }))
       : [{ nom: paymentModalSection.value?.title || "Commande", prix: parseFloat(paymentModalSection.value?.amount || 0), quantity: 1 }]
@@ -1000,7 +980,6 @@ const processStripePayment = async () => {
     })
     if (!res.ok) throw new Error(`Backend error: ${res.status}`)
     const { clientSecret } = await res.json()
-    // 2. Confirm payment with Stripe
     const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
       payment_method: { card },
     })
@@ -1023,7 +1002,6 @@ const processPaypalPayment = async () => {
       notify("⚠️ Configurez votre Client ID PayPal (paypal.js)", "error")
       paymentProcessing.value = false; return
     }
-    // Load PayPal SDK dynamically with the live clientId
     if (!window.paypal) {
       await new Promise((resolve, reject) => {
         const script = document.createElement("script")
@@ -1032,7 +1010,6 @@ const processPaypalPayment = async () => {
         document.head.appendChild(script)
       })
     }
-    // Render PayPal buttons in #paypal-button-container
     await new Promise(r => setTimeout(r, 100))
     const container = document.getElementById("paypal-button-container")
     if (container && container.innerHTML === "") {
@@ -1077,9 +1054,6 @@ const processPaypalPayment = async () => {
   }
 }
 
-// Live config objects du STORE (propres à chaque propriétaire)
-// Ces configs sont SÉPARÉES de stripe.js/paypal.js qui servent
-// pour les paiements des plans vers Sassbuilder
 const liveStripeConfig = ref({
   publishableKey: "",
   backendUrl: "",
@@ -1100,12 +1074,10 @@ const livePaypalConfig = ref({
   brandName: "",
 })
 
-// Charger la config paiement du store depuis Firestore
 const loadSavedConfigs = async () => {
   if (!currentUser.value) return
   try {
     const { doc: fsDoc, getDoc: fsGet } = await import("firebase/firestore")
-    // Chercher dans users/{uid}/storePaymentConfig
     const userSnap = await fsGet(fsDoc(db, "users", currentUser.value.uid))
     if (userSnap.exists()) {
       const d = userSnap.data()
@@ -1121,24 +1093,19 @@ const loadSavedConfigs = async () => {
 
 const openConfigEditor = (target) => {
   configEditorTarget.value = target
-  // Auto-générer les URLs selon le slug publié du store
   const uid  = currentUser.value?.uid || ""
   const slug = publishAddress.value?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || uid
-  const base = "https://musrh.github.io/SaasBuilder/#"
+  // ✅ CORRIGÉ : origin pointe vers mronlinestores.com
+  const origin = "https://mronlinestores.com"
 
   if (target === "stripe") {
     const cfg = liveStripeConfig.value
-    // Si pas d'URLs configurées, générer automatiquement
-    // Stripe supprime tout après # → URL racine simple
-    // La détection du retour Stripe se fait dans main.js de SaasBuilder
-    const origin = "https://musrh.github.io/SaasBuilder"
     const successUrl = cfg.successUrl || `${origin}/`
     const cancelUrl  = cfg.cancelUrl  || `${origin}/`
     configEditorContent.value =
 `// ============================================================
 //  Config Stripe de VOTRE STORE
 //  Ces paramètres permettent à vos CLIENTS de vous payer.
-//  Différent de stripe.js (qui sert pour les plans Sassbuilder)
 // ============================================================
 {
   "publishableKey": "${cfg.publishableKey || "pk_test_VOTRE_CLE_PUBLIQUE"}",
@@ -1151,8 +1118,7 @@ const openConfigEditor = (target) => {
 }`
   } else {
     const cfg = livePaypalConfig.value
-    const origin2 = "https://musrh.github.io/SaasBuilder"
-    const successUrl = cfg.successUrl || `${origin2}/`
+    const successUrl = cfg.successUrl || `${origin}/`
     configEditorContent.value =
 `// ============================================================
 //  Config PayPal de VOTRE STORE
@@ -1175,12 +1141,10 @@ const openConfigEditor = (target) => {
 const saveConfigFile = async () => {
   if (!currentUser.value) { notify("Connectez-vous d'abord.", "error"); return }
   try {
-    // Parser le JSON depuis le textarea
     const txt = configEditorContent.value
-      .replace(/\/\/.*$/gm, "")      // supprimer commentaires
-      .replace(/\/\*[\s\S]*?\*\//g, "") // commentaires bloc
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
       .trim()
-    // Extraire le JSON entre { }
     const jsonMatch = txt.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error("Format invalide — doit contenir { ... }")
     const parsed = JSON.parse(jsonMatch[0])
@@ -1191,7 +1155,6 @@ const saveConfigFile = async () => {
       livePaypalConfig.value = { ...livePaypalConfig.value, ...parsed }
     }
 
-    // Sauvegarder dans Firestore users/{uid}/storePaymentConfig
     const storePaymentConfig = {
       stripe: { ...liveStripeConfig.value },
       paypal: { ...livePaypalConfig.value },
@@ -1212,10 +1175,15 @@ const saveConfigFile = async () => {
 
 const downloadConfigFile = () => {
   const blob = new Blob([configEditorContent.value], { type: "text/javascript" })
-  const a = document.createElement("a")
-  a.href = URL.createObjectURL(blob)
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement("a")
+  a.href     = url
   a.download = configEditorTarget.value === "stripe" ? "stripe.js" : "paypal.js"
+  a.style.display = "none"
+  document.body.appendChild(a)
   a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
   notify(`${configEditorTarget.value}.js téléchargé ✓`)
 }
 
@@ -1333,7 +1301,6 @@ const generateHtml = (pageIndex = 0) => {
   const logo      = siteLogo.value
   const name      = siteName.value || 'Mon Site'
 
-  // Navigation multi-pages
   const navLinks  = pages.map((p,i) =>
     `<a href="${pages.length > 1 ? `page-${i+1}.html` : '#'}" class="${pageIndex===i?'active':''}">${p.name}</a>`
   ).join('')
@@ -1347,9 +1314,13 @@ const generateHtml = (pageIndex = 0) => {
     ? Object.entries(currentPageData.style).map(([k,v]) => `${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`).join(';')
     : ''
 
+  const legalPagesJson = JSON.stringify(visibleLegalPages.value || [])
+  const footerLegalLinks = (visibleLegalPages.value || [])
+    .map(p => `<button class="legal-footer-link" onclick="openLegalPage('${p.key}')">${p.title}</button>`)
+    .join('')
+
   const sectionsHtml = (currentPageData.sections || []).map(buildSectionHtml2).join('\n')
 
-  // Cart HTML
   const cartHtml = `
   <div id="cart-overlay" class="cart-overlay" style="display:none">
     <div class="cart-box">
@@ -1366,11 +1337,8 @@ const generateHtml = (pageIndex = 0) => {
   </div>
   <button id="cart-btn" class="cart-fab" onclick="toggleCart()" style="display:none">🛒 <span id="cart-count">0</span></button>`
 
-  // JavaScript panier + navigation
   const scriptHtml = `<script>
-// ── Panier ──────────────────────────────────────────────────
 const cart = JSON.parse(localStorage.getItem('cart') || '[]')
-
 function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)) }
 function updateCartUI() {
   const count = cart.reduce((s,i) => s + i.qty, 0)
@@ -1417,15 +1385,12 @@ function openLegalPage(key) {
   document.getElementById('legal-modal').style.display = 'flex';
 }
 function closeLegalPage() { document.getElementById('legal-modal').style.display = 'none'; }
-
-// ── Navigation ───────────────────────────────────────────────
 document.querySelectorAll('nav a').forEach(a => {
   a.addEventListener('click', e => {
     document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'))
     e.currentTarget.classList.add('active')
   })
 })
-
 updateCartUI()
 <\/script>`
 
@@ -1459,9 +1424,6 @@ updateCartUI()
   }
   body { background: var(--bg); color: var(--text); font-family: var(--body-font); }
 
-
-
-/* PAGES LÉGALES */
 .legal-top-btn{white-space:nowrap}
 .legal-modal{max-width:920px}
 .legal-editor-layout{display:grid;grid-template-columns:240px 1fr;gap:16px;min-height:420px}
@@ -1494,7 +1456,7 @@ ${sectionsHtml}
 ${cartHtml}
 <footer class="site-footer">
   <div class="site-footer-links">${footerLegalLinks}</div>
-  <p>© ${new Date().getFullYear()} ${name} — Créé avec SaasBuilder</p>
+  <p>© ${new Date().getFullYear()} ${name} — Créé avec MrOnlineStores</p>
 </footer>
 <div id="legal-modal" class="legal-modal-overlay" onclick="if(event.target===this)closeLegalPage()" style="display:none">
   <div class="legal-modal-box">
@@ -1510,11 +1472,9 @@ ${scriptHtml}
 
 // CSS commun du site exporté
 const generateCSS = () => {
-  return `/* ═══ SaasBuilder — style.css ═══════════════════════════════ */
+  return `/* ═══ MrOnlineStores — style.css ══════════════════════════════ */
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--body-font,'DM Sans',sans-serif);color:var(--text,#1a1a2e);background:var(--bg,#fff);min-height:100vh}
-
-/* NAV */
 nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7eb);padding:0 24px;height:60px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:0 1px 6px rgba(0,0,0,.06)}
 .nav-logo{height:36px;max-width:140px;object-fit:contain;border-radius:6px}
 .brand{font-family:var(--hero-font);font-size:18px;color:var(--text);font-weight:600;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
@@ -1522,33 +1482,21 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 .nav-links::-webkit-scrollbar{display:none}
 .nav-links a{text-decoration:none;color:var(--text-sub,#6b7280);font-size:14px;font-weight:500;padding:7px 14px;border-radius:8px;transition:.15s;white-space:nowrap}
 .nav-links a:hover,.nav-links a.active{background:var(--accent,#6c63ff);color:#fff}
-
-/* HERO */
 .hero{padding:clamp(60px,10vw,120px) clamp(20px,6vw,80px);background:var(--bg-hero);text-align:center}
 .hero h1{font-family:var(--hero-font);font-size:clamp(28px,5vw,56px);color:var(--text);line-height:1.15;white-space:pre-line;margin-bottom:18px}
 .hero p{font-size:clamp(15px,2.5vw,20px);color:var(--text-sub);margin-bottom:32px;max-width:600px;margin-left:auto;margin-right:auto}
 .cta-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius,10px);padding:var(--btn-pad,14px 32px);font-size:clamp(14px,2vw,16px);font-weight:600;cursor:pointer;font-family:var(--body-font);transition:all .2s}
 .cta-btn:hover{background:var(--accent-h);transform:translateY(-2px)}
-
-/* TEXTE */
 .sec-text{padding:clamp(32px,5vw,60px) clamp(20px,6vw,80px)}
 .sec-text p{font-size:clamp(14px,2vw,17px);line-height:1.8;color:var(--text);max-width:760px}
-
-/* IMAGE */
 .sec-image{padding:clamp(20px,4vw,40px) clamp(20px,6vw,80px)}
 .sec-image img{width:100%;border-radius:12px;display:block}
-
-/* GALERIE */
 .gallery{padding:clamp(24px,4vw,48px) clamp(16px,5vw,60px)}
 .gallery-grid{display:grid;gap:10px}
 .gallery-item img{width:100%;border-radius:8px;object-fit:cover;aspect-ratio:1;display:block}
-
-/* VIDÉO */
 .sec-video{padding:clamp(24px,4vw,40px) clamp(16px,5vw,60px)}
 .video-title{font-family:var(--hero-font);font-size:clamp(18px,3vw,26px);color:var(--text);margin-bottom:16px;text-align:center}
 .video-wrap iframe{width:100%;height:clamp(220px,50vw,480px);border-radius:12px;border:none;display:block}
-
-/* PRODUITS */
 .sec-products{padding:clamp(24px,4vw,56px) clamp(16px,5vw,60px);background:var(--bg-alt)}
 .products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px}
 .product-card{background:var(--bg);border:1px solid var(--nav-border);border-radius:var(--card-radius,16px);overflow:hidden;box-shadow:var(--card-shadow);transition:transform .2s}
@@ -1564,16 +1512,12 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 .product-price{font-size:18px;font-weight:700;color:var(--accent)}
 .product-btn{background:var(--accent);color:#fff;border:none;border-radius:calc(var(--btn-radius,10px) * .6);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--body-font);transition:all .15s}
 .product-btn:hover{background:var(--accent-h)}
-
-/* FEATURES */
 .sec-features{padding:clamp(40px,6vw,70px) clamp(20px,5vw,60px);background:var(--bg-alt)}
 .features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:24px;max-width:960px;margin:0 auto}
 .feature-card{background:var(--bg);border:1px solid var(--nav-border);border-radius:14px;padding:28px 24px;text-align:center}
 .feat-icon{font-size:32px;display:block;margin-bottom:12px}
 .feature-card strong{font-size:16px;color:var(--text);display:block;margin-bottom:6px}
 .feature-card p{font-size:14px;color:var(--text-sub);line-height:1.5}
-
-/* FORMULAIRE */
 .sec-form{padding:clamp(40px,6vw,70px) clamp(20px,5vw,60px);background:var(--bg-alt);display:flex;flex-direction:column;align-items:center}
 .sec-form h3{font-family:var(--hero-font);font-size:clamp(22px,4vw,30px);color:var(--text);margin-bottom:24px}
 .sec-form form{display:flex;flex-direction:column;gap:12px;width:100%;max-width:500px}
@@ -1581,12 +1525,8 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 .sec-form input:focus,.sec-form textarea:focus{border-color:var(--accent)}
 .sec-form button{background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius);padding:var(--btn-pad);font-size:15px;font-weight:600;cursor:pointer;font-family:var(--body-font)}
 .sec-form button:hover{background:var(--accent-h)}
-
-/* DIVIDER */
 .sec-divider{padding:8px 60px}
 .sec-divider hr{border:none;border-top:1px solid var(--nav-border)}
-
-/* PANIER */
 .cart-fab{position:fixed;bottom:24px;right:24px;z-index:200;background:var(--accent);color:#fff;border:none;border-radius:100px;padding:12px 20px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .2s}
 .cart-fab:hover{background:var(--accent-h);transform:translateY(-2px)}
 .cart-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
@@ -1612,8 +1552,6 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 .cart-total strong{font-size:20px;color:var(--accent)}
 .cart-checkout-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--btn-radius);padding:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--body-font);transition:.2s}
 .cart-checkout-btn:hover{background:var(--accent-h)}
-
-/* FOOTER */
 .site-footer{text-align:center;padding:28px 18px;font-size:13px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt);display:flex;flex-direction:column;align-items:center;gap:16px}
 .site-footer-links{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:360px}
 .legal-footer-link{width:100%;background:transparent;border:0;color:var(--text);font:inherit;font-weight:600;cursor:pointer;padding:8px 10px;border-radius:8px;text-align:center}
@@ -1623,8 +1561,6 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 .legal-modal-close{position:absolute;top:12px;right:12px;border:0;background:var(--bg-alt);color:var(--text);width:32px;height:32px;border-radius:50%;cursor:pointer}
 .legal-modal-box h2{font-family:var(--hero-font);margin-bottom:14px}
 .legal-modal-content{white-space:pre-line;line-height:1.7;color:var(--text-sub)}
-
-/* RESPONSIVE */
 @media(max-width:600px){
   nav{padding:0 12px;height:52px}
   .brand{font-size:15px;max-width:100px}
@@ -1642,7 +1578,7 @@ const generateReadme = () => {
   const name = siteName.value || 'mon-site'
   return `# ${name} — Hébergement du site
 
-Site généré par SaasBuilder le ${new Date().toLocaleDateString('fr-FR')}.
+Site généré par MrOnlineStores le ${new Date().toLocaleDateString('fr-FR')}.
 
 ## 📁 Fichiers inclus
 
@@ -1706,10 +1642,9 @@ Remplacez la fonction \`handleForm()\` par un endpoint email :
 `
 }
 
-// Export ZIP multi-pages
+// ── FIX 3 : Export ZIP multi-pages — ancre ajoutée au DOM ────
 const exportDist = async () => {
   try {
-    // Charger JSZip depuis CDN
     if (!window.JSZip) {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script')
@@ -1722,31 +1657,30 @@ const exportDist = async () => {
     const zip = new window.JSZip()
     const pages = site.value.pages || []
 
-    // Générer une page HTML par page du site
     pages.forEach((page, i) => {
       const filename = i === 0 ? 'index.html' : `page-${i+1}.html`
       zip.file(filename, generateHtml(i))
     })
 
-    // Ajouter le CSS commun
     zip.file('style.css', generateCSS())
 
-    // Ajouter le logo si présent (base64 → Blob)
     if (siteLogo.value && siteLogo.value.startsWith('data:image')) {
       const base64 = siteLogo.value.split(',')[1]
       zip.file('logo.png', base64, { base64: true })
     }
 
-    // README d'hébergement
     zip.file('README.md', generateReadme())
 
-    // Générer le ZIP
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
     a.download = `${(siteName.value || 'mon-site').toLowerCase().replace(/\s+/g,'-')}-dist.zip`
+    // ✅ CORRIGÉ : ajout au DOM avant click pour compatibilité tous navigateurs
+    a.style.display = 'none'
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
     notify('✅ dist.zip téléchargé !', 'success')
     showExportModal.value = false
@@ -1756,14 +1690,20 @@ const exportDist = async () => {
   }
 }
 
+// ── FIX 3 : Export HTML mono-page — ancre ajoutée au DOM ─────
 const exportSite = () => {
-  // Export mono-page HTML simple (ancien comportement conservé)
   const html = generateHtml(0)
   const blob = new Blob([html], { type: 'text/html' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
   a.download = `${(siteName.value || 'mon-site').toLowerCase().replace(/\s+/g,'-')}.html`
+  // ✅ CORRIGÉ : ajout au DOM avant click pour compatibilité tous navigateurs
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
   notify(t.value.exportSuccess)
   showExportModal.value = false
 }
@@ -1822,12 +1762,12 @@ const setPageStyle = (type, value) => {
               <div class="cart-item-price">{{ item.price }}{{ item.currency }}</div>
             </div>
             <div class="cart-item-qty">
-              <button class="qty-btn" @click="updateQty(item.id, -1)">−</button>
+              <button class="qty-btn" @click="updateQty(item.id,-1)">−</button>
               <span class="qty-val">{{ item.qty }}</span>
-              <button class="qty-btn" @click="updateQty(item.id, 1)">+</button>
+              <button class="qty-btn" @click="updateQty(item.id,1)">+</button>
             </div>
-            <div class="cart-item-subtotal">{{ (parseFloat(item.price)*item.qty).toFixed(2) }}{{ item.currency }}</div>
-            <button class="cart-item-del" @click="removeFromCart(item.id)">✕</button>
+            <span class="cart-item-subtotal">{{ (parseFloat(item.price||0)*item.qty).toFixed(2) }}{{ item.currency }}</span>
+            <button class="cart-item-del" @click="removeFromCart(item.id)">🗑</button>
           </div>
         </div>
 
@@ -1837,136 +1777,9 @@ const setPageStyle = (type, value) => {
             <span class="cart-total-amount">{{ cartTotal }}{{ cartCurrency }}</span>
           </div>
           <div class="cart-actions">
-            <button class="btn-action" @click="showCart=false">{{ t.cartContinue }}</button>
-            <button class="pay-submit stripe-submit cart-checkout-btn" @click="checkoutCart">
-              💳 {{ t.cartCheckout }}
-            </button>
+            <button class="btn-action" @click="emptyCart">🗑 Vider</button>
+            <button class="btn-action primary cart-checkout-btn" @click="checkoutCart">{{ t.cartCheckout }}</button>
           </div>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
-  <!-- PAYMENT MODAL -->
-  <Transition name="modal">
-    <div v-if="showPaymentModal" class="modal-overlay" @click.self="showPaymentModal=false">
-      <div class="modal-box payment-modal">
-        <button class="modal-close" @click="showPaymentModal=false">✕</button>
-        <div v-if="!paymentSuccess">
-          <div class="modal-header">
-            <span class="modal-icon">💳</span>
-            <h2>{{ paymentModalSection?.title || 'Finaliser le paiement' }}</h2>
-            <p class="modal-desc">{{ paymentModalSection?.description }}</p>
-            <div class="modal-amount">{{ paymentModalSection?.amount }}{{ paymentModalSection?.currency }}</div>
-          </div>
-          <div class="pay-tabs">
-            <button :class="['pay-tab-btn', { active: paymentProvider==='stripe' }]" @click="paymentProvider='stripe'">💳 Stripe</button>
-            <button :class="['pay-tab-btn', 'paypal-tab', { active: paymentProvider==='paypal' }]" @click="paymentProvider='paypal'">🅿 PayPal</button>
-          </div>
-          <div v-if="paymentProvider==='stripe'" class="pay-form">
-            <div class="pay-form-row">
-              <label>Informations de carte</label>
-              <!-- Stripe Elements s'injecte ici -->
-              <div id="stripe-card-element" class="stripe-card-el"></div>
-              <div id="stripe-card-errors" class="stripe-card-errors"></div>
-            </div>
-            <p class="pay-note">🔒 Paiement sécurisé via Stripe — <code>{{ liveStripeConfig.mode==='test'?'MODE TEST':'MODE LIVE' }}</code></p>
-            <button class="pay-submit stripe-submit" @click="processStripePayment" :disabled="paymentProcessing">
-              <span v-if="paymentProcessing" class="spinner"/>
-              {{ paymentProcessing?'Traitement...':`Payer ${paymentModalSection?.amount}${paymentModalSection?.currency}` }}
-            </button>
-          </div>
-          <div v-if="paymentProvider==='paypal'" class="pay-form">
-            <div class="paypal-info">
-              <div class="paypal-logo">PayPal</div>
-              <p>Paiement sécurisé via votre compte PayPal.</p>
-              <p class="pay-note">Mode : <code>{{ livePaypalConfig.mode==='sandbox'?'SANDBOX (test)':'LIVE' }}</code></p>
-            </div>
-            <!-- PayPal SDK injecte ses boutons ici -->
-            <div id="paypal-button-container" class="paypal-buttons-wrap"></div>
-            <button v-if="!paymentProcessing" class="pay-submit paypal-submit" @click="processPaypalPayment">
-              🅿 Initialiser PayPal
-            </button>
-            <span v-if="paymentProcessing" class="spinner paypal-spinner" style="margin:0 auto"/>
-          </div>
-          <div class="pay-config-links">
-            <button @click="openConfigEditor('stripe');showPaymentModal=false">⚙ stripe.js</button>
-            <button @click="openConfigEditor('paypal');showPaymentModal=false">⚙ paypal.js</button>
-          </div>
-        </div>
-        <div v-else class="pay-success">
-          <div class="pay-success-icon">✓</div>
-          <h2>Paiement réussi !</h2>
-          <p>Votre paiement a bien été traité.</p>
-          <button class="pay-submit stripe-submit" @click="showPaymentModal=false">Fermer</button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
-  <!-- CONFIG EDITOR MODAL -->
-  <Transition name="modal">
-    <div v-if="showConfigEditor" class="modal-overlay" @click.self="showConfigEditor=false">
-      <div class="modal-box config-modal">
-        <button class="modal-close" @click="showConfigEditor=false">✕</button>
-        <div class="modal-header">
-          <span class="modal-icon">{{ configEditorTarget==='stripe'?'💳':'🅿' }}</span>
-          <h2>Config {{ configEditorTarget==='stripe'?'Stripe':'PayPal' }} de votre store</h2>
-          <p class="modal-desc">
-            Configurez vos clés pour recevoir les paiements de <strong>vos clients</strong>.
-            Sauvegardé dans Firestore — actif immédiatement.
-          </p>
-        </div>
-        <textarea v-model="configEditorContent" class="config-editor-textarea" spellcheck="false"/>
-        <div class="config-modal-actions">
-          <button class="btn-action" @click="showConfigEditor=false">Annuler</button>
-          <button class="btn-action primary" @click="saveConfigFile">💾 Sauvegarder dans Firestore</button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-
-
-
-  <!-- PAGES LÉGALES MODAL -->
-  <Transition name="modal">
-    <div v-if="showLegalPagesModal" class="modal-overlay" @click.self="showLegalPagesModal=false">
-      <div class="modal-box legal-modal">
-        <button class="modal-close" @click="showLegalPagesModal=false">✕</button>
-        <div class="modal-header">
-          <span class="modal-icon">⚖</span>
-          <h2>Pages du footer</h2>
-          <p class="modal-desc">Modifiez les contenus par défaut. Les pages activées apparaissent dans le footer du site publié.</p>
-        </div>
-
-        <div class="legal-editor-layout">
-          <div class="legal-tabs">
-            <button
-              v-for="p in legalPages"
-              :key="p.key"
-              :class="['legal-tab', { active: activeLegalPageKey === p.key }]"
-              @click="activeLegalPageKey = p.key"
-            >
-              <span>{{ p.title }}</span>
-              <small>{{ p.enabled ? 'Visible footer' : 'Masquée' }}</small>
-            </button>
-          </div>
-
-          <div v-if="activeLegalPage" class="legal-editor-panel">
-            <label class="legal-check">
-              <input type="checkbox" v-model="activeLegalPage.enabled" />
-              Afficher cette page dans le footer du site publié
-            </label>
-            <label class="legal-field-label">Titre affiché</label>
-            <input v-model="activeLegalPage.title" class="pub-input" />
-            <label class="legal-field-label">Contenu de la page</label>
-            <textarea v-model="activeLegalPage.content" class="legal-textarea" spellcheck="true"></textarea>
-          </div>
-        </div>
-
-        <div class="config-modal-actions">
-          <button class="btn-action" @click="showLegalPagesModal=false">Annuler</button>
-          <button class="btn-action primary" @click="saveLegalPages">✓ Valider les modifications</button>
         </div>
       </div>
     </div>
@@ -1974,7 +1787,7 @@ const setPageStyle = (type, value) => {
 
   <!-- PUBLISH MODAL -->
   <Transition name="modal">
-    <div v-if="showPublishModal" class="modal-overlay" @click.self="showPublishModal=false" :dir="isRtl?'rtl':'ltr'">
+    <div v-if="showPublishModal" class="modal-overlay" @click.self="showPublishModal=false">
       <div class="modal-box publish-modal">
         <button class="modal-close" @click="showPublishModal=false">✕</button>
         <div class="modal-header">
@@ -1992,14 +1805,15 @@ const setPageStyle = (type, value) => {
           <div class="pub-field">
             <label>{{ t.siteAddress }}</label>
             <div class="pub-url-wrap">
-              <span class="pub-url-prefix">SaasBuilder/#/site/</span>
+              <!-- ✅ FIX 2 : préfixe adapté à mronlinestores.com -->
+              <span class="pub-url-prefix">mronlinestores.com/</span>
               <input v-model="publishAddress" class="pub-input" :placeholder="t.siteAddressPlaceholder"/>
             </div>
             <div v-if="publishAddress" class="pub-preview-url">
-              🔗 musrh.github.io/SaasBuilder/#/site/{{ publishAddress.toLowerCase().replace(/[^a-z0-9-]/g,'-') }}
+              🔗 mronlinestores.com/{{ publishAddress.toLowerCase().replace(/[^a-z0-9-]/g,'-') }}
             </div>
             <div v-if="currentUser && publishAddress" class="pub-preview-url" style="color:var(--text3);font-size:11px;margin-top:4px">
-              🆔 uid: musrh.github.io/SaasBuilder/#/site/{{ currentUser.uid }}
+              🆔 uid: mronlinestores.com/site/{{ currentUser.uid }}
             </div>
           </div>
 
@@ -2043,8 +1857,9 @@ const setPageStyle = (type, value) => {
               <div class="dns-row">
                 <span class="dns-type">A</span><span>@</span><span class="dns-val">185.199.109.153</span>
               </div>
+              <!-- ✅ FIX 2 : CNAME pointe vers mronlinestores.com -->
               <div class="dns-row">
-                <span class="dns-type">CNAME</span><span>www</span><span class="dns-val">musrh.github.io</span>
+                <span class="dns-type">CNAME</span><span>www</span><span class="dns-val">mronlinestores.com</span>
               </div>
               <div class="dns-row">
                 <span class="dns-type">TXT</span><span>@</span><span class="dns-val">saas-verify={{ publishInfo.slug }}</span>
@@ -2060,7 +1875,7 @@ const setPageStyle = (type, value) => {
             </div>
           </div>
 
-          <!-- Sans domaine : DNS GitHub Pages -->
+          <!-- Sans domaine : DNS -->
           <div v-else class="dns-section" style="margin-top:14px">
             <h3 class="dns-title">{{ t.dnsTitle }}</h3>
             <p class="dns-desc">Pour lier un domaine à cette adresse :</p>
@@ -2068,7 +1883,8 @@ const setPageStyle = (type, value) => {
               <div class="dns-row dns-head"><span>Type</span><span>Nom</span><span>Valeur</span></div>
               <div class="dns-row"><span class="dns-type">A</span><span>@</span><span class="dns-val">185.199.108.153</span></div>
               <div class="dns-row"><span class="dns-type">A</span><span>@</span><span class="dns-val">185.199.109.153</span></div>
-              <div class="dns-row"><span class="dns-type">CNAME</span><span>www</span><span class="dns-val">musrh.github.io</span></div>
+              <!-- ✅ FIX 2 : CNAME pointe vers mronlinestores.com -->
+              <div class="dns-row"><span class="dns-type">CNAME</span><span>www</span><span class="dns-val">mronlinestores.com</span></div>
             </div>
             <button class="btn-action small" @click="showDnsInput=true" style="margin-top:10px">
               🖊 {{ t.dnsInputTitle }}
@@ -2097,19 +1913,19 @@ const setPageStyle = (type, value) => {
 
   <!-- DNS INPUT MODAL -->
   <Transition name="modal">
-    <div v-if="showDnsInput" class="modal-overlay" @click.self="showDnsInput=false" :dir="isRtl?'rtl':'ltr'">
+    <div v-if="showDnsInput" class="modal-overlay" @click.self="showDnsInput=false">
       <div class="modal-box dns-input-modal">
         <button class="modal-close" @click="showDnsInput=false">✕</button>
         <div class="modal-header">
-          <span class="modal-icon">🔧</span>
+          <span class="modal-icon">🖊</span>
           <h2>{{ t.dnsInputTitle }}</h2>
           <p class="modal-desc">{{ t.dnsInputDesc }}</p>
         </div>
         <div class="dns-input-form">
-          <div class="dns-input-row"><label>{{ t.dnsNs1 }} *</label><input v-model="customDns.ns1" class="dns-input-field" placeholder="ns1.registrar.com"/></div>
-          <div class="dns-input-row"><label>{{ t.dnsNs2 }} *</label><input v-model="customDns.ns2" class="dns-input-field" placeholder="ns2.registrar.com"/></div>
-          <div class="dns-input-row"><label>{{ t.dnsNs3 }}</label><input v-model="customDns.ns3" class="dns-input-field" placeholder="ns3.registrar.com"/></div>
-          <div class="dns-input-row"><label>{{ t.dnsNs4 }}</label><input v-model="customDns.ns4" class="dns-input-field" placeholder="ns4.registrar.com"/></div>
+          <div class="dns-input-row"><label>{{ t.dnsNs1 }}</label><input v-model="customDns.ns1" class="dns-input-field" placeholder="ns1.monregistrar.com"/></div>
+          <div class="dns-input-row"><label>{{ t.dnsNs2 }}</label><input v-model="customDns.ns2" class="dns-input-field" placeholder="ns2.monregistrar.com"/></div>
+          <div class="dns-input-row"><label>{{ t.dnsNs3 }}</label><input v-model="customDns.ns3" class="dns-input-field" placeholder="ns3.monregistrar.com"/></div>
+          <div class="dns-input-row"><label>{{ t.dnsNs4 }}</label><input v-model="customDns.ns4" class="dns-input-field" placeholder="ns4.monregistrar.com"/></div>
         </div>
         <div class="dns-instructions">
           <div class="dns-inst-title">{{ t.dnsInstructions }}</div>
@@ -2118,9 +1934,122 @@ const setPageStyle = (type, value) => {
           <div class="dns-inst-step">{{ t.dnsStep3 }}</div>
           <div class="dns-inst-step">{{ t.dnsStep4 }}</div>
         </div>
-        <div class="config-modal-actions" style="margin-top:16px">
-          <button class="btn-action" @click="showDnsInput=false">{{ t.cancel }}</button>
-          <button class="btn-action primary" @click="saveDnsRecords">💾 {{ t.saveDns }}</button>
+        <button class="pay-submit stripe-submit" @click="saveDnsRecords" style="margin-top:16px">
+          💾 {{ t.saveDns }}
+        </button>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- LEGAL PAGES MODAL -->
+  <Transition name="modal">
+    <div v-if="showLegalPagesModal" class="modal-overlay" @click.self="showLegalPagesModal=false">
+      <div class="modal-box legal-modal">
+        <button class="modal-close" @click="showLegalPagesModal=false">✕</button>
+        <div class="modal-header">
+          <span class="modal-icon">⚖</span>
+          <h2>Pages légales du footer</h2>
+          <p class="modal-desc">Ces pages apparaîtront dans le footer de votre site publié</p>
+        </div>
+        <div class="legal-editor-layout">
+          <div class="legal-tabs">
+            <button v-for="page in legalPages" :key="page.key"
+              class="legal-tab" :class="{ active: activeLegalPageKey === page.key }"
+              @click="activeLegalPageKey = page.key">
+              <span>{{ page.title }}</span>
+              <small>{{ page.enabled ? '✓ Visible' : '✗ Masquée' }}</small>
+            </button>
+          </div>
+          <div v-if="activeLegalPage" class="legal-editor-panel">
+            <label class="legal-check">
+              <input type="checkbox" v-model="activeLegalPage.enabled"/>
+              Afficher dans le footer
+            </label>
+            <div class="legal-field-label">Titre</div>
+            <input v-model="activeLegalPage.title" class="dns-input-field"/>
+            <div class="legal-field-label">Contenu</div>
+            <textarea v-model="activeLegalPage.content" class="legal-textarea"/>
+          </div>
+        </div>
+        <button class="pay-submit stripe-submit" @click="saveLegalPages" style="margin-top:16px">
+          💾 Sauvegarder les pages légales
+        </button>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- PAYMENT MODAL -->
+  <Transition name="modal">
+    <div v-if="showPaymentModal" class="modal-overlay" @click.self="showPaymentModal=false">
+      <div class="modal-box">
+        <button class="modal-close" @click="showPaymentModal=false">✕</button>
+        <div class="modal-header">
+          <span class="modal-icon">💳</span>
+          <h2>{{ paymentModalSection?.title }}</h2>
+          <p class="modal-desc">{{ paymentModalSection?.description }}</p>
+          <div class="modal-amount">{{ paymentModalSection?.amount }}{{ paymentModalSection?.currency }}</div>
+        </div>
+
+        <div v-if="!paymentSuccess">
+          <div class="pay-tabs">
+            <button class="pay-tab-btn" :class="{active:paymentProvider==='stripe'}" @click="paymentProvider='stripe'">💳 Stripe</button>
+            <button class="pay-tab-btn paypal-tab" :class="{active:paymentProvider==='paypal'}" @click="paymentProvider='paypal'">🅿 PayPal</button>
+          </div>
+
+          <div v-if="paymentProvider==='stripe'" class="pay-form">
+            <div class="pay-form-row">
+              <label>Numéro de carte</label>
+              <div id="stripe-card-element" style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:12px 14px;min-height:44px"></div>
+            </div>
+            <p class="pay-note">🔒 Paiement sécurisé via <code>Stripe</code></p>
+            <button class="pay-submit stripe-submit" @click="processStripePayment" :disabled="paymentProcessing">
+              <span v-if="paymentProcessing" class="spinner"/>
+              {{ paymentProcessing ? 'Traitement...' : `💳 Payer ${paymentModalSection?.amount}${paymentModalSection?.currency}` }}
+            </button>
+            <div class="pay-config-links">
+              <button @click="showPaymentModal=false;openConfigEditor('stripe')">⚙ {{ t.configureStripe }}</button>
+              <button @click="showPaymentModal=false;openConfigEditor('paypal')">⚙ {{ t.configurePaypal }}</button>
+            </div>
+          </div>
+
+          <div v-else class="paypal-info">
+            <div class="paypal-logo">PayPal</div>
+            <p>Vous serez redirigé vers PayPal pour finaliser votre paiement de manière sécurisée.</p>
+            <div id="paypal-button-container" style="margin-top:16px"></div>
+            <button class="pay-submit paypal-submit" @click="processPaypalPayment" :disabled="paymentProcessing" style="margin-top:12px">
+              <span v-if="paymentProcessing" class="spinner paypal-spinner"/>
+              {{ paymentProcessing ? 'Connexion PayPal...' : `🅿 Payer avec PayPal` }}
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="pay-success">
+          <div class="pay-success-icon">✓</div>
+          <h2>{{ t.paySuccess }}</h2>
+          <p>{{ t.payDone }}</p>
+          <button class="btn-action primary" @click="showPaymentModal=false" style="margin:0 auto">{{ t.close }}</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- CONFIG EDITOR MODAL -->
+  <Transition name="modal">
+    <div v-if="showConfigEditor" class="modal-overlay" @click.self="showConfigEditor=false">
+      <div class="modal-box config-modal">
+        <button class="modal-close" @click="showConfigEditor=false">✕</button>
+        <div class="modal-header">
+          <span class="modal-icon">⚙</span>
+          <h2>Config {{ configEditorTarget==='stripe'?'Stripe':'PayPal' }} de votre store</h2>
+          <p class="modal-desc">
+            Configurez vos clés pour recevoir les paiements de <strong>vos clients</strong>.
+            Sauvegardé dans Firestore — actif immédiatement.
+          </p>
+        </div>
+        <textarea v-model="configEditorContent" class="config-editor-textarea" spellcheck="false"></textarea>
+        <div class="config-modal-actions">
+          <button class="btn-action" @click="downloadConfigFile">⬇ Télécharger</button>
+          <button class="btn-action primary" @click="saveConfigFile">💾 Sauvegarder dans Firestore</button>
         </div>
       </div>
     </div>
@@ -2159,7 +2088,6 @@ const setPageStyle = (type, value) => {
   <Transition name="modal">
     <div v-if="showPublicPreview" class="public-preview-overlay">
       <button class="pub-preview-close" @click="showPublicPreview=false">✕ Fermer l'aperçu</button>
-      <!-- Navigation du site -->
       <nav class="pub-preview-nav">
         <div class="pub-preview-brand-wrap">
           <img v-if="siteLogo" :src="siteLogo" class="pub-preview-logo" alt="logo"/>
@@ -2178,7 +2106,6 @@ const setPageStyle = (type, value) => {
           🛒 <span class="cart-badge">{{ cartCount }}</span>
         </button>
       </nav>
-      <!-- Contenu du site -->
       <div class="pub-preview-content" :style="currentPage?.style">
         <div v-for="s in currentPage?.sections" :key="s.id">
           <div v-if="s.type==='hero'" class="prev-hero" :style="s.style">
@@ -2274,7 +2201,6 @@ const setPageStyle = (type, value) => {
       <select class="lang-select" v-model="currentLang">
         <option v-for="l in langs" :key="l.code" :value="l.code">{{ l.label }}</option>
       </select>
-      <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
       <button class="btn-action icon-btn btn-theme-pick" @click="showThemeModal=true" title="Thème du site">🎨</button>
       <button class="btn-action legal-top-btn" @click="openLegalPagesModal" title="Pages du footer">⚖ Pages légales</button>
@@ -2291,7 +2217,6 @@ const setPageStyle = (type, value) => {
         {{ mode==='preview' ? t.edit : t.preview }}
       </button>
 
-      <!-- Bouton connexion/déconnexion -->
       <div class="topbar-user">
         <span v-if="currentUser" class="topbar-user-email">{{ currentUser.email?.split('@')[0] }}</span>
         <button v-if="currentUser" class="btn-action btn-logout" @click="logoutUser" title="Se déconnecter">
@@ -2386,17 +2311,14 @@ const setPageStyle = (type, value) => {
               <button @click.stop="moveSection(i,1)" :disabled="i===currentPage.sections.length-1">↓</button>
               <button @click.stop="deleteSection(i)" class="del-btn">✕</button>
             </div>
-            <!-- HERO -->
             <div v-if="s.type==='hero'" class="sec-hero" :style="s.style">
               <textarea v-model="s.content" class="hero-title-input" :placeholder="t.heroTitlePh"/>
               <input v-model="s.subtitle" class="hero-sub-input" :placeholder="t.heroSubPh"/>
               <input v-model="s.cta" class="hero-cta-input" :placeholder="t.heroCtaPh"/>
             </div>
-            <!-- TEXT -->
             <div v-else-if="s.type==='text'" class="sec-text" :style="s.style">
               <textarea v-model="s.content" class="text-input" :placeholder="t.textPh"/>
             </div>
-            <!-- IMAGE -->
             <div v-else-if="s.type==='image'" class="sec-image" :style="s.style">
               <label class="img-drop" v-if="!s.url">
                 <input type="file" accept="image/*" @change="uploadImage($event,s)" hidden/>
@@ -2410,7 +2332,6 @@ const setPageStyle = (type, value) => {
                 </div>
               </div>
             </div>
-            <!-- GALLERY -->
             <div v-else-if="s.type==='gallery'" class="sec-gallery" :style="s.style">
               <div class="gallery-toolbar">
                 <span class="sec-type-label">🎨 {{ t.galleryLabel }} — {{ s.images.length }} {{ t.galleryImages }}</span>
@@ -2424,7 +2345,6 @@ const setPageStyle = (type, value) => {
               </div>
               <div v-else class="gallery-empty">{{ t.galleryEmpty }}</div>
             </div>
-            <!-- VIDEO -->
             <div v-else-if="s.type==='video'" class="sec-video" :style="s.style">
               <div class="video-toolbar"><span class="sec-type-label">▶️ {{ t.videoLabel }}</span></div>
               <input v-model="s.title" class="video-title-input" :placeholder="t.videoTitlePh"/>
@@ -2432,7 +2352,6 @@ const setPageStyle = (type, value) => {
               <div v-if="s.url" class="video-preview"><iframe :src="getEmbedUrl(s.url)" allowfullscreen class="video-iframe"/></div>
               <div v-else class="video-placeholder"><span>▶</span><span>{{ t.videoHint }}</span></div>
             </div>
-            <!-- PRODUCTS -->
             <div v-else-if="s.type==='products'" class="sec-products" :style="s.style">
               <div class="products-toolbar">
                 <span class="sec-type-label">🛍️ {{ t.productsLabel }}</span>
@@ -2460,7 +2379,6 @@ const setPageStyle = (type, value) => {
                 </div>
               </div>
             </div>
-            <!-- FEATURES -->
             <div v-else-if="s.type==='features'" class="sec-features" :style="s.style">
               <div class="features-grid">
                 <div v-for="(item,fi) in s.items" :key="fi" class="feature-item">
@@ -2470,7 +2388,6 @@ const setPageStyle = (type, value) => {
                 </div>
               </div>
             </div>
-            <!-- PAYMENT -->
             <div v-else-if="s.type==='payment'" class="sec-payment" :style="s.style">
               <div class="payment-edit-header">
                 <span class="sec-type-label">💳 {{ t.paymentLabel }}</span>
@@ -2497,7 +2414,6 @@ const setPageStyle = (type, value) => {
                 <button @click.stop="openConfigEditor('paypal')">paypal.js</button>
               </div>
             </div>
-            <!-- FORM -->
             <div v-else-if="s.type==='form'" class="sec-form" :style="s.style">
               <p class="form-label-heading">{{ t.contactLabel }}</p>
               <div class="form-fields">
@@ -2507,7 +2423,6 @@ const setPageStyle = (type, value) => {
                 <button disabled class="form-submit">{{ t.sendBtn }}</button>
               </div>
             </div>
-            <!-- DIVIDER -->
             <div v-else-if="s.type==='divider'" class="sec-divider" :style="s.style">
               <div class="divider-line"></div>
             </div>
@@ -2593,7 +2508,7 @@ const setPageStyle = (type, value) => {
   </div>
 </div>
 
-  <!-- ── MODAL THÈME ─────────────────────────────────────── -->
+  <!-- MODAL THÈME -->
   <div v-if="showThemeModal" class="modal-overlay" @click.self="showThemeModal=false; themeImportError=''">
     <div class="modal-box theme-pick-modal">
       <button class="modal-close" @click="showThemeModal=false; themeImportError=''">✕</button>
@@ -2727,6 +2642,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .lang-select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;padding:5px 8px;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif;outline:none}
 .publish-btn{background:linear-gradient(135deg,#10b981,#059669);border-color:#059669;color:white;font-weight:600}
 .publish-btn:hover{background:linear-gradient(135deg,#059669,#047857);border-color:#047857}
+.pub-btn-group{display:flex;gap:2px}
+.preview-pub-btn{padding:6px 10px}
 .workspace{display:flex;margin-top:var(--topbar-h);min-height:calc(100vh - var(--topbar-h))}
 .sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:var(--topbar-h);height:calc(100vh - var(--topbar-h));overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
 .sidebar-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
@@ -2774,134 +2691,72 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .text-input{width:100%;min-height:120px;resize:vertical;border:1px dashed #d1d5db;border-radius:6px;padding:12px;font-size:16px;line-height:1.7;color:#374151;outline:none;background:#fafafa;font-family:'DM Sans',sans-serif;transition:border-color .15s}
 .text-input:focus{border-color:var(--accent);background:white}
 .sec-image{padding:20px 40px}
-.img-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed #d1d5db;border-radius:12px;padding:50px 20px;cursor:pointer;color:#9ca3af;transition:all .15s}
-.img-drop:hover{border-color:var(--accent);color:#6c63ff}
+.img-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed #d1d5db;border-radius:12px;padding:40px;cursor:pointer;color:#9ca3af;transition:all .15s;min-height:160px}
+.img-drop:hover{border-color:var(--accent);color:var(--accent)}
 .img-drop span:first-child{font-size:32px}
-.img-drop span:last-child{font-size:14px}
-.img-preview-wrap{position:relative}
-.img-preview{width:100%;border-radius:8px;display:block}
-.img-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;opacity:0;transition:opacity .2s}
+.img-preview-wrap{position:relative;border-radius:12px;overflow:hidden}
+.img-preview{width:100%;display:block;border-radius:12px}
+.img-overlay{position:absolute;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;gap:12px;opacity:0;transition:opacity .2s}
 .img-preview-wrap:hover .img-overlay{opacity:1}
-.alt-input{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;padding:6px 12px;border-radius:6px;font-size:12px;text-align:center;outline:none;width:200px;font-family:'DM Sans',sans-serif}
+.alt-input{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:white;border-radius:4px;padding:4px 8px;font-size:12px;outline:none}
 .sec-gallery{padding:20px 40px}
-.gallery-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.gallery-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .gallery-grid-edit{display:grid;gap:8px}
 .gallery-item{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1}
 .gallery-item img{width:100%;height:100%;object-fit:cover}
-.gallery-del{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:none;color:white;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
-.gallery-item:hover .gallery-del{opacity:1}
-.gallery-empty{border:2px dashed #d1d5db;border-radius:12px;padding:40px;text-align:center;color:#9ca3af;font-size:14px}
+.gallery-del{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.gallery-empty{padding:30px;text-align:center;color:#9ca3af;font-size:14px;border:2px dashed #d1d5db;border-radius:10px}
 .sec-video{padding:20px 40px}
 .video-toolbar{margin-bottom:10px}
-.video-title-input{width:100%;font-size:18px;font-weight:600;color:#1a1a2e;border:none;border-bottom:1px dashed #d1d5db;outline:none;padding-bottom:6px;margin-bottom:10px;background:transparent;font-family:'DM Sans',sans-serif}
-.video-url-input{width:100%;font-size:13px;color:#6b7280;border:1px dashed #d1d5db;border-radius:6px;outline:none;padding:8px 12px;margin-bottom:12px;background:#fafafa;font-family:'DM Sans',sans-serif}
-.video-preview{border-radius:10px;overflow:hidden}
-.video-iframe{width:100%;height:340px;border:none;display:block}
-.video-placeholder{border:2px dashed #d1d5db;border-radius:12px;padding:50px;text-align:center;color:#9ca3af;display:flex;flex-direction:column;align-items:center;gap:8px}
-.video-placeholder span:first-child{font-size:36px;opacity:.4}
+.video-title-input,.video-url-input{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:14px;padding:8px 12px;border-radius:var(--radius);outline:none;font-family:'DM Sans',sans-serif;margin-bottom:8px}
+.video-preview{border-radius:12px;overflow:hidden;margin-top:8px}
+.video-iframe{width:100%;height:280px;border:none;display:block}
+.video-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:40px;border:2px dashed #d1d5db;border-radius:12px;color:#9ca3af;font-size:14px}
+.video-placeholder span:first-child{font-size:28px}
 .sec-products{padding:20px 40px}
-.products-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.products-grid-edit{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.product-card-edit{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;position:relative;display:flex;flex-direction:column}
-.product-del{position:absolute;top:8px;right:8px;background:white;border:1px solid #e5e7eb;color:#ef4444;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:2}
+.products-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.products-grid-edit{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.product-card-edit{background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;position:relative}
+.product-del{position:absolute;top:6px;right:6px;background:rgba(239,68,68,.9);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;z-index:2}
 .product-img-upload{display:block;cursor:pointer}
 .product-img{width:100%;height:120px;object-fit:cover;display:block}
-.product-img-ph{width:100%;height:120px;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:28px;color:#9ca3af;gap:4px}
-.product-img-ph span{font-size:11px}
+.product-img-ph{width:100%;height:120px;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:24px;color:#9ca3af}
+.product-img-ph span{font-size:10px}
 .product-fields{padding:10px;display:flex;flex-direction:column;gap:6px}
-.product-badge-input{font-size:10px;font-weight:700;background:#fef3c7;border:none;color:#92400e;padding:3px 8px;border-radius:100px;outline:none;width:fit-content;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px}
-.product-name-input{font-size:14px;font-weight:600;color:#111;border:none;border-bottom:1px dashed #d1d5db;outline:none;background:transparent;font-family:'DM Sans',sans-serif;padding-bottom:3px}
-.product-desc-input{font-size:12px;color:#6b7280;border:none;outline:none;background:transparent;font-family:'DM Sans',sans-serif}
-.product-price-row{display:flex;align-items:center;gap:6px;margin-top:4px}
-.product-price-input{font-size:16px;font-weight:700;color:#6c63ff;border:none;outline:none;background:transparent;width:70px;font-family:'DM Sans',sans-serif}
-.product-currency-select{font-size:13px;background:transparent;border:1px solid #e5e7eb;border-radius:4px;color:#6b7280;padding:2px 4px;cursor:pointer}
-.sec-features{padding:40px}
-.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.feature-item{background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px}
-.feat-icon-input{font-size:24px;background:transparent;border:none;outline:none;width:40px}
-.feat-title-input{font-weight:600;font-size:15px;background:transparent;border:none;border-bottom:1px dashed #d1d5db;outline:none;color:#1a1a2e;font-family:'DM Sans',sans-serif;padding-bottom:4px}
-.feat-desc-input{font-size:13px;color:#6b7280;background:transparent;border:none;outline:none;font-family:'DM Sans',sans-serif}
-.sec-payment{padding:32px 40px;background:linear-gradient(135deg,#f8f7ff,#ede9fe)}
-.payment-edit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.product-badge-input,.product-name-input,.product-desc-input,.product-price-input{width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:5px 8px;font-size:12px;color:#374151;font-family:'DM Sans',sans-serif;outline:none}
+.product-price-row{display:flex;gap:4px}
+.product-price-input{flex:1}
+.product-currency-select{background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:5px 4px;font-size:12px;color:#374151;width:52px}
+.features-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.feature-item{display:grid;grid-template-columns:50px 1fr 1fr;gap:6px;align-items:center;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px}
+.feat-icon-input,.feat-title-input,.feat-desc-input{background:white;border:1px solid #e5e7eb;border-radius:4px;padding:5px 8px;font-size:13px;color:#374151;font-family:'DM Sans',sans-serif;outline:none;width:100%}
+.feat-icon-input{text-align:center;font-size:18px}
+.sec-payment{padding:20px 40px;background:linear-gradient(135deg,#f8f7ff,#ede9fe)}
+.payment-edit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .pay-providers-badge{display:flex;gap:6px}
-.badge-stripe{background:var(--stripe);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px}
-.badge-paypal{background:var(--paypal);color:#003087;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px}
-.payment-edit-fields{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
-.payment-title-input{font-family:'Playfair Display',serif;font-size:24px;font-weight:600;color:#1a1a2e;border:none;border-bottom:1px dashed rgba(108,99,255,.4);outline:none;background:transparent;padding-bottom:6px}
-.payment-desc-input{font-size:15px;color:#6b7280;border:none;outline:none;background:transparent;border-bottom:1px dashed #e5e7eb;padding-bottom:4px;font-family:'DM Sans',sans-serif}
-.payment-price-row{display:flex;align-items:center;gap:8px}
-.payment-amount-input{font-size:36px;font-weight:700;color:#6c63ff;border:none;outline:none;background:transparent;width:120px;font-family:'DM Sans',sans-serif}
-.payment-currency-select{font-size:18px;background:transparent;border:1px solid #d1d5db;border-radius:6px;color:#6b7280;padding:4px 8px;cursor:pointer}
-.payment-preview-btns{display:flex;gap:10px;margin-bottom:16px}
-.preview-pay-btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .15s}
-.preview-pay-btn:hover{transform:translateY(-1px)}
-.stripe-preview{background:var(--stripe);color:white}
-.paypal-preview{background:var(--paypal);color:#003087}
-.payment-config-hint{font-size:12px;color:#9ca3af;display:flex;align-items:center;gap:6px}
-.payment-config-hint button{background:none;border:none;color:#6c63ff;font-size:12px;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif}
-.sec-form{padding:40px}
-.form-label-heading{font-size:18px;font-weight:600;color:#1a1a2e;margin-bottom:16px;font-family:'Playfair Display',serif}
-.form-fields{display:flex;flex-direction:column;gap:10px;max-width:480px}
-.form-field{padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#374151;background:#f9fafb;font-family:'DM Sans',sans-serif}
-.form-textarea{min-height:100px;resize:none}
-.form-submit{background:#6c63ff;color:white;border:none;border-radius:8px;padding:11px 24px;font-weight:600;font-size:14px;cursor:default;font-family:'DM Sans',sans-serif;align-self:flex-start}
-.sec-divider{padding:12px 40px}
-.divider-line{border:none;border-top:1px solid #e5e7eb}
-.preview-mode{font-family:'DM Sans',sans-serif}
-.prev-hero{padding:100px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
-.prev-hero-title{font-family:'Playfair Display',serif;font-size:52px;font-weight:600;color:#1a1a2e;line-height:1.15;white-space:pre-line;margin-bottom:16px}
-.prev-hero-sub{font-size:20px;color:#6b7280;margin-bottom:32px}
-.prev-hero-cta{background:#6c63ff;color:white;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
-.prev-hero-cta:hover{transform:translateY(-2px)}
-.prev-text{padding:48px 60px}
-.prev-text p{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
-.prev-image{padding:32px 60px}
-.prev-img{width:100%;border-radius:12px}
-.prev-img-placeholder{height:200px;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;margin:32px 60px}
-.prev-gallery{padding:32px 60px}
-.prev-gallery-grid{display:grid;gap:10px}
-.prev-gallery-item{border-radius:10px;overflow:hidden;aspect-ratio:1}
-.prev-gallery-item img{width:100%;height:100%;object-fit:cover}
-.prev-video{padding:32px 60px}
-.prev-video-title{font-family:'Playfair Display',serif;font-size:24px;color:#1a1a2e;margin-bottom:16px}
-.prev-video-wrap{border-radius:12px;overflow:hidden}
-.prev-video-iframe{width:100%;height:400px;border:none;display:block}
-.prev-products{padding:48px 60px;background:#fafafa}
-.prev-products-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.prev-product-card{background:white;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);transition:transform .2s}
-.prev-product-card:hover{transform:translateY(-4px)}
-.prev-product-img-wrap{position:relative}
-.prev-product-img{width:100%;height:180px;object-fit:cover;display:block}
-.prev-product-img-ph{width:100%;height:180px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:40px}
-.prev-product-badge{position:absolute;top:10px;left:10px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.5px}
-.prev-product-body{padding:16px}
-.prev-product-name{font-size:15px;font-weight:600;color:#111;margin-bottom:6px}
-.prev-product-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:14px}
-.prev-product-footer{display:flex;align-items:center;justify-content:space-between}
-.prev-product-price{font-size:18px;font-weight:700;color:#6c63ff}
-.prev-product-btn{background:#6c63ff;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
-.prev-features{padding:60px;background:#fafafa}
-.prev-features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:840px;margin:0 auto}
-.prev-feature-card{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:28px 24px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-.prev-feat-icon{font-size:32px;display:block;margin-bottom:12px}
-.prev-feature-card strong{font-size:16px;color:#111;display:block;margin-bottom:6px}
-.prev-feature-card p{font-size:14px;color:#6b7280;line-height:1.5}
-.prev-payment{padding:80px 60px;background:linear-gradient(135deg,#f8f7ff,#ede9fe);text-align:center}
-.prev-payment-title{font-family:'Playfair Display',serif;font-size:36px;color:#1a1a2e;margin-bottom:10px}
-.prev-payment-desc{font-size:16px;color:#6b7280;margin-bottom:24px}
-.prev-payment-amount{font-size:64px;font-weight:700;color:#6c63ff;margin-bottom:36px}
-.prev-payment-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.prev-pay-btn{padding:14px 32px;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
-.prev-pay-btn:hover{transform:translateY(-2px)}
-.prev-pay-btn.stripe-btn{background:var(--stripe);color:white}
-.prev-pay-btn.paypal-btn{background:var(--paypal);color:#003087}
-.prev-form{padding:60px;background:#f8f7ff;display:flex;flex-direction:column;align-items:center}
-.prev-form h3{font-family:'Playfair Display',serif;font-size:30px;color:#1a1a2e;margin-bottom:24px}
-.prev-form-field{width:100%;max-width:500px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:10px;font-size:15px;margin-bottom:12px;font-family:'DM Sans',sans-serif;background:white;color:#374151}
-.prev-form-ta{min-height:120px;resize:none}
-.prev-form-btn{background:#6c63ff;color:white;border:none;border-radius:10px;padding:13px 28px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
-.prev-divider{padding:8px 60px}
-.prev-divider-line{border:none;border-top:1px solid #e5e7eb}
+.badge-stripe{background:#635bff;color:white;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px}
+.badge-paypal{background:#ffc439;color:#003087;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px}
+.payment-edit-fields{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.payment-title-input,.payment-desc-input{width:100%;background:rgba(255,255,255,.8);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:10px 14px;font-size:15px;color:#1a1a2e;font-family:'DM Sans',sans-serif;outline:none}
+.payment-title-input{font-family:'Playfair Display',serif;font-size:22px;font-weight:600}
+.payment-price-row{display:flex;gap:8px;align-items:center}
+.payment-amount-input{flex:1;background:rgba(255,255,255,.8);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:10px 14px;font-size:18px;font-weight:700;color:#6c63ff;font-family:'DM Sans',sans-serif;outline:none}
+.payment-currency-select{background:rgba(255,255,255,.8);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:10px 8px;font-size:14px;color:#374151;width:64px}
+.payment-preview-btns{display:flex;gap:8px;flex-wrap:wrap}
+.preview-pay-btn{padding:10px 20px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.stripe-preview{background:#635bff;color:white}
+.paypal-preview{background:#ffc439;color:#003087}
+.payment-config-hint{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:#6b7280}
+.payment-config-hint button{background:none;border:none;color:#6c63ff;font-size:11px;cursor:pointer;text-decoration:underline;font-family:'DM Sans',sans-serif}
+.sec-form{padding:20px 40px}
+.form-label-heading{font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.form-fields{display:flex;flex-direction:column;gap:8px;opacity:.6;pointer-events:none}
+.form-field{padding:10px 14px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;background:#f9fafb;color:#374151}
+.form-textarea{min-height:80px;resize:none}
+.form-submit{background:#6c63ff;color:white;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;align-self:flex-start}
+.sec-divider{padding:16px 40px}
+.divider-line{border:none;border-top:2px dashed #d1d5db}
+.preview-mode{background:white;min-height:100%}
 .logo-area{display:flex;align-items:center;cursor:pointer;border-radius:6px;overflow:hidden;width:32px;height:32px;flex-shrink:0}
 .site-logo-img{width:32px;height:32px;object-fit:contain;border-radius:6px}
 .publish-modal{max-width:560px}
@@ -2943,8 +2798,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .dns-instructions{background:rgba(108,99,255,.06);border:1px solid rgba(108,99,255,.15);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px}
 .dns-inst-title{font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .dns-inst-step{font-size:12px;color:var(--text2);line-height:1.5}
-
-/* CART */
 .cart-btn{position:relative;background:var(--surface2);border:1px solid var(--border2);padding:6px 12px;gap:6px}
 .cart-badge{background:var(--accent);color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:100px;min-width:18px;text-align:center;display:inline-block}
 .cart-modal{max-width:540px}
@@ -2972,8 +2825,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions{display:flex;gap:10px}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
-
-/* ══ MODAL THÈME ═══════════════════════════════════════════ */
 .theme-pick-modal{max-width:500px;width:93%;max-height:88vh;overflow-y:auto}
 .tpm-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px}
 .tpm-sub{font-size:13px;color:var(--text2);margin-bottom:14px}
@@ -2999,17 +2850,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .tpm-export-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn-theme-pick{background:linear-gradient(135deg,#a78bfa,#6c63ff)!important;color:#fff!important}
 .btn-theme-pick:hover{background:linear-gradient(135deg,#6c63ff,#4f46e5)!important}
-
-/* ══ BOUTONS LOGIN / LOGOUT ══════════════════════════════════ */
 .topbar-user{display:flex;align-items:center;gap:6px;border-left:1px solid var(--border);padding-left:10px;flex-shrink:0}
 .topbar-user-email{font-size:11px;color:var(--text3);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn-logout{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.25)!important;color:#ef4444!important;font-size:16px!important;padding:6px 8px!important}
 .btn-logout:hover{background:rgba(239,68,68,.25)!important}
 .btn-login{background:linear-gradient(135deg,#6c63ff,#4f46e5)!important;color:#fff!important;font-size:12px!important;padding:6px 10px!important}
 .btn-login:hover{opacity:.9}
-
-
-/* ══ MODE APERÇU PUBLIC ══════════════════════════════════════ */
 .public-preview-overlay{position:fixed!important;inset:0!important;z-index:99999!important;background:#fff;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column}
 .pub-preview-close{position:fixed;top:8px;right:10px;z-index:100000;background:#ef4444;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .pub-preview-close:hover{background:#dc2626}
@@ -3056,6 +2902,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .prev-form-field{width:100%;max-width:460px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:9px;font-size:14px;margin-bottom:10px;background:#fff;color:#374151;display:block}
 .prev-form-ta{min-height:90px;resize:none}.prev-form-btn{background:#6c63ff;color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer}
 .prev-divider{padding:6px clamp(12px,5vw,60px)}.prev-divider-line{border:none;border-top:1px solid #e5e7eb}
+.legal-top-btn{white-space:nowrap}
+.legal-modal{max-width:920px}
+.legal-editor-layout{display:grid;grid-template-columns:240px 1fr;gap:16px;min-height:420px}
+.legal-tabs{display:flex;flex-direction:column;gap:8px}
+.legal-tab{border:1px solid var(--border2);background:var(--surface2);border-radius:12px;padding:12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px;color:var(--text)}
+.legal-tab.active{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.12)}
+.legal-tab small{color:var(--text3);font-size:11px}
+.legal-editor-panel{display:flex;flex-direction:column;gap:10px}
+.legal-check{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text2)}
+.legal-field-label{font-size:12px;font-weight:700;color:var(--text2)}
+.legal-textarea{min-height:300px;resize:vertical;border:1px solid var(--border2);border-radius:12px;padding:14px;font-family:inherit;line-height:1.6;color:var(--text);background:var(--surface2)}
+.legal-publish-status{border:1px solid var(--border2);border-radius:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;background:var(--surface2);margin-bottom:12px}
+.legal-publish-status strong{font-size:13px;color:var(--text)}
+.legal-publish-status span{font-size:12px;color:var(--text3)}
+.legal-publish-status.ok{border-color:#22c55e;background:rgba(34,197,94,.08)}
+.legal-publish-status .btn-action{grid-row:1 / span 2;grid-column:2}
+.pub-preview-cart{background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:100px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0}
+@media(max-width:760px){.legal-editor-layout{grid-template-columns:1fr}.legal-tabs{max-height:180px;overflow:auto}.legal-publish-status{grid-template-columns:1fr}.legal-publish-status .btn-action{grid-row:auto;grid-column:auto}}
 @media(max-width:520px){
   .pub-preview-logo{height:26px!important;max-width:90px!important}
   .pub-preview-brand-name{max-width:70px;font-size:12px}
