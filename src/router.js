@@ -113,7 +113,7 @@ router.beforeEach(async (to, from, next) => {
             const exp        = d.expiry
             const notExpired = !exp || exp === 0 || exp > Date.now()
             if (!isPro || !isPaid || !notExpired) {
-              next({ name: "saasgenerator" }); return
+              next({ name: "/saasgenerator" }); return
             }
           }
         }
