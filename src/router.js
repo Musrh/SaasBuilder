@@ -1,5 +1,5 @@
 // ============================================================
-//  SaasBuilder/src/router.js — ROUTER COMPLET FINAL
+//  SaasBuilder/src/router.js — ROUTER COMPLET FINAL (CORRIGÉ)
 // ============================================================
 import { createRouter, createWebHashHistory } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
@@ -14,12 +14,30 @@ import NotFound      from "./views/NotFound.vue"
 
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
+// Durée d'essai gratuit du Builder après création du premier slug
+const FREE_TRIAL_DAYS = 30
+const FREE_TRIAL_MS   = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000
+
 // ── Attendre Firebase Auth (auth.currentUser = null au 1er tick) ──
 const waitForAuth = () => new Promise(resolve => {
   const auth = getAuth()
   if (auth.currentUser !== null) { resolve(auth.currentUser); return }
   const unsub = onAuthStateChanged(auth, user => { unsub(); resolve(user) })
 })
+
+// ── Convertit un champ Firestore (Timestamp | number | Date | string) en ms ──
+const toMillis = (v) => {
+  if (!v) return 0
+  if (typeof v === "number") return v
+  if (typeof v === "string") {
+    const t = Date.parse(v)
+    return isNaN(t) ? 0 : t
+  }
+  if (v instanceof Date) return v.getTime()
+  if (typeof v.toMillis === "function") return v.toMillis()      // Firestore Timestamp
+  if (typeof v.seconds === "number")    return v.seconds * 1000  // Timestamp brut
+  return 0
+}
 
 const routes = [
   // ── App principale ──────────────────────────────────────────
@@ -106,19 +124,37 @@ router.beforeEach(async (to, from, next) => {
             next({ name: "slug-setup" }); return
           }
 
-          // /saasgenerator réservé Pro payé non expiré
+          // /saasgenerator : Pro payé OU essai gratuit de 30 jours
           if (to.name === "saasgenerator") {
-            const isPro      = d.plan !== "free"
+            const isPro      = d.plan && d.plan !== "free"
             const isPaid     = d.paye === true
             const exp        = d.expiry
             const notExpired = !exp || exp === 0 || exp > Date.now()
-            if (!isPro || !isPaid || !notExpired) {
-              next({ name: "/saasgenerator" }); return
+            const proAccess  = isPro && isPaid && notExpired
+
+            // Essai gratuit : 30 jours à partir de la création du 1er slug.
+            // On lit slugCreatedAt (préféré), sinon slugSetAt, sinon createdAt
+            // en dernier recours pour les anciens comptes.
+            const slugStart  = toMillis(d.slugCreatedAt)
+                            || toMillis(d.slugSetAt)
+                            || toMillis(d.createdAt)
+            const trialEnd   = slugStart ? slugStart + FREE_TRIAL_MS : 0
+            const inTrial    = !!d.publishedSlug && slugStart > 0 && Date.now() < trialEnd
+
+            if (!proAccess && !inTrial) {
+              // Essai expiré / pas Pro → on renvoie vers la sélection de plan
+              // ⚠️ FIX antérieur : next({ name: "/saasgenerator" }) était cassé
+              // ("/saasgenerator" est un PATH, pas un NAME) → la navigation
+              // échouait silencieusement et l'utilisateur restait bloqué.
+              next({ name: "home" }); return
             }
           }
         }
       } catch(e) {
         console.error("Router guard:", e.message)
+        // En cas d'erreur Firestore, on laisse passer plutôt que de
+        // bloquer l'utilisateur sur une page blanche.
+        next(); return
       }
     }
 
