@@ -4,289 +4,164 @@ import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getFirestore, doc, getDoc } from "firebase/firestore"
 
 import PlanSelection from "./views/PlanSelection.vue"
-import SlugSetup from "./views/Slugsetup.vue"
-import AuthForm from "./views/AuthForm.vue"
-import Dashboard from "./views/Dashboard.vue"
-import SiteViewer from "./views/Siteviewer.vue"
-import NotFound from "./views/NotFound.vue"
+import SlugSetup     from "./views/Slugsetup.vue"
+import AuthForm      from "./views/AuthForm.vue"
+import Dashboard     from "./views/Dashboard.vue"
+import SiteViewer    from "./views/Siteviewer.vue"
+import NotFound      from "./views/NotFound.vue"
 
-const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
-const FREE_TRIAL_MS = 30 * 24 * 60 * 60 * 1000
+const ADMIN_EMAILS  = ["musmamon@gmail.com", "musrh@gmail.com"]
+const FREE_TRIAL_MS = 30 * 24 * 60 * 60 * 1000   // 30 jours en ms
 
-const waitForAuth = () =>
-  new Promise((resolve) => {
-    const auth = getAuth()
+// Attend que Firebase Auth ait resolu l'utilisateur courant
+const waitForAuth = () => new Promise(resolve => {
+  const auth = getAuth()
+  if (auth.currentUser !== null) { resolve(auth.currentUser); return }
+  const unsub = onAuthStateChanged(auth, user => { unsub(); resolve(user) })
+})
 
-    if (auth.currentUser) {
-      resolve(auth.currentUser)
-      return
-    }
-
-    const unsub = onAuthStateChanged(auth, (user) => {
-      unsub()
-      resolve(user)
-    })
-  })
-
+// Convertit un champ Firestore (Timestamp | number | Date | string) en millisecondes
 const toMillis = (v) => {
   if (!v) return 0
   if (typeof v === "number") return v
-
   if (typeof v === "string") {
     const t = Date.parse(v)
-    return Number.isNaN(t) ? 0 : t
+    return isNaN(t) ? 0 : t
   }
-
   if (v instanceof Date) return v.getTime()
   if (typeof v.toMillis === "function") return v.toMillis()
   if (typeof v.seconds === "number") return v.seconds * 1000
-
   return 0
 }
 
-const getUserSlug = (data = {}) => {
-  return (
-    data.publishedSlug ||
-    data.slug ||
-    data.siteSlug ||
-    data.storeSlug ||
-    ""
-  )
-}
-
-const hasValidBuilderAccess = (data = {}) => {
-  const slug = getUserSlug(data)
-
-  if (!slug) return false
-
-  const plan = String(data.plan || "free").toLowerCase()
-
-  // Plan free : autorisé si slug déjà configuré
-  if (plan === "free") {
-    return true
-  }
-
-  // Plan pro/payant : paye === true + expiry null/0 = non expiré
-  const isPaid = data.paye === true || data.paid === true
-  const expiryMs = toMillis(data.expiry)
-  const notExpired = !data.expiry || expiryMs === 0 || expiryMs > Date.now()
-
-  if (plan !== "free" && isPaid && notExpired) {
-    return true
-  }
-
-  // Ancien système : essai gratuit 30 jours
-  const slugStart =
-    toMillis(data.slugCreatedAt) ||
-    toMillis(data.slugSetAt) ||
-    toMillis(data.createdAt)
-
-  const inTrial = slugStart === 0 || Date.now() < slugStart + FREE_TRIAL_MS
-
-  return !!slug && inTrial
-}
-
-const SaasGeneratorView = () => import("./views/Saasgenerator.vue")
-
 const routes = [
-  // Routes principales
-  { path: "/", name: "home", component: PlanSelection },
-  { path: "/auth", name: "auth", component: AuthForm },
-
-  {
-    path: "/slug-setup",
-    name: "slug-setup",
-    component: SlugSetup,
-    meta: { requiresAuth: true },
-  },
-
-  {
-    path: "/dashboard",
-    name: "dashboard",
-    component: Dashboard,
-    meta: { requiresAuth: true },
-  },
-
-  // Nouvelle URL professionnelle du Builder
-  {
-    path: "/builder",
-    name: "builder",
-    component: SaasGeneratorView,
-    meta: { requiresAuth: true, requiresSlug: true, requiresBuilderAccess: true },
-  },
-
-  // Ancienne URL gardée pour compatibilité
+  // Routes de l'application principale
+  { path: "/",           name: "home",       component: PlanSelection },
+  { path: "/auth",       name: "auth",       component: AuthForm },
+  { path: "/slug-setup", name: "slug-setup", component: SlugSetup,  meta: { requiresAuth: true } },
+  { path: "/dashboard",  name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
   {
     path: "/saasgenerator",
     name: "saasgenerator",
-    redirect: { name: "builder" },
+    component: () => import("./views/Saasgenerator.vue"),
     meta: { requiresAuth: true },
   },
 
-  // Sites publiés par UID Firestore direct
-  {
-    path: "/site/:uid",
-    name: "site",
-    component: SiteViewer,
-    props: true,
-  },
+  // Sites publies par UID Firestore direct (/site/:uid)
+  { path: "/site/:uid", name: "site", component: SiteViewer, props: true },
 
   // Authentification client du store
-  {
-    path: "/store-auth",
-    name: "store-auth",
-    component: () => import("./views/Storeauth.vue"),
-  },
+  { path: "/store-auth", name: "store-auth", component: () => import("./views/Storeauth.vue") },
 
-  // Paiement
-  {
-    path: "/payment-success",
-    name: "payment-success",
-    component: () => import("./views/Paymentsuccess.vue"),
-  },
-  {
-    path: "/payment-cancel",
-    name: "payment-cancel",
-    component: () => import("./views/Paymentcancel.vue"),
-  },
-  {
-    path: "/success",
-    name: "success",
-    component: () => import("./views/Success.vue"),
-  },
-  {
-    path: "/cancel",
-    name: "cancel",
-    component: () => import("./views/Cancel.vue"),
-  },
+  // Pages de paiement
+  { path: "/payment-success", name: "payment-success", component: () => import("./views/Paymentsuccess.vue") },
+  { path: "/payment-cancel",  name: "payment-cancel",  component: () => import("./views/Paymentcancel.vue") },
+  { path: "/success",         name: "success",         component: () => import("./views/Success.vue") },
+  { path: "/cancel",          name: "cancel",          component: () => import("./views/Cancel.vue") },
 
   // Administration
-  {
-    path: "/admin",
-    name: "admin",
-    component: () => import("./views/Admin.vue"),
-    meta: { requiresAdmin: true },
-  },
-  {
-    path: "/orders",
-    name: "orders",
-    component: () => import("./views/Orders.vue"),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: "/panier",
-    name: "panier",
-    component: () => import("./views/Panier.vue"),
-  },
+  { path: "/admin",  name: "admin",  component: () => import("./views/Admin.vue"),  meta: { requiresAdmin: true } },
+  { path: "/orders", name: "orders", component: () => import("./views/Orders.vue"), meta: { requiresAuth: true } },
+  { path: "/panier", name: "panier", component: () => import("./views/Panier.vue") },
 
-  // Site public par slug ou email encodé
-  // Exemples :
-  // /ma-boutique
-  // /user%40gmail.com
+  // FIX : route slug conviviale — ex: /mrstore => SiteViewer({ slug: "mrstore" })
+  // Placee AVANT le catch-all, APRES toutes les routes specifiques.
+  // Seuls les slugs format [a-z0-9][a-z0-9-]* sont captured.
   {
-    path: "/:slugOrEmail",
-    name: "public-site",
+    path: "/:slug([a-z0-9][a-z0-9-]*)",
+    name: "slug-site",
     component: SiteViewer,
-    props: (route) => {
-      const value = decodeURIComponent(String(route.params.slugOrEmail || ""))
-
-      if (value.includes("@")) {
-        return { email: value }
-      }
-
-      return { slug: value }
-    },
+    props: (route) => ({ slug: route.params.slug }),
   },
 
   // Catch-all 404
-  {
-    path: "/:pathMatch(.*)*",
-    name: "not-found",
-    component: NotFound,
-  },
+  { path: "/:pathMatch(.*)*", name: "not-found", component: NotFound },
 ]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(),
   routes,
   scrollBehavior: () => ({ top: 0 }),
 })
 
-router.beforeEach(async (to) => {
-  const auth = getAuth()
+// Guard de navigation global
+router.beforeEach(async (to, from, next) => {
 
-  // Admin
+  // Route admin : verifie l'email
   if (to.meta.requiresAdmin) {
     const user = await waitForAuth()
-
-    if (!user) {
-      return {
-        name: "auth",
-        query: { redirect: to.fullPath },
-      }
+    if (!user) { next({ name: "auth" }); return }
+    if (!ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
+      next({ name: "not-found" }); return
     }
-
-    const email = user.email?.toLowerCase()
-
-    if (!email || !ADMIN_EMAILS.includes(email)) {
-      return { name: "not-found" }
-    }
-
-    return true
+    next(); return
   }
 
-  // Routes protégées
+  // Routes protegees par authentification
   if (to.meta.requiresAuth) {
     const user = await waitForAuth()
 
     if (!user) {
-      return {
-        name: "auth",
-        query: { redirect: to.fullPath },
-      }
+      next({ name: "auth", query: { redirect: to.fullPath } })
+      return
     }
 
-    try {
-      const db = getFirestore()
-      const snap = await getDoc(doc(db, "users", user.uid))
+    // Verifications supplementaires pour dashboard / builder / slug-setup
+    if (to.name === "dashboard" || to.name === "saasgenerator" || to.name === "slug-setup") {
+      try {
+        const db   = getFirestore()
+        const snap = await getDoc(doc(db, "users", user.uid))
 
-      if (!snap.exists()) {
-        if (to.meta.requiresSlug || to.meta.requiresBuilderAccess) {
-          return { name: "slug-setup" }
+        if (snap.exists()) {
+          const d = snap.data()
+
+          // Compte desactive
+          if (d.active === false) {
+            await getAuth().signOut()
+            next({ name: "auth" }); return
+          }
+
+          // Pas de slug configure : rediriger vers slug-setup
+          if (to.name === "saasgenerator" && !d.publishedSlug) {
+            next({ name: "slug-setup" }); return
+          }
+
+          // Acces au builder : Pro paye OU essai gratuit de 30 jours
+          if (to.name === "saasgenerator") {
+            const isPro      = d.plan && d.plan !== "free"
+            const isPaid     = d.paye === true
+            const exp        = d.expiry
+            const notExpired = !exp || exp === 0 || exp > Date.now()
+            const proAccess  = isPro && isPaid && notExpired
+
+            // Date de debut d'essai (plusieurs champs selon l'anciennete du compte)
+            const slugStart = toMillis(d.slugCreatedAt)
+                           || toMillis(d.slugSetAt)
+                           || toMillis(d.createdAt)
+
+            // FIX GUARD : si pas de date en Firestore (ancien compte), on accorde l'acces.
+            // slugStart === 0 signifie "aucune date trouvee => benefice du doute".
+            const trialEnd = slugStart ? slugStart + FREE_TRIAL_MS : 0
+            const inTrial  = !!d.publishedSlug && (slugStart === 0 || Date.now() < trialEnd)
+
+            if (!proAccess && !inTrial) {
+              next({ name: "home" }); return
+            }
+          }
         }
-
-        return true
+        // Pas encore de document Firestore (compte tout neuf) : on laisse passer
+      } catch (e) {
+        console.error("Router guard Firestore:", e.message)
+        // Erreur Firestore : on laisse passer pour ne pas bloquer
+        next(); return
       }
-
-      const data = snap.data()
-
-      if (data.active === false) {
-        await auth.signOut()
-        return { name: "auth" }
-      }
-
-      const slug = getUserSlug(data)
-
-      // Builder interdit tant que le slug n'est pas configuré
-      if (to.meta.requiresSlug && !slug) {
-        return { name: "slug-setup" }
-      }
-
-      // Accès Builder fiable : free/pro + expiry null accepté
-      if (to.meta.requiresBuilderAccess && !hasValidBuilderAccess(data)) {
-        return { name: "home" }
-      }
-
-      return true
-    } catch (e) {
-      console.error("Router guard Firestore:", e)
-
-      // Ne pas bloquer l'app si Firestore répond mal temporairement
-      return true
     }
+
+    next(); return
   }
 
-  return true
+  // Route publique
+  next()
 })
 
 export default router
