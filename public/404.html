@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Redirecting...</title>
+    <script>
+      (function () {
+        // Récupérer le path complet (ex: /payment-success)
+        var path = window.location.pathname;
+
+        // Récupérer aussi les query params (important pour Stripe)
+        var search = window.location.search;
+
+        // Construire l'URL de redirection vers index.html
+        // On garde redirect + search (ex: ?stripe=ok&slug=xxx)
+        var newUrl = "/" + "?redirect=" + encodeURIComponent(path) + search;
+
+        window.location.replace(newUrl);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
