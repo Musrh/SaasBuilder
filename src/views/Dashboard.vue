@@ -607,13 +607,26 @@ const openStore = () => {
 }
 
 const goToBuilder = async () => {
-  // Vérifier si le slug est configuré
-  if (userData.value?.publishedSlug) {
-    window.location.href = "https://mronlinestores.com/#/saasgenerator"
-  } else {
-    router.push("/slug-setup")
+  // Garde-fou côté UI
+  if (!canAccessBuilder.value) {
+    showPlanModal.value = true
+    return
   }
+
+  // Pas de slug configuré → on va d'abord le choisir
+  if (!userData.value?.publishedSlug) {
+    router.push("/slug-setup")
+    return
+  }
+
+  // Navigation interne SPA — surtout PAS window.location.href ni "#/..."
+  // (le router est en createWebHistory, donc pas de hash)
+  router.push("/saasgenerator")
 }
+
+
+
+  
 
 const goToPlans = () => { showPlanModal.value = true }
 
