@@ -621,7 +621,7 @@ const goToBuilder = async () => {
 
   // Navigation interne SPA — surtout PAS window.location.href ni "#/..."
   // (le router est en createWebHistory, donc pas de hash)
-  router.push("/saasgenerator")
+  router.push("/builder")
 }
 
 
