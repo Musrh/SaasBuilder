@@ -16,6 +16,8 @@
 import { createApp } from "vue"
 import App    from "./App.vue"
 import router from "./router.js"
+const app = createApp(App)
+app.use(router)
 
 // ── Interception retour Stripe ────────────────────────────────
 // Stripe supprime le # dans l'URL de retour.
@@ -40,7 +42,9 @@ if (params.get("stripe") === "ok" && pending) {
 
       // ✅ Forcer le hash AVANT le montage Vue
       // Vue Router lira ce hash au démarrage et chargera /payment-success
-      window.location.hash = "#/payment-success"
+     // window.location.hash = "#/payment-success"
+
+      router.replace('/payment-success')
       // NOTE : pas de return ici — on laisse app.mount() s'exécuter
       // Le rechargement causé par hash= est géré par le navigateur
       // Vue se monte sur la nouvelle URL /#/payment-success
@@ -79,6 +83,5 @@ if (params.get("stripe") === "ok" && pending) {
 // Toujours exécuté, même après modification du hash ci-dessus.
 // Si hash = "#/payment-success", Vue Router charge directement
 // le composant PaymentSuccess.vue sans rechargement supplémentaire.
-const app = createApp(App)
-app.use(router)
+
 app.mount("#app")
