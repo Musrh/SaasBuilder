@@ -126,27 +126,28 @@ router.beforeEach(async (to, from, next) => {
             next({ name: "slug-setup" }); return
           }
 
-          // Acces au builder : Pro paye OU essai gratuit de 30 jours
+          // Acces au builder
           if (to.name === "saasgenerator") {
-            const isPro      = d.plan && d.plan !== "free"
+            const plan = d.plan || "free"
+
+            // ✅ Plan FREE avec slug → accès autorisé (fonctionnalités limitées)
+            if (plan === "free") {
+              // Autorisé — le builder gère lui-même les restrictions Free
+              next(); return
+            }
+
+            // Plan payant → vérifier paiement et expiration
             const isPaid     = d.paye === true
             const exp        = d.expiry
             const notExpired = !exp || exp === 0 || exp > Date.now()
-            const proAccess  = isPro && isPaid && notExpired
 
-            // Date de debut d'essai (plusieurs champs selon l'anciennete du compte)
-            const slugStart = toMillis(d.slugCreatedAt)
-                           || toMillis(d.slugSetAt)
-                           || toMillis(d.createdAt)
-
-            // FIX GUARD : si pas de date en Firestore (ancien compte), on accorde l'acces.
-            // slugStart === 0 signifie "aucune date trouvee => benefice du doute".
-            const trialEnd = slugStart ? slugStart + FREE_TRIAL_MS : 0
-            const inTrial  = !!d.publishedSlug && (slugStart === 0 || Date.now() < trialEnd)
-
-            if (!proAccess && !inTrial) {
-              next({ name: "home" }); return
+            if (isPaid && notExpired) {
+              // Pro payé actif → accès complet
+              next(); return
             }
+
+            // Pro non payé ou expiré → dashboard pour renouveler
+            next({ name: "dashboard" }); return
           }
         }
         // Pas encore de document Firestore (compte tout neuf) : on laisse passer
