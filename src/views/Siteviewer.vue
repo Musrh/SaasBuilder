@@ -4,12 +4,13 @@
   Affiche le site PUBLIÉ d'un propriétaire de store.
   Mode : aperçu final uniquement — pas de barre d'édition.
   
-  Route  : /site/:uid
-  :uid   : UID Firestore direct OU slug convivial
+  Routes supportées :
+    /site/:uid   → prop uid  (UID Firestore direct)
+    /:slug       → prop slug (URL conviviale mronlinestores.com/mrstore)
   
-  Résolution :
-    1. users/{uid}/siteData          → UID direct
-    2. slugs/{uid} → uid réel        → Slug
+  Résolution (les deux props passent par le même loadSite) :
+    1. users/{identifiant}/siteData  → UID direct
+    2. slugs/{identifiant} → uid réel → slug convivial
     3. Introuvable                   → Page 404 intégrée
   
   Paiement client :
@@ -21,7 +22,7 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from "vue"
-import { useRouter } from "vue-router"
+import { useRouter, useRoute } from "vue-router"
 import VoiceAssistantClient from "../components/VoiceAssistantClient.vue"
 import { db } from "../firebase.js"
 import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs } from "firebase/firestore"
@@ -37,20 +38,27 @@ const svName          = ref("")
 const svAuthError     = ref("")
 const svAuthSuccess   = ref("")
 const svAuthLoading   = ref(false)
-// ── Profil client ─────────────────────────────────────────────
+// - Profil client -----------------------
 const svShowProfile   = ref(false)
 const svClientOrders  = ref([])
 const svLoadingOrders = ref(false)
 const svOrdersLoaded  = ref(false)
 
-// ── Props ─────────────────────────────────────────────────────
-const props  = defineProps({ uid: { type: String, required: true } })
+// - Props ---------------------------
+// uid  : reçu depuis la route /site/:uid  (UID Firestore direct)
+// slug : reçu depuis la route /:slug      (URL conviviale, ex: /mrstore)
+// Les deux sont optionnels - loadSite() fusionne les deux.
+const props  = defineProps({
+  uid:  { type: String, default: null },
+  slug: { type: String, default: null },
+})
 const router = useRouter()
+const route  = useRoute()
 
-// ── État global ───────────────────────────────────────────────
+// - État global ------------------------
 const site         = ref(null)
 
-// ── Langue du store (sélecteur visible par les clients) ───────
+// - Langue du store (sélecteur visible par les clients) ----
 const svLang  = ref("fr")
 const svLangs = [
   { code:"fr", flag:"🇫🇷", full:"Français" },
@@ -60,7 +68,7 @@ const svLangs = [
 ]
 const svIsRtl = computed(() => svLang.value === "ar")
 
-// Textes traduits du store — utilisés dans tous les boutons/labels
+// Textes traduits du store - utilisés dans tous les boutons/labels
 const svT = computed(() => {
   const all = {
     fr:{ buy:"🛒 Acheter", login:"🔑 Se connecter", logout:"Déconnexion", cart:"Mon panier", delivery:"Livraison & Paiement", checkout:"Finaliser la commande", back:"← Retour", payCard:"💳 Payer par carte", name:"Nom complet *", email:"Email *", password:"Mot de passe * (min.6)", confirm:"Confirmer *", createAccount:"✨ Créer mon compte", register:"Inscription", send:"Envoyer", noOrders:"Aucune commande pour le moment.", discover:"Découvrir les produits →", orders:"MES COMMANDES", totalSpent:"TOTAL DÉPENSÉ", forgotPwd:"Mot de passe oublié ?", resetSent:"Email envoyé !", address:"Adresse", zip:"Code postal", city:"Ville", country:"Pays" },
@@ -76,10 +84,10 @@ const resolvedUid  = ref("")
 const siteMeta     = ref({})          // { name, logo }
 const currentPageIndex = ref(0)
 
-// ── Config paiement du store ──────────────────────────────────
+// - Config paiement du store -----------------
 const storePayConfig = ref({ stripe: null, paypal: null })
 
-// ── Plan du propriétaire → backend dynamique ──────────────────
+// - Plan du propriétaire -> backend dynamique ---------
 const storeOwner = ref({ plan: "free", paye: false })
 
 const isPro = computed(() =>
@@ -92,7 +100,7 @@ const BACKEND_URL = computed(() =>
     : "https://backend-master-production-cf50.up.railway.app"
 )
 
-// ── Formulaire contact ───────────────────────────────────────
+// - Formulaire contact --------------------
 const contactName    = ref("")
 const contactEmail   = ref("")
 const contactMessage = ref("")
@@ -112,7 +120,7 @@ const sendContact = async () => {
   contactError.value   = ""
   try {
     // Écrire dans users/{ownerUid}/contacts/{id}
-    // Règle Firestore : allow create: if true  → pas besoin d'auth
+    // Règle Firestore : allow create: if true  -> pas besoin d'auth
     const ownerUid = resolvedUid.value
     if (!ownerUid) throw new Error("Store non trouvé")
 
@@ -121,7 +129,7 @@ const sendContact = async () => {
       email:     contactEmail.value.trim().toLowerCase(),
       message:   contactMessage.value.trim(),
       storeUid:  ownerUid,
-      siteSlug:  props.uid,
+      siteSlug:  props.slug || props.uid || ownerUid,
       status:    "nouveau",
       createdAt: new Date().toISOString(),
     })
@@ -138,7 +146,7 @@ const sendContact = async () => {
   }
 }
 
-// ── Panier ────────────────────────────────────────────────────
+// - Panier --------------------------
 const svCartStep = ref("cart")   // "cart" | "checkout"
 const svAddress  = ref("")
 const svZip      = ref("")
@@ -171,13 +179,13 @@ const cartTotal    = computed(() => cart.value.reduce((s, i) => s + parseFloat(i
 const cartCurrency = computed(() => cart.value[0]?.currency || "€")
 const currentPage  = computed(() => site.value?.pages?.[currentPageIndex.value] || site.value?.pages?.[0])
 
-// ── Panier — actions ──────────────────────────────────────────
+// - Panier - actions ---------------------
 // Auth Firebase pour vérifier si le client est connecté
 const addToCart = (product) => {
   // Vérifier la session locale (clients Firestore) OU Firebase Auth
   // svCurrentUser est défini dès que le client est connecté via n'importe quelle méthode
   if (!svCurrentUser.value) {
-    // Non connecté → ouvrir le formulaire de connexion du store
+    // Non connecté -> ouvrir le formulaire de connexion du store
     svShowAuth.value = true
     svAuthMode.value = "login"
     svAuthError.value   = ""
@@ -194,7 +202,7 @@ const updateQty = (id, delta) => {
   if (item) item.qty = Math.max(1, item.qty + delta)
 }
 
-// ── Embed vidéo ───────────────────────────────────────────────
+// - Embed vidéo ------------------------
 const getEmbedUrl = (url) => {
   if (!url) return ""
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)
@@ -204,14 +212,27 @@ const getEmbedUrl = (url) => {
   return url
 }
 
-// ── Chargement site + config paiement ────────────────────────
+// - Chargement site + config paiement ------------
 const debugInfo = ref("")   // infos de diagnostic affichées si erreur
 
 const loadSite = async () => {
   loading.value  = true
   error.value    = ""
   debugInfo.value = ""
-  const uid = props.uid?.trim()
+
+  // Résolution de l'identifiant (4 niveaux de fallback) :
+  // 1. props.uid   -> route /site/:uid avec props:true
+  // 2. props.slug  -> route /:slug avec props:true ou props fn
+  // 3. route.params -> si props:true absent du routeur (défensif)
+  // 4. URL path    -> dernier recours (premier segment de pathname)
+  const routeParam = route.params.uid
+                  || route.params.slug
+                  || (Array.isArray(route.params.pathMatch)
+                      ? route.params.pathMatch[0]
+                      : route.params.pathMatch)
+                  || ""
+  const urlSlug = window.location.pathname.replace(/^\/+/, "").split("/")[0] || ""
+  const uid = (props.uid || props.slug || routeParam || urlSlug).trim()
 
   if (!uid) {
     error.value = "Aucun identifiant de site fourni."
@@ -219,10 +240,10 @@ const loadSite = async () => {
     return
   }
 
-  console.log("🔍 SiteViewer: chargement pour uid/slug =", uid)
+  console.log("SiteViewer: chargement uid/slug =", uid, "| props:", props.uid, props.slug, "| route:", routeParam, "| url:", urlSlug)
 
   try {
-    // ── Étape 1 : essayer comme UID Firestore direct ──────
+    // - Étape 1 : essayer comme UID Firestore direct ---
     let userSnap = null
     try {
       userSnap = await getDoc(doc(db, "users", uid))
@@ -234,7 +255,7 @@ const loadSite = async () => {
     if (userSnap?.exists()) {
       const data = userSnap.data()
       if (data.siteData) {
-        // ✅ UID direct avec siteData
+        // [OK] UID direct avec siteData
         site.value           = data.siteData
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
@@ -251,7 +272,7 @@ const loadSite = async () => {
       }
     }
 
-    // ── Étape 2 : essayer comme slug dans collection slugs ─
+    // - Étape 2 : essayer comme slug dans collection slugs -
     console.log("  Étape 2: cherche slug 'slugs/" + uid + "'")
     let slugSnap = null
     try {
@@ -271,7 +292,7 @@ const loadSite = async () => {
       }
 
       if (realSnap?.exists() && realSnap.data().siteData) {
-        // ✅ Slug résolu avec succès
+        // [OK] Slug résolu avec succès
         const rd             = realSnap.data()
         site.value           = rd.siteData
         siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
@@ -288,7 +309,7 @@ const loadSite = async () => {
       }
     }
 
-    // ── Rien trouvé ───────────────────────────────────────
+    // - Rien trouvé --------------------
     if (debugInfo.value) {
       error.value = debugInfo.value
     } else {
@@ -317,7 +338,7 @@ const loadPayConfig = async (uid) => {
   } catch (e) { console.warn("Pas de config paiement:", e.message) }
 }
 
-// ── Appliquer le thème du store (depuis Firestore ou localStorage) ──
+// - Appliquer le thème du store (depuis Firestore ou localStorage) -
 // Appelé après chaque résolution de slug/uid
 const applySiteTheme = (themeData) => {
   if (!themeData) return
@@ -342,6 +363,16 @@ const applySiteTheme = (themeData) => {
     console.log("🎨 Thème appliqué:", th.name || "custom")
   } catch(e) { console.warn("applySiteTheme:", e.message) }
 }
+
+// Recharger si la route change (navigation entre stores)
+watch(
+  () => [props.uid, props.slug, route.params.uid, route.params.slug],
+  (next, prev) => {
+    if (JSON.stringify(next) !== JSON.stringify(prev)) {
+      loadSite()
+    }
+  }
+)
 
 onMounted(() => {
   loadSite()
@@ -368,7 +399,7 @@ onMounted(() => {
   })
 })
 
-// ── Fonctions Auth client du store ───────────────────────────
+// - Fonctions Auth client du store --------------
 const svLogin = async () => {
   svAuthError.value   = ""
   svAuthSuccess.value = ""
@@ -379,7 +410,7 @@ const svLogin = async () => {
   try {
     const email = svEmail.value.trim().toLowerCase()
 
-    // ── Tentative 1 : chercher dans customers/ (compte store Firestore) ──
+    // - Tentative 1 : chercher dans customers/ (compte store Firestore) -
     const q = await getDocs(
       query(collection(db, "customers"), where("email", "==", email))
     )
@@ -397,7 +428,7 @@ const svLogin = async () => {
         }
       }
 
-      // ✅ Connexion réussie — stocker la session localement
+      // [OK] Connexion réussie - stocker la session localement
       const clientSession = {
         uid:         customerData.uid || customerDoc.id,
         email:       customerData.email,
@@ -415,8 +446,8 @@ const svLogin = async () => {
       return
     }
 
-    // ── Tentative 2 : fallback Firebase Auth (anciens comptes) ──
-    // Ces anciens clients ont un compte Auth — on les connecte
+    // - Tentative 2 : fallback Firebase Auth (anciens comptes) -
+    // Ces anciens clients ont un compte Auth - on les connecte
     // mais ils ne verront pas le builder car isOwner = false
     try {
       const { signInWithEmailAndPassword } = await import("firebase/auth")
@@ -424,7 +455,7 @@ const svLogin = async () => {
       // Vérifier que ce n'est pas un propriétaire (pas de doc users/)
       const userSnap = await getDoc(doc(db, "users", cred.user.uid))
       if (userSnap.exists() && userSnap.data().role === "owner") {
-        // C'est un propriétaire → déconnecter et refuser
+        // C'est un propriétaire -> déconnecter et refuser
         await signOut(clientAuth)
         svAuthError.value = "Veuillez vous connecter depuis l'espace propriétaire."
         return
@@ -456,7 +487,7 @@ const svLogin = async () => {
 }
 
 // Hash simple du mot de passe côté client (pour stockage Firestore)
-// NB : pas de Firebase Auth — les clients du store ne peuvent pas se connecter au builder
+// NB : pas de Firebase Auth - les clients du store ne peuvent pas se connecter au builder
 const svHashPassword = async (password) => {
   const encoder = new TextEncoder()
   const data     = encoder.encode(password)
@@ -582,7 +613,7 @@ const svLoadOrders = async (user) => {
     const uid   = user.uid   || ""
     let   email = (user.email || "").toLowerCase()
 
-    // ── Étape 0 : retrouver l'email depuis customers/ ─────────
+    // - Étape 0 : retrouver l'email depuis customers/ -----
     // IMPORTANT : svCurrentUser.email est stocké à l'inscription
     // mais si manquant, on le récupère depuis Firestore
     if (!email && uid) {
@@ -600,15 +631,15 @@ const svLoadOrders = async (user) => {
 
     console.log(`[profil] uid=${uid} | email=${email} | storeUid=${resolvedUid.value}`)
 
-    // ══════════════════════════════════════════════════════════
+    // ==========================================================
     // DONNÉES FIRESTORE OBSERVÉES :
-    // orders.customerEmail = email client ← CHAMP PRINCIPAL
-    // orders.clientUid     = uid client Firestore ← CHAMP SECONDAIRE
+    // orders.customerEmail = email client <- CHAMP PRINCIPAL
+    // orders.clientUid     = uid client Firestore <- CHAMP SECONDAIRE
     // orders.clientId      = UID du STORE (pas du client !)
     // orders.ownerUid      = UID du store
-    // ══════════════════════════════════════════════════════════
+    // ==========================================================
 
-    // ── Source 1 : orders par customerEmail (PRINCIPALE) ─────
+    // - Source 1 : orders par customerEmail (PRINCIPALE) ---
     if (email) {
       try {
         const s1 = await gd(q(col(db, "orders"), where("customerEmail", "==", email)))
@@ -617,7 +648,7 @@ const svLoadOrders = async (user) => {
       } catch(e) { console.error("[profil] orders/customerEmail:", e.message) }
     }
 
-    // ── Source 2 : orders par clientUid (UID client Firestore) ─
+    // - Source 2 : orders par clientUid (UID client Firestore) -
     if (uid) {
       try {
         const s2 = await gd(q(col(db, "orders"), where("clientUid", "==", uid)))
@@ -626,7 +657,7 @@ const svLoadOrders = async (user) => {
       } catch(e) { console.error("[profil] orders/clientUid:", e.message) }
     }
 
-    // ── Source 3 : users/{storeUid}/orders par customerEmail ──
+    // - Source 3 : users/{storeUid}/orders par customerEmail -
     if (resolvedUid.value && email) {
       try {
         const s3 = await gd(q(
@@ -637,7 +668,7 @@ const svLoadOrders = async (user) => {
       } catch(e) { console.error("[profil] store/orders:", e.message) }
     }
 
-    // ── Source 4 : cmdclients par clientEmail ─────────────────
+    // - Source 4 : cmdclients par clientEmail ---------
     if (email) {
       try {
         const s4 = await gd(q(col(db, "cmdclients"), where("clientEmail", "==", email)))
@@ -646,7 +677,7 @@ const svLoadOrders = async (user) => {
       } catch(e) { console.error("[profil] cmdclients/email:", e.message) }
     }
 
-    // ── Source 5 : cmdclients par clientUid ───────────────────
+    // - Source 5 : cmdclients par clientUid ----------
     if (uid) {
       try {
         const s5 = await gd(q(col(db, "cmdclients"), where("clientUid", "==", uid)))
@@ -655,7 +686,7 @@ const svLoadOrders = async (user) => {
       } catch(e) { console.error("[profil] cmdclients/uid:", e.message) }
     }
 
-    // ── Source 6 : orders par email simple ────────────────────
+    // - Source 6 : orders par email simple ----------
     if (email) {
       try {
         const s6 = await gd(q(col(db, "orders"), where("email", "==", email)))
@@ -698,11 +729,11 @@ const svOpenProfile = async () => {
   }
 }
 
-// ── Stripe Checkout (redirect) ───────────────────────────────
-// Le backend retourne { url } → on redirige vers Stripe Checkout
+// - Stripe Checkout (redirect) ----------------
+// Le backend retourne { url } -> on redirige vers Stripe Checkout
 // Pas besoin de Stripe Elements (formulaire inline)
 
-// ── PayPal buttons ────────────────────────────────────────────
+// - PayPal buttons ----------------------
 const initPaypal = async () => {
   const cfg = storePayConfig.value?.paypal
   if (!cfg?.clientId || cfg.clientId.length < 5) {
@@ -761,14 +792,14 @@ const initPaypal = async () => {
   } catch (e) { payError.value = "Erreur PayPal : " + e.message }
 }
 
-// ── Watch payment modal → init PayPal si nécessaire ─────────
+// - Watch payment modal -> init PayPal si nécessaire -----
 watch([showPayModal, payProvider], ([open, provider]) => {
   if (!open) return
   payError.value = ""
   if (provider === "paypal") setTimeout(initPaypal, 150)
 })
 
-// ── Paiement Stripe Checkout (redirect) ──────────────────────
+// - Paiement Stripe Checkout (redirect) -----------
 const payWithStripe = async () => {
   const cfg = storePayConfig.value?.stripe
 
@@ -798,7 +829,7 @@ const payWithStripe = async () => {
     const adresseLivraison = [svAddress.value, svZip.value, svCity.value, svCountry.value]
       .filter(Boolean).join(", ")
 
-    // ── Sauvegarder dans localStorage (survit au redirect cross-domain)
+    // - Sauvegarder dans localStorage (survit au redirect cross-domain)
     const pendingOrder = {
       items:           cart.value.map(i => ({ id: i.id, name: i.name, price: i.price, currency: i.currency, qty: i.qty, image: i.image || "" })),
       total:           cartTotal.value,
@@ -807,7 +838,7 @@ const payWithStripe = async () => {
       customerName:    customerName.value,
       customerEmail:   customerEmail.value,
       customerAddress: adresseLivraison,
-      siteSlug:        props.uid,
+      siteSlug:        props.slug || props.uid || resolvedUid.value,
       ownerUid:        resolvedUid.value,
       storeUid:        resolvedUid.value,
       clientUid:       svCurrentUser.value?.uid || clientAuth.currentUser?.uid || "",
@@ -816,20 +847,20 @@ const payWithStripe = async () => {
     }
     localStorage.setItem("pendingStripeOrder", JSON.stringify(pendingOrder))
     localStorage.setItem("stripeOwnerUid",  resolvedUid.value)
-    localStorage.setItem("stripeSiteSlug",  props.uid)
+    localStorage.setItem("stripeSiteSlug",  props.slug || props.uid || resolvedUid.value)
 
-    // ── URLs retour Stripe
-    // Stripe accepte les query params même avec hash history
-    // successUrl : Stripe redirige vers la racine avec ?stripe=ok
-    // main.js intercepte avant Vue et redirige vers /#/payment-success
-    const origin     = "https://musrh.github.io/SaasBuilder"
-    const slug       = props.uid || resolvedUid.value
+    // - URLs retour Stripe
+    // successUrl : Stripe redirige vers mronlinestores.com avec ?stripe=ok
+    // main.js intercepte le paramètre et redirige vers /payment-success
+    // cancelUrl  : URL propre du store (createWebHistory, pas de #)
+    const origin     = "https://mronlinestores.com"
+    const slug       = props.slug || props.uid || resolvedUid.value
     const ownerUid   = resolvedUid.value
     const successUrl = cfg?.successUrl ||
       `${origin}/?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
-    const cancelUrl  = cfg?.cancelUrl  || `${origin}/#/site/${slug}`
+    const cancelUrl  = cfg?.cancelUrl  || `${origin}/${slug}`
 
-    // ── Backend selon le plan du store (isPro = computed)
+    // - Backend selon le plan du store (isPro = computed)
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
     console.log(`💳 Paiement → ${backendUrl} (isPro: ${isPro.value})`)
 
@@ -846,7 +877,7 @@ const payWithStripe = async () => {
         ownerUid:         resolvedUid.value,
         storeUid:         resolvedUid.value,
         clientId:         svCurrentUser.value?.uid || clientAuth.currentUser?.uid || resolvedUid.value,
-        siteSlug:         props.uid,
+        siteSlug:         props.slug || props.uid || resolvedUid.value,
         adresseLivraison,
         storeName:        cfg?.storeName || siteMeta.value.name || "Store",
         currency:         cfg?.currency  || "eur",
@@ -876,10 +907,10 @@ const payWithStripe = async () => {
   }
 }
 
-// ── Sauvegarde commande Firestore ─────────────────────────────
+// - Sauvegarde commande Firestore ---------------
 // Écrit dans DEUX endroits :
-//   1. users/{ownerUid}/orders/{id}  → dashboard propriétaire
-//   2. orders/{id}                   → collection globale (webhook Stripe)
+//   1. users/{ownerUid}/orders/{id}  -> dashboard propriétaire
+//   2. orders/{id}                   -> collection globale (webhook Stripe)
 const saveOrder = async (provider, transactionId) => {
   if (!resolvedUid.value) return
   const orderData = {
@@ -896,7 +927,7 @@ const saveOrder = async (provider, transactionId) => {
     customerEmail: customerEmail.value,
     status:        "paid",
     createdAt:     new Date().toISOString(),
-    siteSlug:      props.uid,
+    siteSlug:      props.slug || props.uid || resolvedUid.value,
     storeUid:      resolvedUid.value,
     ownerUid:      resolvedUid.value,
   }
@@ -918,7 +949,7 @@ const saveOrder = async (provider, transactionId) => {
     console.error("Erreur sauvegarde commande (racine):", e.message)
   }
   try {
-    // 3. Collection cmdclients — commandes du CLIENT (pour profil client)
+    // 3. Collection cmdclients - commandes du CLIENT (pour profil client)
     await addDoc(collection(db, "cmdclients"), {
       ...orderData,
       clientUid:   svCurrentUser.value?.uid || clientAuth.currentUser?.uid || "",
@@ -955,7 +986,7 @@ const saveOrder = async (provider, transactionId) => {
     <h2>Site introuvable</h2>
     <p class="sv-error-msg">{{ error }}</p>
     <div class="sv-error-debug">
-      <p>Adresse demandée : <code>{{ uid }}</code></p>
+      <p>Adresse demandée : <code>{{ slug || uid }}</code></p>
       <p v-if="debugInfo" class="sv-debug-info">{{ debugInfo }}</p>
       <div class="sv-error-hints">
         <p>Causes possibles :</p>
