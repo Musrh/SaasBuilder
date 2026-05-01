@@ -1,5 +1,5 @@
 // ============================================================
-//  SaasBuilder/src/router.js — ROUTER COMPLET FINAL (CORRIGÉ)
+//  SaasBuilder/src/router.js — ROUTER COMPLET FINAL (CORRIGÉ v2)
 // ============================================================
 import { createRouter, createWebHistory } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
@@ -14,7 +14,6 @@ import NotFound      from "./views/NotFound.vue"
 
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
-// Durée d'essai gratuit du Builder après création du premier slug
 const FREE_TRIAL_DAYS = 30
 const FREE_TRIAL_MS   = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000
 
@@ -34,17 +33,17 @@ const toMillis = (v) => {
     return isNaN(t) ? 0 : t
   }
   if (v instanceof Date) return v.getTime()
-  if (typeof v.toMillis === "function") return v.toMillis()      // Firestore Timestamp
-  if (typeof v.seconds === "number")    return v.seconds * 1000  // Timestamp brut
+  if (typeof v.toMillis === "function") return v.toMillis()
+  if (typeof v.seconds === "number")    return v.seconds * 1000
   return 0
 }
 
 const routes = [
   // ── App principale ──────────────────────────────────────────
-  { path: "/",             name: "home",            component: PlanSelection },
-  { path: "/auth",         name: "auth",            component: AuthForm },
-  { path: "/slug-setup",   name: "slug-setup",      component: SlugSetup,    meta: { requiresAuth: true } },
-  { path: "/dashboard",    name: "dashboard",       component: Dashboard,    meta: { requiresAuth: true } },
+  { path: "/",             name: "home",       component: PlanSelection },
+  { path: "/auth",         name: "auth",       component: AuthForm },
+  { path: "/slug-setup",   name: "slug-setup", component: SlugSetup,  meta: { requiresAuth: true } },
+  { path: "/dashboard",    name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
   {
     path: "/saasgenerator",
     name: "saasgenerator",
@@ -52,9 +51,11 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
-  // ── Sites publiés ───────────────────────────────────────────
-  { path: "/site/:uid",    name: "site",            component: SiteViewer, props: true },
-  { path: "/store-auth",   name: "store-auth",      component: () => import("./views/Storeauth.vue") },
+  // ── Sites publiés (URL technique UID) ───────────────────────
+  { path: "/site/:uid", name: "site", component: SiteViewer, props: true },
+
+  // ── Authentification store client ───────────────────────────
+  { path: "/store-auth", name: "store-auth", component: () => import("./views/Storeauth.vue") },
 
   // ── Paiements ───────────────────────────────────────────────
   { path: "/payment-success", name: "payment-success", component: () => import("./views/Paymentsuccess.vue") },
@@ -63,14 +64,27 @@ const routes = [
   { path: "/cancel",          name: "cancel",          component: () => import("./views/Cancel.vue") },
 
   // ── Admin ────────────────────────────────────────────────────
-  { path: "/admin",        name: "admin",           component: () => import("./views/Admin.vue"), meta: { requiresAdmin: true } },
+  { path: "/admin", name: "admin", component: () => import("./views/Admin.vue"), meta: { requiresAdmin: true } },
 
   // ── Autres ──────────────────────────────────────────────────
-  { path: "/orders",       name: "orders",          component: () => import("./views/Orders.vue"),        meta: { requiresAuth: true } },
-//  { path: "/products",     name: "products",        component: () => import("./views/ListeProducts.vue"), meta: { requiresAuth: true } },
- // { path: "/plans",        name: "plans",           component: () => import("./views/Plans.vue") },
-  { path: "/panier",       name: "panier",          component: () => import("./views/Panier.vue") },
-  { path: "/:pathMatch(.*)*", name: "not-found",    component: NotFound },
+  { path: "/orders", name: "orders", component: () => import("./views/Orders.vue"), meta: { requiresAuth: true } },
+  { path: "/panier", name: "panier", component: () => import("./views/Panier.vue") },
+
+  // ── ✅ FIX BUG 1 — Sites publiés par slug (URL conviviale) ──
+  // Ex: /mon-store  → SiteViewer reçoit { slug: "mon-store" }
+  // Cette route est placée AVANT le catch-all NotFound mais APRÈS toutes
+  // les routes spécifiques, donc elle ne capture que les segments simples
+  // non résolus comme /mon-slug.
+  // SiteViewer doit chercher dans Firestore : slugs/{slug} → uid → siteData.
+  {
+    path: "/:slug([a-z0-9][a-z0-9-]*)",
+    name: "slug-site",
+    component: SiteViewer,
+    props: (route) => ({ slug: route.params.slug }),
+  },
+
+  // ── Catch-all ────────────────────────────────────────────────
+  { path: "/:pathMatch(.*)*", name: "not-found", component: NotFound },
 ]
 
 const router = createRouter({
@@ -99,12 +113,11 @@ router.beforeEach(async (to, from, next) => {
     const user = await waitForAuth()
 
     if (!user) {
-      // Non connecté → /auth avec redirect param
       next({ name: "auth", query: { redirect: to.fullPath } })
       return
     }
 
-    // Vérifier statut compte pour dashboard / builder
+    // Vérifier statut compte pour dashboard / builder / slug-setup
     if (to.name === "dashboard" || to.name === "saasgenerator" || to.name === "slug-setup") {
       try {
         const db   = getFirestore()
@@ -124,7 +137,7 @@ router.beforeEach(async (to, from, next) => {
             next({ name: "slug-setup" }); return
           }
 
-          // /saasgenerator : Pro payé OU essai gratuit de 30 jours
+          // ── Accès /saasgenerator : Pro payé OU essai gratuit ──
           if (to.name === "saasgenerator") {
             const isPro      = d.plan && d.plan !== "free"
             const isPaid     = d.paye === true
@@ -132,28 +145,32 @@ router.beforeEach(async (to, from, next) => {
             const notExpired = !exp || exp === 0 || exp > Date.now()
             const proAccess  = isPro && isPaid && notExpired
 
-            // Essai gratuit : 30 jours à partir de la création du 1er slug.
-            // On lit slugCreatedAt (préféré), sinon slugSetAt, sinon createdAt
-            // en dernier recours pour les anciens comptes.
+            // Date de début d'essai : plusieurs champs possibles selon l'ancienneté du compte
             const slugStart  = toMillis(d.slugCreatedAt)
                             || toMillis(d.slugSetAt)
                             || toMillis(d.createdAt)
+
+            // ✅ FIX BUG 2 — Si l'utilisateur a un publishedSlug mais aucune
+            // date enregistrée dans Firestore (ancien compte ou données manquantes),
+            // on lui accorde l'accès plutôt que de le bloquer : on considère l'essai
+            // comme actif. slugStart === 0 signifie "pas de date → bénéfice du doute".
             const trialEnd   = slugStart ? slugStart + FREE_TRIAL_MS : 0
-            const inTrial    = !!d.publishedSlug && slugStart > 0 && Date.now() < trialEnd
+            const inTrial    = !!d.publishedSlug && (
+              slugStart === 0            // pas de date → accès accordé par défaut
+              || Date.now() < trialEnd  // ou encore dans les 30 jours
+            )
 
             if (!proAccess && !inTrial) {
-              // Essai expiré / pas Pro → on renvoie vers la sélection de plan
-              // ⚠️ FIX antérieur : next({ name: "/saasgenerator" }) était cassé
-              // ("/saasgenerator" est un PATH, pas un NAME) → la navigation
-              // échouait silencieusement et l'utilisateur restait bloqué.
+              // Essai vraiment expiré ET pas Pro → sélection de plan
               next({ name: "home" }); return
             }
           }
         }
+        // Si le document n'existe pas encore dans Firestore, on laisse passer
+        // (compte tout neuf, les données seront créées lors du slug-setup)
       } catch(e) {
         console.error("Router guard:", e.message)
-        // En cas d'erreur Firestore, on laisse passer plutôt que de
-        // bloquer l'utilisateur sur une page blanche.
+        // En cas d'erreur Firestore, on laisse passer pour ne pas bloquer l'utilisateur
         next(); return
       }
     }
