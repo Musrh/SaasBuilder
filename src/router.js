@@ -103,7 +103,7 @@ const routes = [
 
   // Public : monsaas.com/slug ou monsaas.com/email
   {
-    path: "/:slugOrEmail((?!saasgenerator)[a-zA-Z0-9@._-]+)",
+    path: "/:slugOrEmail",
     name: "public-site",
     component: SiteViewer,
     props: route => ({ slugOrEmail: decodeURIComponent(route.params.slugOrEmail) }),
