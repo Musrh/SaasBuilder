@@ -609,7 +609,7 @@ const openStore = () => {
 
 const goToBuilder = () => {
   if (userData.value?.publishedSlug) {
-    router.push({ name: "saasgenerator" })
+    router.push("/saasgenerator")
   } else {
     router.push("/slug-setup")
   }
