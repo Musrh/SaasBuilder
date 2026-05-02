@@ -11,7 +11,6 @@ import SiteViewer    from "./views/Siteviewer.vue"
 import NotFound      from "./views/NotFound.vue"
 
 const ADMIN_EMAILS  = ["musmamon@gmail.com", "musrh@gmail.com"]
-const FREE_TRIAL_MS = 30 * 24 * 60 * 60 * 1000   // 30 jours en ms
 
 // Attend que Firebase Auth ait resolu l'utilisateur courant
 const waitForAuth = () => new Promise(resolve => {
@@ -19,20 +18,6 @@ const waitForAuth = () => new Promise(resolve => {
   if (auth.currentUser !== null) { resolve(auth.currentUser); return }
   const unsub = onAuthStateChanged(auth, user => { unsub(); resolve(user) })
 })
-
-// Convertit un champ Firestore (Timestamp | number | Date | string) en millisecondes
-const toMillis = (v) => {
-  if (!v) return 0
-  if (typeof v === "number") return v
-  if (typeof v === "string") {
-    const t = Date.parse(v)
-    return isNaN(t) ? 0 : t
-  }
-  if (v instanceof Date) return v.getTime()
-  if (typeof v.toMillis === "function") return v.toMillis()
-  if (typeof v.seconds === "number") return v.seconds * 1000
-  return 0
-}
 
 const routes = [
   // Routes de l'application principale
@@ -64,9 +49,8 @@ const routes = [
   { path: "/orders", name: "orders", component: () => import("./views/Orders.vue"), meta: { requiresAuth: true } },
   { path: "/panier", name: "panier", component: () => import("./views/Panier.vue") },
 
-  // FIX : route slug conviviale — ex: /mrstore => SiteViewer({ slug: "mrstore" })
+  // Route slug conviviale — ex: /mrstore => SiteViewer({ slug: "mrstore" })
   // Placee AVANT le catch-all, APRES toutes les routes specifiques.
-  // Seuls les slugs format [a-z0-9][a-z0-9-]* sont captured.
   {
     path: "/:slug([a-z0-9][a-z0-9-]*)",
     name: "slug-site",
@@ -106,8 +90,13 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    // Verifications supplementaires pour dashboard / builder / slug-setup
-    if (to.name === "dashboard" || to.name === "saasgenerator" || to.name === "slug-setup") {
+    // Saasgenerator : acces libre pour tout utilisateur connecte, quel que soit le plan ou le slug
+    if (to.name === "saasgenerator") {
+      next(); return
+    }
+
+    // Verifications supplementaires pour dashboard / slug-setup uniquement
+    if (to.name === "dashboard" || to.name === "slug-setup") {
       try {
         const db   = getFirestore()
         const snap = await getDoc(doc(db, "users", user.uid))
@@ -119,39 +108,6 @@ router.beforeEach(async (to, from, next) => {
           if (d.active === false) {
             await getAuth().signOut()
             next({ name: "auth" }); return
-          }
-
-          // Pas de slug configure : rediriger vers slug-setup
-          if (to.name === "saasgenerator" && !d.publishedSlug) {
-            next({ name: "slug-setup" }); return
-          }
-
-          // Acces au builder
-          if (to.name === "saasgenerator") {
-
-            // FIX : plan free inclut le builder visuel — acces toujours autorise
-            if (!d.plan || d.plan === "free") {
-              next(); return
-            }
-
-            // Plan payant : Pro paye et non expire OU essai gratuit de 30 jours
-            const isPaid     = d.paye === true
-            const exp        = d.expiry
-            const notExpired = !exp || exp === 0 || exp > Date.now()
-            const proAccess  = isPaid && notExpired
-
-            // Date de debut d'essai (plusieurs champs selon l'anciennete du compte)
-            const slugStart = toMillis(d.slugCreatedAt)
-                           || toMillis(d.slugSetAt)
-                           || toMillis(d.createdAt)
-
-            // Si pas de date en Firestore (ancien compte) : benefice du doute
-            const trialEnd = slugStart ? slugStart + FREE_TRIAL_MS : 0
-            const inTrial  = !!d.publishedSlug && (slugStart === 0 || Date.now() < trialEnd)
-
-            if (!proAccess && !inTrial) {
-              next({ name: "home" }); return
-            }
           }
         }
         // Pas encore de document Firestore (compte tout neuf) : on laisse passer
