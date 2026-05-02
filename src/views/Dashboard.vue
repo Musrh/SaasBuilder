@@ -607,7 +607,7 @@ const openStore = () => {
 }
 
 const goToBuilder = () => {
-  router.push({ name: "saasgenerator" })
+  router.push("/#/saasgenerator")
 }
   
   
