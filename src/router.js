@@ -3,14 +3,15 @@ import { createRouter, createWebHashHistory } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getFirestore, doc, getDoc } from "firebase/firestore"
 
-import PlanSelection from "./views/PlanSelection.vue"
-import SlugSetup     from "./views/Slugsetup.vue"
-import AuthForm      from "./views/AuthForm.vue"
-import Dashboard     from "./views/Dashboard.vue"
-import SiteViewer    from "./views/Siteviewer.vue"
-import NotFound      from "./views/NotFound.vue"
+import PlanSelection  from "./views/PlanSelection.vue"
+import SlugSetup      from "./views/Slugsetup.vue"
+import AuthForm       from "./views/AuthForm.vue"
+import Dashboard      from "./views/Dashboard.vue"
+import SiteViewer     from "./views/Siteviewer.vue"
+import NotFound       from "./views/NotFound.vue"
+import Saasgenerator  from "./views/Saasgenerator.vue"
 
-const ADMIN_EMAILS  = ["musmamon@gmail.com", "musrh@gmail.com"]
+const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
 // Attend que Firebase Auth ait resolu l'utilisateur courant
 const waitForAuth = () => new Promise(resolve => {
@@ -23,14 +24,9 @@ const routes = [
   // Routes de l'application principale
   { path: "/",           name: "home",       component: PlanSelection },
   { path: "/auth",       name: "auth",       component: AuthForm },
-  { path: "/slug-setup", name: "slug-setup", component: SlugSetup,  meta: { requiresAuth: true } },
-  { path: "/dashboard",  name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
-  {
-    path: "/saasgenerator",
-    name: "saasgenerator",
-    component: () => import("./views/Saasgenerator.vue"),
-    meta: { requiresAuth: true },
-  },
+  { path: "/slug-setup", name: "slug-setup", component: SlugSetup,       meta: { requiresAuth: true } },
+  { path: "/dashboard",  name: "dashboard",  component: Dashboard,       meta: { requiresAuth: true } },
+  { path: "/saasgenerator", name: "saasgenerator", component: Saasgenerator, meta: { requiresAuth: true } },
 
   // Sites publies par UID Firestore direct (/site/:uid)
   { path: "/site/:uid", name: "site", component: SiteViewer, props: true },
@@ -90,7 +86,7 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    // Saasgenerator : acces libre pour tout utilisateur connecte, quel que soit le plan ou le slug
+    // Saasgenerator : acces libre pour tout utilisateur connecte
     if (to.name === "saasgenerator") {
       next(); return
     }
@@ -113,7 +109,6 @@ router.beforeEach(async (to, from, next) => {
         // Pas encore de document Firestore (compte tout neuf) : on laisse passer
       } catch (e) {
         console.error("Router guard Firestore:", e.message)
-        // Erreur Firestore : on laisse passer pour ne pas bloquer
         next(); return
       }
     }
