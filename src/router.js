@@ -26,7 +26,7 @@ const routes = [
   { path: "/auth",       name: "auth",       component: AuthForm },
   { path: "/slug-setup", name: "slug-setup", component: SlugSetup,       meta: { requiresAuth: true } },
   { path: "/dashboard",  name: "dashboard",  component: Dashboard,       meta: { requiresAuth: true } },
-  { path: "/#/saasgenerator", name: "saasgenerator", component: Saasgenerator, meta: { requiresAuth: true } },
+  { path: "/saasgenerator", name: "saasgenerator", component: Saasgenerator, meta: { requiresAuth: true } },
 
   // Sites publies par UID Firestore direct (/site/:uid)
   { path: "/site/:uid", name: "site", component: SiteViewer, props: true },
