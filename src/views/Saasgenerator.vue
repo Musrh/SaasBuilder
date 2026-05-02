@@ -461,8 +461,9 @@ const publishSite = async () => {
 
   // URL principale : /site/{uid} — route Vue Router dans SaasBuilder
   // URL slug (alias convivial) : /site/{slug} → résolu via collection slugs
-  const urlUid  = `https://musrh.github.io/SaasBuilder/#/site/${uid}`
-  const urlSlug = `https://musrh.github.io/SaasBuilder/#/site/${slug}`
+
+  const urlUid  = `https://mronlinestores.com/#/site/${uid}`
+  const urlSlug = `https://mronlinestores.com/#/${slug}`
 
   try {
     // 1. Sauvegarder siteData + slug dans le document de l'utilisateur
