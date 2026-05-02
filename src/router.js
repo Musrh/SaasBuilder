@@ -80,14 +80,14 @@ const routes = [
 
   // Route principale du Builder (URL professionnelle)
   {
-    path: "/builder",
-    name: "builder",
+    path: "/saasgenerator",
+    name: "saasgenerator",
     component: () => import("./views/Saasgenerator.vue"),
     meta: { requiresAuth: true, requiresSlug: true, requiresBuilderAccess: true },
   },
 
   // Ancienne URL : redirige vers /builder
-  { path: "/saasgenerator", redirect: { name: "builder" } },
+ // { path: "/saasgenerator", redirect: { name: "builder" } },
 
   // Sites publiés
   { path: "/site/:uid", name: "site", component: SiteViewer, props: true },
