@@ -607,26 +607,18 @@ const openStore = () => {
 }
 
 const goToBuilder = async () => {
-  // Garde-fou côté UI
   if (!canAccessBuilder.value) {
     showPlanModal.value = true
     return
   }
 
-  // Pas de slug configuré → on va d'abord le choisir
   if (!userData.value?.publishedSlug) {
     router.push("/slug-setup")
     return
   }
 
-  // Navigation interne SPA — surtout PAS window.location.href ni "#/..."
-  // (le router est en createWebHistory, donc pas de hash)
-  router.push("/saasgenerator")
+  await router.push({ name: "builder" })
 }
-
-
-
-  
 
 const goToPlans = () => { showPlanModal.value = true }
 
