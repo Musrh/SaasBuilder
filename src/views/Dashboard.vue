@@ -606,19 +606,15 @@ const openStore = () => {
   window.open(`https://mronlinestores.com/${userData.value.publishedSlug}`, "_blank")
 }
 
-const goToBuilder = async () => {
-  if (!canAccessBuilder.value) {
-    showPlanModal.value = true
-    return
-  }
 
-  if (!userData.value?.publishedSlug) {
+const goToBuilder = () => {
+  if (userData.value?.publishedSlug) {
+    router.push({ name: "saasgenerator" })
+  } else {
     router.push("/slug-setup")
-    return
   }
-
-  await router.push("/saasgenerator")
 }
+  
 
 const goToPlans = () => { showPlanModal.value = true }
 
