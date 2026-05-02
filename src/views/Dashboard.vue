@@ -607,13 +607,23 @@ const openStore = () => {
 }
 
 
-const goToBuilder = () => {
+  const goToBuilder = () => {
+  console.log("👉 Accès Builder")
+
+  if (!userData.value) {
+    console.warn("❌ userData vide")
+    return
+  }
+
   if (userData.value?.publishedSlug) {
-    router.push("/saasgenerator")
+    // ✅ Navigation interne Vue Router
+    router.push({ name: "saasgenerator" })
   } else {
-    router.push("/slug-setup")
+    // Si pas de slug → setup obligatoire
+    router.push({ name: "slug-setup" })
   }
 }
+
   
 
 const goToPlans = () => { showPlanModal.value = true }
