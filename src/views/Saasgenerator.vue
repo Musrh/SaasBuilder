@@ -928,14 +928,14 @@ const openConfigEditor = (target) => {
   // Auto-générer les URLs selon le slug publié du store
   const uid  = currentUser.value?.uid || ""
   const slug = publishAddress.value?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || uid
-  const base = "https://musrh.github.io/SaasBuilder/#"
+  const base = "https://mronlinestores.com/#"
 
   if (target === "stripe") {
     const cfg = liveStripeConfig.value
     // Si pas d'URLs configurées, générer automatiquement
     // Stripe supprime tout après # → URL racine simple
     // La détection du retour Stripe se fait dans main.js de SaasBuilder
-    const origin = "https://musrh.github.io/SaasBuilder"
+    const origin = "https://mronlinestores.com"
     const successUrl = cfg.successUrl || `${origin}/`
     const cancelUrl  = cfg.cancelUrl  || `${origin}/`
     configEditorContent.value =
@@ -955,7 +955,7 @@ const openConfigEditor = (target) => {
 }`
   } else {
     const cfg = livePaypalConfig.value
-    const origin2 = "https://musrh.github.io/SaasBuilder"
+    const origin2 = "https://mronlinestores.com"
     const successUrl = cfg.successUrl || `${origin2}/`
     configEditorContent.value =
 `// ============================================================
@@ -1698,14 +1698,14 @@ const setPageStyle = (type, value) => {
           <div class="pub-field">
             <label>{{ t.siteAddress }}</label>
             <div class="pub-url-wrap">
-              <span class="pub-url-prefix">SaasBuilder/#/site/</span>
+              <span class="pub-url-prefix">mronlinestores.com/#/</span>
               <input v-model="publishAddress" class="pub-input" :placeholder="t.siteAddressPlaceholder"/>
             </div>
             <div v-if="publishAddress" class="pub-preview-url">
-              🔗 musrh.github.io/SaasBuilder/#/site/{{ publishAddress.toLowerCase().replace(/[^a-z0-9-]/g,'-') }}
+              🔗 mronlinestores.com/#/{{ publishAddress.toLowerCase().replace(/[^a-z0-9-]/g,'-') }}
             </div>
             <div v-if="currentUser && publishAddress" class="pub-preview-url" style="color:var(--text3);font-size:11px;margin-top:4px">
-              🆔 uid: musrh.github.io/SaasBuilder/#/site/{{ currentUser.uid }}
+              🆔 uid: mronlinestores.com/#/site/{{ currentUser.uid }}
             </div>
           </div>
 
