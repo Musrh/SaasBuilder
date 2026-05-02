@@ -1,5 +1,5 @@
 // SaasBuilder/src/router.js
-import { createRouter, createWebHashHistory } from "vue-router"
+import { createRouter, createWebHistory } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getFirestore, doc, getDoc } from "firebase/firestore"
 
@@ -59,7 +59,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes,
   scrollBehavior: () => ({ top: 0 }),
 })
