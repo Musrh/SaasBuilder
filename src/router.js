@@ -82,8 +82,8 @@ const routes = [
   {
     path: "/saasgenerator",
     name: "saasgenerator",
-    component: () => import("./views/Saasgenerator.vue"),
-    meta: { requiresAuth: true, requiresSlug: true, requiresBuilderAccess: true },
+    component: () => import("./views/Saasgenerator.vue")
+    //meta: { requiresAuth: true, requiresSlug: true, requiresBuilderAccess: true },
   },
 
   // Ancienne URL : redirige vers /builder
