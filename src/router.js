@@ -48,15 +48,9 @@ const routes = [
   // Route slug conviviale — ex: /mrstore => SiteViewer({ slug: "mrstore" })
   // Placee AVANT le catch-all, APRES toutes les routes specifiques.
 
-  {
-  path: "/:slug((?!auth$|dashboard$|admin$|orders$|slug-setup$|saasgenerator$|site$|payment-success$|payment-cancel$)[a-z0-9][a-z0-9-]*)",
-  name: "slug-site",
-  component: SiteViewer,
-  props: route => ({ slug: route.params.slug }),
-},
 
   // Catch-all 404
-  { path: "/:pathMatch(.*)*", name: "not-found", component: NotFound },
+  { path: "/:pathMatch(.*)*", name: "not-found", component: NotFound }
 ]
 
 const router = createRouter({
