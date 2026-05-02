@@ -606,12 +606,8 @@ const openStore = () => {
   window.open(`https://mronlinestores.com/${userData.value.publishedSlug}`, "_blank")
 }
 
-const goToBuilder = async () => {
-  if (userData.value?.publishedSlug) {
-    router.push({ name: 'saasgenerator' })   // ✅ navigation Vue, zéro rechargement
-  } else {
-    router.push('/slug-setup')
-  }
+const goToBuilder = () => {
+  router.push({ name: "saasgenerator" })
 }
   
   
