@@ -13,44 +13,69 @@ import Saasgenerator  from "./views/Saasgenerator.vue"
 
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
-// Attend que Firebase Auth ait resolu l'utilisateur courant
+// Attente auth Firebase
 const waitForAuth = () => new Promise(resolve => {
   const auth = getAuth()
-  if (auth.currentUser !== null) { resolve(auth.currentUser); return }
-  const unsub = onAuthStateChanged(auth, user => { unsub(); resolve(user) })
+  if (auth.currentUser) return resolve(auth.currentUser)
+
+  const unsub = onAuthStateChanged(auth, user => {
+    unsub()
+    resolve(user)
+  })
 })
 
 const routes = [
-  // Routes de l'application principale
-  { path: "/",           name: "home",       component: PlanSelection },
-  { path: "/auth",       name: "auth",       component: AuthForm },
-  { path: "/slug-setup", name: "slug-setup", component: SlugSetup,       meta: { requiresAuth: true } },
-  { path: "/dashboard",  name: "dashboard",  component: Dashboard,       meta: { requiresAuth: true } },
+  // ======================
+  // ROUTES PRINCIPALES
+  // ======================
+  { path: "/", name: "home", component: PlanSelection },
+  { path: "/auth", name: "auth", component: AuthForm },
+
+  { path: "/slug-setup", name: "slug-setup", component: SlugSetup, meta: { requiresAuth: true } },
+  { path: "/dashboard",  name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
+
+  // ⚠️ Builder SaaS (DOIT rester accessible directement)
   { path: "/saasgenerator", name: "saasgenerator", component: Saasgenerator, meta: { requiresAuth: true } },
 
-  // Sites publies par UID Firestore direct (/site/:uid)
+  // ======================
+  // SITE PAR UID
+  // ======================
   { path: "/site/:uid", name: "site", component: SiteViewer, props: true },
 
-  // Authentification client du store
+  // ======================
+  // AUTH STORE CLIENT
+  // ======================
   { path: "/store-auth", name: "store-auth", component: () => import("./views/Storeauth.vue") },
 
-  // Pages de paiement
+  // ======================
+  // PAIEMENT
+  // ======================
   { path: "/payment-success", name: "payment-success", component: () => import("./views/Paymentsuccess.vue") },
   { path: "/payment-cancel",  name: "payment-cancel",  component: () => import("./views/Paymentcancel.vue") },
-  { path: "/success",         name: "success",         component: () => import("./views/Success.vue") },
-  { path: "/cancel",          name: "cancel",          component: () => import("./views/Cancel.vue") },
+  { path: "/success", name: "success", component: () => import("./views/Success.vue") },
+  { path: "/cancel",  name: "cancel",  component: () => import("./views/Cancel.vue") },
 
-  // Administration
+  // ======================
+  // ADMIN / ORDERS
+  // ======================
   { path: "/admin",  name: "admin",  component: () => import("./views/Admin.vue"),  meta: { requiresAdmin: true } },
   { path: "/orders", name: "orders", component: () => import("./views/Orders.vue"), meta: { requiresAuth: true } },
   { path: "/panier", name: "panier", component: () => import("./views/Panier.vue") },
 
-  // Route slug conviviale — ex: /mrstore => SiteViewer({ slug: "mrstore" })
-  // Placee AVANT le catch-all, APRES toutes les routes specifiques.
+  // ======================
+  // SLUG PUBLIC (IMPORTANT)
+  // ======================
+  {
+    path: "/:slug([a-z0-9][a-z0-9-]*)",
+    name: "slug-site",
+    component: SiteViewer,
+    props: route => ({ slug: route.params.slug }),
+  },
 
-
-  // Catch-all 404
-  { path: "/:pathMatch(.*)*", name: "not-found", component: NotFound }
+  // ======================
+  // 404
+  // ======================
+  { path: "/:pathMatch(.*)*", name: "not-found", component: NotFound },
 ]
 
 const router = createRouter({
@@ -59,60 +84,54 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
-// Guard de navigation global
+// ======================
+// GLOBAL GUARD
+// ======================
 router.beforeEach(async (to, from, next) => {
 
-  // Route admin : verifie l'email
+  // ===== ADMIN =====
   if (to.meta.requiresAdmin) {
     const user = await waitForAuth()
-    if (!user) { next({ name: "auth" }); return }
+
+    if (!user) return next({ name: "auth" })
     if (!ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
-      next({ name: "not-found" }); return
+      return next({ name: "not-found" })
     }
-    next(); return
+
+    return next()
   }
 
-  // Routes protegees par authentification
+  // ===== AUTH REQUIRED =====
   if (to.meta.requiresAuth) {
     const user = await waitForAuth()
 
     if (!user) {
-      next({ name: "auth", query: { redirect: to.fullPath } })
-      return
+      return next({ name: "auth", query: { redirect: to.fullPath } })
     }
 
-    // Saasgenerator : acces libre pour tout utilisateur connecte
-    if (to.name === "saasgenerator") {
-      next(); return
-    }
+    // SaaS builder toujours autorisé
+    if (to.name === "saasgenerator") return next()
 
-    // Verifications supplementaires pour dashboard / slug-setup uniquement
+    // Vérif compte (dashboard + setup)
     if (to.name === "dashboard" || to.name === "slug-setup") {
       try {
-        const db   = getFirestore()
+        const db = getFirestore()
         const snap = await getDoc(doc(db, "users", user.uid))
 
-        if (snap.exists()) {
-          const d = snap.data()
-
-          // Compte desactive
-          if (d.active === false) {
-            await getAuth().signOut()
-            next({ name: "auth" }); return
-          }
+        if (snap.exists() && snap.data().active === false) {
+          await getAuth().signOut()
+          return next({ name: "auth" })
         }
-        // Pas encore de document Firestore (compte tout neuf) : on laisse passer
       } catch (e) {
-        console.error("Router guard Firestore:", e.message)
-        next(); return
+        console.error("Router error:", e.message)
       }
     }
 
-    next(); return
+    return next()
   }
 
-  // Route publique
-  next()
+  // ===== PUBLIC =====
+  return next()
 })
 
 export default router
