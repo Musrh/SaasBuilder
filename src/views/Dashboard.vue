@@ -617,7 +617,7 @@ const goToBuilder = async () => {
     return
   }
 
-  await router.push({ name: "builder" })
+  await router.push("/saasgenerator")
 }
 
 const goToPlans = () => { showPlanModal.value = true }
