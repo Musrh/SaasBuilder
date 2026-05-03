@@ -587,7 +587,7 @@ onMounted(() => {
         if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "", privacyPolicy: "", remboursement: "" }
         // Ajouter les nouveaux champs si absent (migration)
         if (!('privacyPolicy'  in site.value.legal)) site.value.legal.privacyPolicy  = ""
-        if (!('remboursement'  in site.value.legal)) site.value.legal.remboursement  = 
+        if (!('remboursement'  in site.value.legal)) site.value.legal.remboursement  = ""
         if (d.siteLogo)   siteLogo.value = d.siteLogo
         if (!d.siteData) {
           const saved = localStorage.getItem("siteDataPro")
