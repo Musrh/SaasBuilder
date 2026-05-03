@@ -234,7 +234,14 @@ const loadSite = async () => {
   const urlSlug = window.location.pathname.replace(/^\/+/, "").split("/")[0] || ""
   const uid = (props.uid || props.slug || routeParam || urlSlug).trim()
 
-  if (!uid) {
+  // Routes internes de l'application — ne jamais tenter de les charger comme sites publics
+  const RESERVED_SLUGS = [
+    "saasgenerator", "dashboard", "auth", "slug-setup", "admin",
+    "orders", "panier", "payment-success", "payment-cancel",
+    "success", "cancel", "store-auth", "site", "not-found"
+  ]
+
+  if (!uid || RESERVED_SLUGS.includes(uid)) {
     error.value = "Aucun identifiant de site fourni."
     loading.value = false
     return
