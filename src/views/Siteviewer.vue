@@ -356,13 +356,25 @@ const loadPayConfig = async (uid) => {
 
 // - Appliquer le thème du store (depuis Firestore ou localStorage) -
 // Appelé après chaque résolution de slug/uid
+// Vérifie si une couleur hex est trop claire (luminosité > 85%) → pas utilisable comme fond de bouton
+const isColorTooBright = (hex) => {
+  try {
+    const c = hex.replace('#','')
+    const r = parseInt(c.slice(0,2),16), g = parseInt(c.slice(2,4),16), b = parseInt(c.slice(4,6),16)
+    return (r*299 + g*587 + b*114) / 1000 > 200
+  } catch { return false }
+}
+
 const applySiteTheme = (themeData) => {
   if (!themeData) return
   try {
     const th = typeof themeData === "string" ? JSON.parse(themeData) : themeData
     const r  = document.documentElement
-    if (th.accent)      r.style.setProperty("--theme-accent",      th.accent)
-    if (th.accentHover) r.style.setProperty("--theme-accent-hover",th.accentHover)
+    // Sécurité : si accent est trop clair (proche du blanc), garder le violet par défaut
+    const safeAccent      = th.accent      && !isColorTooBright(th.accent)      ? th.accent      : null
+    const safeAccentHover = th.accentHover && !isColorTooBright(th.accentHover) ? th.accentHover : null
+    if (safeAccent)      r.style.setProperty("--theme-accent",      safeAccent)
+    if (safeAccentHover) r.style.setProperty("--theme-accent-hover", safeAccentHover)
     if (th.bg)          r.style.setProperty("--theme-bg",          th.bg)
     if (th.bgAlt)       r.style.setProperty("--theme-bg-alt",      th.bgAlt)
     if (th.bgHero)      r.style.setProperty("--theme-bg-hero",     th.bgHero)
