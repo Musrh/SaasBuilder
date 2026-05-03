@@ -10,7 +10,9 @@ const site = ref({
   legal: {
     mentions: "",
     cgv: "",
-    privacy: ""
+    privacy: "",
+    privacyPolicy: "",
+    remboursement: ""
   },
   pages: [{
     id: 1, name: "Accueil", style: {},
@@ -582,7 +584,10 @@ onMounted(() => {
         if (d.siteData)   site.value     = d.siteData
         if (d.siteName)   siteName.value = d.siteName
         // Initialiser legal si absent des données sauvegardées (rétrocompat)
-        if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "" }
+        if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "", privacyPolicy: "", remboursement: "" }
+        // Ajouter les nouveaux champs si absent (migration)
+        if (!('privacyPolicy'  in site.value.legal)) site.value.legal.privacyPolicy  = ""
+        if (!('remboursement'  in site.value.legal)) site.value.legal.remboursement  = 
         if (d.siteLogo)   siteLogo.value = d.siteLogo
         if (!d.siteData) {
           const saved = localStorage.getItem("siteDataPro")
@@ -669,6 +674,53 @@ Ce site utilise uniquement des cookies fonctionnels indispensables à son bon fo
 
 5. Hébergement
 Les données sont hébergées en Europe par des prestataires conformes au RGPD.`
+}
+
+const fillPrivacyPolicy = () => {
+  if (site.value.legal.privacyPolicy) return
+  site.value.legal.privacyPolicy = [
+    "Privacy Policy — " + siteName.value,
+    "",
+    "1. Data Collection",
+    "We only collect data necessary to process your orders: name, email, and delivery address.",
+    "",
+    "2. Use of Data",
+    "Your data is used solely to process your orders and is never sold to third parties.",
+    "",
+    "3. Your Rights (GDPR)",
+    "You have the right to access, correct, or delete your personal data.",
+    "Contact us: [Your email]",
+    "",
+    "4. Cookies",
+    "This site uses only functional cookies essential to its operation.",
+    "",
+    "5. Hosting",
+    "Data is hosted in Europe by GDPR-compliant providers."
+  ].join("\n")
+}
+
+const fillRemboursement = () => {
+  if (site.value.legal.remboursement) return
+  site.value.legal.remboursement = [
+    "Politique de remboursement — " + siteName.value,
+    "",
+    "Délai de retour",
+    "Vous disposez de 14 jours calendaires à compter de la réception pour exercer votre droit de retour.",
+    "",
+    "Conditions de retour",
+    "L'article doit être retourné dans son état d'origine, non utilisé, dans son emballage d'origine.",
+    "",
+    "Procédure",
+    "1. Contactez-nous à [Votre email] en indiquant votre numéro de commande.",
+    "2. Nous vous communiquons l'adresse de retour.",
+    "3. Expédiez l'article à vos frais.",
+    "",
+    "Remboursement",
+    "Le remboursement est effectué sous 5 à 10 jours ouvrés après réception du retour, via le moyen de paiement initial.",
+    "",
+    "Exceptions",
+    "Les articles personnalisés ou téléchargeables ne sont pas éligibles au retour."
+  ].join("\n")
 }
 
 const saveSite = async () => {
@@ -2027,9 +2079,11 @@ const setPageStyle = (type, value) => {
           <p class="modal-desc">Ces pages seront affichées dans le footer de votre site.</p>
         </div>
         <div class="legal-tabs">
-          <button class="legal-tab" :class="{active:legalTab==='mentions'}" @click="legalTab='mentions'">📋 Mentions légales</button>
-          <button class="legal-tab" :class="{active:legalTab==='cgv'}"      @click="legalTab='cgv'">🛒 CGV</button>
-          <button class="legal-tab" :class="{active:legalTab==='privacy'}"  @click="legalTab='privacy'">🔒 Confidentialité</button>
+          <button class="legal-tab" :class="{active:legalTab==='mentions'}"      @click="legalTab='mentions'">📋 Mentions légales</button>
+          <button class="legal-tab" :class="{active:legalTab==='cgv'}"           @click="legalTab='cgv'">📜 Conditions générales</button>
+          <button class="legal-tab" :class="{active:legalTab==='privacy'}"       @click="legalTab='privacy'">🔒 Confidentialité</button>
+          <button class="legal-tab" :class="{active:legalTab==='privacyPolicy'}" @click="legalTab='privacyPolicy'">🌐 Privacy Policy</button>
+          <button class="legal-tab" :class="{active:legalTab==='remboursement'}" @click="legalTab='remboursement'">💸 Remboursement</button>
         </div>
         <div class="legal-editor">
           <div v-if="legalTab==='mentions'">
@@ -2046,6 +2100,16 @@ const setPageStyle = (type, value) => {
             <p class="legal-hint">Politique de confidentialité — obligatoire (RGPD).</p>
             <textarea v-model="site.legal.privacy" class="legal-textarea" placeholder="Collecte des données&#10;Nous collectons uniquement les données nécessaires au traitement de vos commandes.&#10;&#10;Utilisation&#10;Vos données ne sont jamais revendues à des tiers.&#10;&#10;Droits&#10;Vous pouvez demander la suppression de vos données en contactant : contact@monsite.com&#10;&#10;Cookies&#10;Ce site utilise des cookies fonctionnels uniquement."/>
             <button class="btn-action small" @click="fillPrivacy">✨ Pré-remplir</button>
+          </div>
+          <div v-if="legalTab==='privacyPolicy'">
+            <p class="legal-hint">Privacy Policy (English version) — required for international visitors.</p>
+            <textarea v-model="site.legal.privacyPolicy" class="legal-textarea" placeholder="Privacy Policy&#10;&#10;Data Collection&#10;We only collect data necessary to process your orders.&#10;&#10;Use of Data&#10;Your data is never sold to third parties.&#10;&#10;Your Rights&#10;You may request deletion of your data by contacting: contact@mysite.com&#10;&#10;Cookies&#10;This site uses functional cookies only."/>
+            <button class="btn-action small" @click="fillPrivacyPolicy">✨ Pre-fill</button>
+          </div>
+          <div v-if="legalTab==='remboursement'">
+            <p class="legal-hint">Politique de remboursement — conditions de retour et remboursement.</p>
+            <textarea v-model="site.legal.remboursement" class="legal-textarea" placeholder="Politique de remboursement&#10;&#10;Délai de retour&#10;Vous disposez de 14 jours à compter de la réception pour retourner votre article.&#10;&#10;Conditions&#10;L'article doit être retourné dans son état d'origine, non utilisé.&#10;&#10;Procédure&#10;Contactez-nous à contact@monsite.com pour initier un retour.&#10;&#10;Remboursement&#10;Le remboursement sera effectué sous 5 à 10 jours ouvrés après réception du retour."/>
+            <button class="btn-action small" @click="fillRemboursement">✨ Pré-remplir</button>
           </div>
         </div>
         <div class="config-modal-actions">
