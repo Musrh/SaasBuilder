@@ -55,14 +55,6 @@ const props  = defineProps({
 const router = useRouter()
 const route  = useRoute()
 
-// ── SiteViewer ne doit s'afficher QUE sur ses propres routes ──
-// Si le router le monte par erreur sur /saasgenerator ou /dashboard,
-// isValidRoute = false → template entier masqué, loadSite jamais appelé.
-const VALID_ROUTE_NAMES = ["site", "slug-site"]
-const isValidRoute = computed(() =>
-  !route.name || VALID_ROUTE_NAMES.includes(String(route.name))
-)
-
 // - État global ------------------------
 const site         = ref(null)
 
@@ -228,39 +220,33 @@ const loadSite = async () => {
   error.value    = ""
   debugInfo.value = ""
 
-  // ── Garde de sécurité : SiteViewer ne doit s'activer QUE sur les routes "site" et "slug-site"
-  // Si Vue Router l'a monté sur une autre route par erreur, on arrête immédiatement
-  // sans afficher d'erreur (composant silencieux).
-  const SITEVIEWER_ROUTES = ["site", "slug-site"]
-  if (route.name && !SITEVIEWER_ROUTES.includes(route.name)) {
+  // SiteViewer ne doit s'activer QUE sur ses routes dédiées
+  const VALID_ROUTES = ["site", "slug-site"]
+  if (route.name && !VALID_ROUTES.includes(String(route.name))) {
     loading.value = false
     return
   }
 
-  // Résolution de l'identifiant (4 niveaux de fallback) :
-  // 1. props.uid   -> route /site/:uid avec props:true
-  // 2. props.slug  -> route /:slug avec props:true ou props fn
-  // 3. route.params -> si props:true absent du routeur (défensif)
-  // 4. URL hash    -> dernier recours (segment après #/)
+  // Résolution de l'identifiant :
+  // 1. props.uid   -> route /site/:uid
+  // 2. props.slug  -> route /:slug
+  // 3. route.params -> défensif
+  // 4. Hash URL    -> dernier recours (⚠️ pathname = "/" avec createWebHashHistory)
   const routeParam = route.params.uid
                   || route.params.slug
                   || (Array.isArray(route.params.pathMatch)
                       ? route.params.pathMatch[0]
                       : route.params.pathMatch)
                   || ""
-  // ⚠️ Avec createWebHashHistory, pathname = "/" donc on lit le hash à la place
-  const hashPath = window.location.hash.replace(/^#\//, "").split("/")[0] || ""
-  const uid = (props.uid || props.slug || routeParam || hashPath).trim()
+  // Lire le hash au lieu de pathname (createWebHashHistory)
+  const hashSlug = window.location.hash.replace(/^#\//, "").split("/")[0] || ""
+  const uid = (props.uid || props.slug || routeParam || hashSlug).trim()
 
-  // Routes internes de l'application — ne jamais tenter de les charger comme sites publics
-  const RESERVED_SLUGS = [
-    "saasgenerator", "dashboard", "auth", "slug-setup", "admin",
-    "orders", "panier", "payment-success", "payment-cancel",
-    "success", "cancel", "store-auth", "site", "not-found"
-  ]
-
-  if (!uid || RESERVED_SLUGS.includes(uid)) {
-    error.value = "Aucun identifiant de site fourni."
+  // Bloquer les routes réservées de l'application
+  const RESERVED = ["saasgenerator","dashboard","auth","slug-setup","admin",
+                    "orders","panier","payment-success","payment-cancel",
+                    "success","cancel","store-auth","site","not-found"]
+  if (!uid || RESERVED.includes(uid)) {
     loading.value = false
     return
   }
@@ -997,7 +983,7 @@ const saveOrder = async (provider, transactionId) => {
 </script>
 
 <template>
-<div v-if="isValidRoute" class="sv-root" :dir="svIsRtl ? 'rtl' : 'ltr'">
+<div class="sv-root" :dir="svIsRtl ? 'rtl' : 'ltr'">
 
   <!-- LOADING -->
   <div v-if="loading" class="sv-loading">
