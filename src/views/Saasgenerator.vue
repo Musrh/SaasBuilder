@@ -53,6 +53,12 @@ const trendLoading     = ref(false)
 const trendError       = ref("")
 const trendSelected    = ref(new Set())
 const trendTargetSection = ref(null)
+const trendMode        = ref("search")   // "search" | "url"
+const scrapeUrl        = ref("")
+const scrapeLoading    = ref(false)
+const scrapeError      = ref("")
+const scrapeResults    = ref([])
+const scrapeSelected   = ref(new Set())
 const legalTab         = ref("mentions") // mentions | cgv | privacy
 
 // ===== I18N =====
@@ -486,9 +492,10 @@ const publishSite = async () => {
     // 1. Sauvegarder siteData + slug dans le document de l'utilisateur
     const userRef = doc(db, "users", uid)
     await setDoc(userRef, {
-      siteData: site.value,
-      siteName: siteName.value,
-      siteLogo: siteLogo.value,
+      siteData:  site.value,
+      siteName:  siteName.value,
+      siteLogo:  siteLogo.value,
+      siteTheme: (currentTheme?.value || null),
       publishedSlug: slug,
       publishedAt: new Date().toISOString(),
       customDomain: domain || null,
@@ -862,13 +869,137 @@ const importTrendProducts = () => {
   setTimeout(() => { showNotif.value = false }, 3000)
 }
 
+
+// ══ SCRAPER PRODUIT DEPUIS URL ════════════════════════════════════
+const scrapeProductFromUrl = async () => {
+  const url = scrapeUrl.value.trim()
+  if (!url) return
+
+  const apiKey = liveAnthropicConfig.value.apiKey?.trim()
+  if (!apiKey || apiKey.startsWith("sk-ant-VOTRE")) {
+    scrapeError.value = "Clé API Anthropic manquante. Cliquez sur ⚙ Configurer anthropic.js."
+    return
+  }
+
+  scrapeLoading.value = true
+  scrapeError.value   = ""
+  scrapeResults.value = []
+  scrapeSelected.value = new Set()
+
+  const prompt = `Visite cette page web et extrais TOUS les produits présents : ${url}
+
+Pour chaque produit trouvé sur cette page, retourne un tableau JSON valide (sans texte autour, sans markdown) :
+[
+  {
+    "name": "Nom exact du produit",
+    "description": "Description courte (1-2 phrases)",
+    "price": "29.99",
+    "currency": "€",
+    "badge": "",
+    "image": "URL de l'image principale si disponible, sinon chaine vide"
+  }
+]
+
+Règles :
+- Extrais TOUS les produits visibles sur la page (jusqu'à 12 maximum)
+- Si la page ne contient qu'un seul produit, retourne un tableau avec un seul élément
+- Prix sans symbole de devise dans le champ "price", devise dans "currency"
+- Si le prix n'est pas visible, mets "0.00"
+- Badge peut être : Nouveau, Promo, Best-seller, ou vide
+- Image : URL absolue de l'image si possible, sinon ""
+- Retourne UNIQUEMENT le tableau JSON, rien d'autre`
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: prompt }]
+      })
+    })
+
+    const data = await res.json()
+    if (data.error) throw new Error(data.error.message)
+
+    const textBlock = data.content?.find(b => b.type === "text")
+    if (!textBlock) throw new Error("Aucune réponse reçue — le site est peut-être inaccessible.")
+
+    // Extraire le JSON du texte
+    const raw = textBlock.text
+    const match = raw.match(/\[[\s\S]*\]/)
+    if (!match) throw new Error("Aucun produit trouvé sur cette page.")
+
+    const products = JSON.parse(match[0])
+    if (!products.length) throw new Error("Aucun produit détecté sur cette page.")
+
+    scrapeResults.value = products.map((p, i) => ({
+      id:          Date.now() + i,
+      name:        p.name        || "Produit",
+      description: p.description || "",
+      price:       String(p.price || "0.00"),
+      currency:    p.currency    || "€",
+      badge:       p.badge       || "",
+      image:       p.image       || "",
+    }))
+
+    // Tout sélectionner par défaut
+    scrapeSelected.value = new Set(scrapeResults.value.map(p => p.id))
+
+  } catch(e) {
+    scrapeError.value = "Erreur : " + e.message
+  } finally {
+    scrapeLoading.value = false
+  }
+}
+
+const toggleScrapeSelect = (id) => {
+  const s = new Set(scrapeSelected.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  scrapeSelected.value = s
+}
+
+const importScrapeProducts = () => {
+  let sec = trendTargetSection.value
+  if (!sec) {
+    addSection("products")
+    sec = currentPage.value.sections[currentPage.value.sections.length - 1]
+  }
+  const toImport = scrapeResults.value.filter(p => scrapeSelected.value.has(p.id))
+  toImport.forEach(p => {
+    sec.items.push({
+      id:          Date.now() + Math.random(),
+      name:        p.name,
+      description: p.description,
+      price:       p.price,
+      currency:    p.currency,
+      badge:       p.badge,
+      image:       p.image,
+    })
+  })
+  showTrendModal.value  = false
+  scrapeSelected.value  = new Set()
+  trendTargetSection.value = null
+  showNotif.value = true
+  notifMsg.value  = toImport.length + " produit(s) importé(s) depuis le site !"
+  notifType.value = "success"
+  setTimeout(() => { showNotif.value = false }, 3000)
+}
+
 const saveSite = async () => {
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
   if (isSaving.value) return
   isSaving.value = true
   try {
     const docRef = doc(db, "users", currentUser.value.uid)
-    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value }, { merge: true })
+    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value, siteTheme: (currentTheme?.value || null) }, { merge: true })
     localStorage.setItem("siteDataPro", JSON.stringify(site.value))
     isSaved.value = true
     notify(t.value.saved)
@@ -2291,28 +2422,8 @@ const setPageStyle = (type, value) => {
         <!-- Header -->
         <div class="modal-header">
           <span class="modal-icon">🔥</span>
-          <h2>Produits Tendance</h2>
-          <p class="modal-desc">Recherchez les produits populaires sur internet et importez-les en un clic dans votre catalogue.</p>
-        </div>
-
-        <!-- Barre de recherche -->
-        <div class="trend-search-bar">
-          <input
-            v-model="trendQuery"
-            class="trend-input"
-            placeholder="Ex: bijoux femme, sneakers, accessoires maison, gadgets..."
-            @keydown.enter="searchTrendProducts"
-          />
-          <select v-model="trendLang" class="trend-lang-select">
-            <option value="fr">🇫🇷 FR</option>
-            <option value="en">🇬🇧 EN</option>
-            <option value="ar">🇸🇦 AR</option>
-            <option value="es">🇪🇸 ES</option>
-          </select>
-          <button class="btn-action primary trend-search-btn" @click="searchTrendProducts" :disabled="trendLoading || !trendQuery.trim()">
-            <span v-if="trendLoading" class="spinner"/>
-            <span>{{ trendLoading ? "Recherche..." : "🔍 Rechercher" }}</span>
-          </button>
+          <h2>Importer des Produits</h2>
+          <p class="modal-desc">Trouvez des produits tendance ou importez directement depuis un site.</p>
         </div>
 
         <!-- Config manquante -->
@@ -2322,71 +2433,139 @@ const setPageStyle = (type, value) => {
           <button class="btn-action small" @click="openConfigEditor('anthropic'); showTrendModal=false">⚙ Configurer anthropic.js</button>
         </div>
 
-        <!-- Erreur -->
-        <div v-if="trendError" class="trend-error">⚠️ {{ trendError }}</div>
-
-        <!-- Loading skeleton -->
-        <div v-if="trendLoading" class="trend-loading">
-          <div v-for="i in 4" :key="i" class="trend-skeleton"/>
-          <p class="trend-loading-msg">🌐 Recherche des tendances sur internet...</p>
+        <!-- Onglets -->
+        <div class="trend-mode-tabs">
+          <button class="trend-mode-tab" :class="{active: trendMode==='search'}" @click="trendMode='search'">🔥 Produits Tendance</button>
+          <button class="trend-mode-tab" :class="{active: trendMode==='url'}"    @click="trendMode='url'">🔗 Importer depuis URL</button>
         </div>
 
-        <!-- Résultats -->
-        <div v-if="!trendLoading && trendResults.length" class="trend-results-area">
-          <div class="trend-results-header">
-            <span class="trend-count">{{ trendResults.length }} produits trouvés</span>
-            <button class="trend-select-all" @click="selectAllTrend">
-              {{ trendSelected.size === trendResults.length ? '✓ Tout désélectionner' : '☐ Tout sélectionner' }}
+        <!-- ══ ONGLET TENDANCE ══ -->
+        <template v-if="trendMode==='search'">
+          <div class="trend-search-bar">
+            <input
+              v-model="trendQuery"
+              class="trend-input"
+              placeholder="Ex: bijoux femme, sneakers, accessoires maison, gadgets..."
+              @keydown.enter="searchTrendProducts"
+            />
+            <select v-model="trendLang" class="trend-lang-select">
+              <option value="fr">🇫🇷 FR</option>
+              <option value="en">🇬🇧 EN</option>
+              <option value="ar">🇸🇦 AR</option>
+              <option value="es">🇪🇸 ES</option>
+            </select>
+            <button class="btn-action primary trend-search-btn" @click="searchTrendProducts" :disabled="trendLoading || !trendQuery.trim()">
+              <span v-if="trendLoading" class="spinner"/>
+              <span>{{ trendLoading ? "Recherche..." : "🔍 Rechercher" }}</span>
             </button>
           </div>
 
-          <div class="trend-grid">
-            <div
-              v-for="p in trendResults"
-              :key="p.id"
-              class="trend-card"
-              :class="{ selected: trendSelected.has(p.id) }"
-              @click="toggleTrendSelect(p.id)"
-            >
-              <div class="trend-card-check">
-                <span v-if="trendSelected.has(p.id)">✓</span>
+          <div v-if="trendError" class="trend-error">⚠️ {{ trendError }}</div>
+
+          <div v-if="trendLoading" class="trend-loading">
+            <div v-for="i in 4" :key="i" class="trend-skeleton"/>
+            <p class="trend-loading-msg">🌐 Recherche des tendances sur internet...</p>
+          </div>
+
+          <div v-if="!trendLoading && trendResults.length" class="trend-results-area">
+            <div class="trend-results-header">
+              <span class="trend-count">{{ trendResults.length }} produits trouvés</span>
+              <button class="trend-select-all" @click="selectAllTrend">
+                {{ trendSelected.size === trendResults.length ? '✓ Tout désélectionner' : '☐ Tout sélectionner' }}
+              </button>
+            </div>
+            <div class="trend-grid">
+              <div v-for="p in trendResults" :key="p.id" class="trend-card" :class="{selected: trendSelected.has(p.id)}" @click="toggleTrendSelect(p.id)">
+                <div class="trend-card-check"><span v-if="trendSelected.has(p.id)">✓</span></div>
+                <div class="trend-card-badge" v-if="p.badge">{{ p.badge }}</div>
+                <div class="trend-card-img">🛍️</div>
+                <div class="trend-card-body">
+                  <div class="trend-card-name">{{ p.name }}</div>
+                  <div class="trend-card-desc">{{ p.description }}</div>
+                  <div class="trend-card-why" v-if="p.why">💡 {{ p.why }}</div>
+                  <div class="trend-card-price">{{ p.price }} {{ p.currency }}</div>
+                </div>
               </div>
-              <div class="trend-card-badge" v-if="p.badge">{{ p.badge }}</div>
-              <div class="trend-card-img">🛍️</div>
-              <div class="trend-card-body">
-                <div class="trend-card-name">{{ p.name }}</div>
-                <div class="trend-card-desc">{{ p.description }}</div>
-                <div class="trend-card-why" v-if="p.why">💡 {{ p.why }}</div>
-                <div class="trend-card-price">{{ p.price }} {{ p.currency }}</div>
-              </div>
+            </div>
+            <div class="trend-target">
+              <label class="trend-target-label">Importer dans :</label>
+              <select class="trend-target-select" v-model="trendTargetSection">
+                <option :value="null">Nouvelle section catalogue</option>
+                <option v-for="(s,i) in currentPage.sections.filter(s=>s.type==='products')" :key="s.id" :value="s">Section catalogue {{ i+1 }}</option>
+              </select>
             </div>
           </div>
 
-          <!-- Section cible -->
-          <div class="trend-target">
-            <label class="trend-target-label">Importer dans :</label>
-            <select class="trend-target-select" v-model="trendTargetSection">
-              <option :value="null">Nouvelle section catalogue</option>
-              <option
-                v-for="(s, i) in currentPage.sections.filter(s => s.type === 'products')"
-                :key="s.id"
-                :value="s"
-              >Section catalogue {{ i + 1 }}</option>
-            </select>
+          <div class="config-modal-actions" v-if="trendResults.length">
+            <button class="btn-action" @click="showTrendModal=false">Annuler</button>
+            <button class="btn-action primary" @click="importTrendProducts" :disabled="!trendSelected.size">
+              ⬇ Importer {{ trendSelected.size > 0 ? trendSelected.size + ' produit(s)' : '' }}
+            </button>
           </div>
-        </div>
+        </template>
 
-        <!-- Actions -->
-        <div class="config-modal-actions" v-if="trendResults.length">
-          <button class="btn-action" @click="showTrendModal=false">Annuler</button>
-          <button
-            class="btn-action primary"
-            @click="importTrendProducts"
-            :disabled="!trendSelected.size"
-          >
-            ⬇ Importer {{ trendSelected.size > 0 ? trendSelected.size + ' produit(s)' : '' }}
-          </button>
-        </div>
+        <!-- ══ ONGLET URL ══ -->
+        <template v-if="trendMode==='url'">
+          <div class="scrape-search-bar">
+            <div class="scrape-url-wrap">
+              <span class="scrape-url-icon">🔗</span>
+              <input
+                v-model="scrapeUrl"
+                class="trend-input scrape-url-input"
+                placeholder="https://www.exemple.com/produit ou https://www.boutique.com/catalogue"
+                @keydown.enter="scrapeProductFromUrl"
+              />
+            </div>
+            <button class="btn-action primary trend-search-btn" @click="scrapeProductFromUrl" :disabled="scrapeLoading || !scrapeUrl.trim()">
+              <span v-if="scrapeLoading" class="spinner"/>
+              <span>{{ scrapeLoading ? "Analyse..." : "📥 Analyser" }}</span>
+            </button>
+          </div>
+          <p class="scrape-hint">Collez l'URL d'une page produit ou d'un catalogue. Claude va lire la page et extraire les produits automatiquement.</p>
+
+          <div v-if="scrapeError" class="trend-error">⚠️ {{ scrapeError }}</div>
+
+          <div v-if="scrapeLoading" class="trend-loading">
+            <div v-for="i in 3" :key="i" class="trend-skeleton"/>
+            <p class="trend-loading-msg">🤖 Analyse de la page en cours...</p>
+          </div>
+
+          <div v-if="!scrapeLoading && scrapeResults.length" class="trend-results-area">
+            <div class="trend-results-header">
+              <span class="trend-count">{{ scrapeResults.length }} produit(s) détecté(s)</span>
+              <button class="trend-select-all" @click="scrapeSelected = new Set(scrapeResults.map(p=>p.id))">☐ Tout sélectionner</button>
+            </div>
+            <div class="trend-grid">
+              <div v-for="p in scrapeResults" :key="p.id" class="trend-card" :class="{selected: scrapeSelected.has(p.id)}" @click="toggleScrapeSelect(p.id)">
+                <div class="trend-card-check"><span v-if="scrapeSelected.has(p.id)">✓</span></div>
+                <div class="trend-card-badge" v-if="p.badge">{{ p.badge }}</div>
+                <div class="trend-card-img">
+                  <img v-if="p.image" :src="p.image" class="scrape-thumb" @error="p.image=''"/>
+                  <span v-else>🛍️</span>
+                </div>
+                <div class="trend-card-body">
+                  <div class="trend-card-name">{{ p.name }}</div>
+                  <div class="trend-card-desc">{{ p.description }}</div>
+                  <div class="trend-card-price">{{ p.price }} {{ p.currency }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="trend-target">
+              <label class="trend-target-label">Importer dans :</label>
+              <select class="trend-target-select" v-model="trendTargetSection">
+                <option :value="null">Nouvelle section catalogue</option>
+                <option v-for="(s,i) in currentPage.sections.filter(s=>s.type==='products')" :key="s.id" :value="s">Section catalogue {{ i+1 }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="config-modal-actions" v-if="scrapeResults.length">
+            <button class="btn-action" @click="showTrendModal=false">Annuler</button>
+            <button class="btn-action primary" @click="importScrapeProducts" :disabled="!scrapeSelected.size">
+              ⬇ Importer {{ scrapeSelected.size > 0 ? scrapeSelected.size + ' produit(s)' : '' }}
+            </button>
+          </div>
+        </template>
 
       </div>
     </div>
@@ -3376,4 +3555,68 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 }
 .trend-config-warn span:first-child { font-size: 18px; }
 .trend-config-warn .btn-action { margin-left: auto; }
+
+/* ══ ONGLETS MODE TREND/URL ══════════════════════════════════════ */
+.trend-mode-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 12px;
+}
+.trend-mode-tab {
+  flex: 1;
+  background: #1a1a2e;
+  border: 2px solid #1e293b;
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .18s;
+}
+.trend-mode-tab:hover { border-color: #334155; color: #e2e8f0; }
+.trend-mode-tab.active { border-color: #6c63ff; background: #1e1b4b; color: #fff; }
+
+/* ══ SCRAPER URL ══════════════════════════════════════════════════ */
+.scrape-search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.scrape-url-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #1a1a2e;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0 12px;
+  min-width: 200px;
+}
+.scrape-url-icon { font-size: 16px; margin-right: 8px; flex-shrink: 0; }
+.scrape-url-input {
+  background: transparent !important;
+  border: none !important;
+  padding: 10px 0 !important;
+  flex: 1;
+}
+.scrape-url-input:focus { outline: none !important; }
+.scrape-hint {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+  margin-bottom: 14px;
+}
+.scrape-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+  margin: 0 auto;
+}
 </style>
