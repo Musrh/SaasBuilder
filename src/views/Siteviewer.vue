@@ -85,7 +85,7 @@ const siteMeta      = ref({})          // { name, logo }
 const showLegalPage  = ref(false)
 const legalPageType  = ref("")         // mentions | cgv | privacy
 
-const legalTitle = { mentions: "Mentions légales", cgv: "Conditions Générales de Vente", privacy: "Politique de confidentialité" }
+const legalTitle = { mentions: "Mentions légales", cgv: "Conditions générales", privacy: "Confidentialité", privacyPolicy: "Privacy Policy", remboursement: "Remboursement" }
 const openLegal  = (type) => { legalPageType.value = type; showLegalPage.value = true }
 const currentPageIndex = ref(0)
 
@@ -1204,9 +1204,11 @@ const saveOrder = async (provider, transactionId) => {
     <footer class="sv-footer" v-if="!loading && !error">
       <p class="sv-footer-copy">© {{ new Date().getFullYear() }} {{ siteMeta.name || 'Mon Store' }}</p>
       <nav class="sv-footer-links">
-        <button v-if="site.legal?.mentions" class="sv-footer-link" @click="openLegal('mentions')">Mentions légales</button>
-        <button v-if="site.legal?.cgv"      class="sv-footer-link" @click="openLegal('cgv')">CGV</button>
-        <button v-if="site.legal?.privacy"  class="sv-footer-link" @click="openLegal('privacy')">Confidentialité</button>
+        <button v-if="site.legal?.privacyPolicy"  class="sv-footer-link" @click="openLegal('privacyPolicy')">Privacy Policy</button>
+        <button v-if="site.legal?.remboursement"  class="sv-footer-link" @click="openLegal('remboursement')">Remboursement</button>
+        <button v-if="site.legal?.privacy"        class="sv-footer-link" @click="openLegal('privacy')">Confidentialité</button>
+        <button v-if="site.legal?.mentions"       class="sv-footer-link" @click="openLegal('mentions')">Mentions légales</button>
+        <button v-if="site.legal?.cgv"            class="sv-footer-link" @click="openLegal('cgv')">Conditions générales</button>
       </nav>
     </footer>
 
