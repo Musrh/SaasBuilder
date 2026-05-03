@@ -13,6 +13,13 @@ import Saasgenerator  from "./views/Saasgenerator.vue"
 
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
+// Routes réservées à l'application — ne doivent jamais être traitées comme des slugs publics
+const RESERVED_SLUGS = [
+  "saasgenerator", "dashboard", "auth", "slug-setup", "admin",
+  "orders", "panier", "payment-success", "payment-cancel",
+  "success", "cancel", "store-auth", "site", "not-found"
+]
+
 // Attente auth Firebase
 const waitForAuth = () => new Promise(resolve => {
   const auth = getAuth()
@@ -63,13 +70,20 @@ const routes = [
   { path: "/panier", name: "panier", component: () => import("./views/Panier.vue") },
 
   // ======================
-  // SLUG PUBLIC (IMPORTANT)
+  // SLUG PUBLIC
+  // ⚠️ Guard beforeEnter : rejette tout slug qui correspond à une route réservée
   // ======================
   {
     path: "/:slug([a-z0-9][a-z0-9-]*)",
     name: "slug-site",
     component: SiteViewer,
     props: route => ({ slug: route.params.slug }),
+    beforeEnter: (to) => {
+      if (RESERVED_SLUGS.includes(to.params.slug)) {
+        // Renvoie vers 404 pour éviter que SiteViewer tente de charger un slug réservé
+        return { name: "not-found" }
+      }
+    },
   },
 
   // ======================
