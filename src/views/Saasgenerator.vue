@@ -45,6 +45,14 @@ const configEditorTarget = ref("stripe")
 const configEditorContent = ref("")
 const showExportModal  = ref(false)
 const showLegalModal   = ref(false)
+const showTrendModal   = ref(false)
+const trendQuery       = ref("")
+const trendLang        = ref("fr")
+const trendResults     = ref([])
+const trendLoading     = ref(false)
+const trendError       = ref("")
+const trendSelected    = ref(new Set())
+const trendTargetSection = ref(null)
 const legalTab         = ref("mentions") // mentions | cgv | privacy
 
 // ===== I18N =====
@@ -723,6 +731,137 @@ const fillRemboursement = () => {
   ].join("\n")
 }
 
+
+// ══ RECHERCHE PRODUITS TENDANCE ══════════════════════════════════
+const searchTrendProducts = async () => {
+  if (!trendQuery.value.trim()) return
+
+  // Vérifier que la clé API Anthropic est configurée
+  const apiKey = liveAnthropicConfig.value.apiKey?.trim()
+  if (!apiKey || apiKey.startsWith("sk-ant-VOTRE")) {
+    trendError.value = "Clé API Anthropic manquante. Cliquez sur ⚙ anthropic.js pour la configurer."
+    return
+  }
+
+  trendLoading.value = true
+  trendError.value   = ""
+  trendResults.value = []
+  trendSelected.value = new Set()
+
+  const langInstructions = {
+    fr: "Réponds en français. Les noms et descriptions des produits doivent être en français.",
+    en: "Reply in English. Product names and descriptions must be in English.",
+    ar: "أجب بالعربية. يجب أن تكون أسماء المنتجات وأوصافها بالعربية.",
+    es: "Responde en español. Los nombres y descripciones deben estar en español."
+  }
+
+  const prompt = `Tu es un expert en e-commerce et tendances produits.
+Recherche sur internet les produits les plus tendance et populaires dans la niche : "${trendQuery.value}".
+${langInstructions[trendLang.value] || langInstructions.fr}
+
+Retourne UNIQUEMENT un tableau JSON valide (sans texte autour, sans markdown) avec 8 produits au format :
+[
+  {
+    "name": "Nom du produit",
+    "description": "Description courte et accrocheuse (1-2 phrases)",
+    "price": "29.99",
+    "currency": "€",
+    "badge": "Tendance",
+    "why": "Pourquoi ce produit est tendance en 1 phrase"
+  }
+]
+
+Les prix doivent être réalistes pour la niche. Les badges peuvent être : Tendance, Nouveau, Best-seller, Promo, Populaire, Viral.`
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: prompt }]
+      })
+    })
+
+    const data = await res.json()
+    if (data.error) throw new Error(data.error.message)
+
+    // Extraire le texte de la réponse (ignorer les blocs tool_use/tool_result)
+    const textBlock = data.content?.find(b => b.type === "text")
+    if (!textBlock) throw new Error("Pas de réponse texte reçue")
+
+    // Parser le JSON
+    const raw = textBlock.text.replace(/^[\s\S]*?(\[)/m, "[").replace(/\][^]*$/, "]")
+    const products = JSON.parse(raw)
+
+    trendResults.value = products.map((p, i) => ({
+      id: Date.now() + i,
+      name:        p.name        || "Produit",
+      description: p.description || "",
+      price:       p.price       || "0.00",
+      currency:    p.currency    || "€",
+      badge:       p.badge       || "",
+      why:         p.why         || "",
+      image:       ""
+    }))
+  } catch(e) {
+    trendError.value = "Erreur : " + e.message
+  } finally {
+    trendLoading.value = false
+  }
+}
+
+const toggleTrendSelect = (id) => {
+  const s = new Set(trendSelected.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  trendSelected.value = s
+}
+
+const selectAllTrend = () => {
+  trendSelected.value = new Set(trendResults.value.map(p => p.id))
+}
+
+const importTrendProducts = () => {
+  if (!trendTargetSection.value) {
+    // Chercher ou créer une section products sur la page courante
+    let sec = currentPage.value.sections.find(s => s.type === "products")
+    if (!sec) {
+      addSection("products")
+      sec = currentPage.value.sections[currentPage.value.sections.length - 1]
+    }
+    trendTargetSection.value = sec
+  }
+
+  const toImport = trendResults.value.filter(p => trendSelected.value.has(p.id))
+  toImport.forEach(p => {
+    trendTargetSection.value.items.push({
+      id:          Date.now() + Math.random(),
+      name:        p.name,
+      description: p.description,
+      price:       p.price,
+      currency:    p.currency,
+      badge:       p.badge,
+      image:       ""
+    })
+  })
+
+  showTrendModal.value = false
+  trendSelected.value  = new Set()
+  trendTargetSection.value = null
+  // Notification
+  showNotif.value  = true
+  notifMsg.value   = toImport.length + " produit(s) importé(s) dans le catalogue !"
+  notifType.value  = "success"
+  setTimeout(() => { showNotif.value = false }, 3000)
+}
+
 const saveSite = async () => {
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
   if (isSaving.value) return
@@ -1016,6 +1155,9 @@ const livePaypalConfig = ref({
   successUrl: "",
   brandName: "",
 })
+const liveAnthropicConfig = ref({
+  apiKey: "",
+})
 
 // Charger la config paiement du store depuis Firestore
 const loadSavedConfigs = async () => {
@@ -1031,6 +1173,9 @@ const loadSavedConfigs = async () => {
       }
       if (d.storePaymentConfig?.paypal) {
         livePaypalConfig.value = { ...livePaypalConfig.value, ...d.storePaymentConfig.paypal }
+      }
+      if (d.storePaymentConfig?.anthropic) {
+        liveAnthropicConfig.value = { ...liveAnthropicConfig.value, ...d.storePaymentConfig.anthropic }
       }
     }
   } catch(e) { console.warn("Config load error:", e) }
@@ -1086,6 +1231,19 @@ const openConfigEditor = (target) => {
   "brandName": "${cfg.brandName || siteName.value}"
 }`
   }
+  if (target === "anthropic") {
+    const cfg = liveAnthropicConfig.value
+    configEditorContent.value =
+`// ============================================================
+//  Clé API Anthropic — Produits Tendance 🔥
+//  Obtenez votre clé sur : https://console.anthropic.com/
+//  Cette clé est stockée dans Firestore et n'est jamais partagée.
+// ============================================================
+{
+  "apiKey": "${cfg.apiKey || "sk-ant-VOTRE_CLE_API_ICI"}"
+}`
+  }
+
   showConfigEditor.value = true
 }
 
@@ -1104,14 +1262,17 @@ const saveConfigFile = async () => {
 
     if (configEditorTarget.value === "stripe") {
       liveStripeConfig.value = { ...liveStripeConfig.value, ...parsed }
+    } else if (configEditorTarget.value === "anthropic") {
+      liveAnthropicConfig.value = { ...liveAnthropicConfig.value, ...parsed }
     } else {
       livePaypalConfig.value = { ...livePaypalConfig.value, ...parsed }
     }
 
     // Sauvegarder dans Firestore users/{uid}/storePaymentConfig
     const storePaymentConfig = {
-      stripe: { ...liveStripeConfig.value },
-      paypal: { ...livePaypalConfig.value },
+      stripe:    { ...liveStripeConfig.value },
+      paypal:    { ...livePaypalConfig.value },
+      anthropic: { ...liveAnthropicConfig.value },
     }
     await setDoc(
       doc(db, "users", currentUser.value.uid),
@@ -1780,8 +1941,8 @@ const setPageStyle = (type, value) => {
       <div class="modal-box config-modal">
         <button class="modal-close" @click="showConfigEditor=false">✕</button>
         <div class="modal-header">
-          <span class="modal-icon">{{ configEditorTarget==='stripe'?'💳':'🅿' }}</span>
-          <h2>Config {{ configEditorTarget==='stripe'?'Stripe':'PayPal' }} de votre store</h2>
+          <span class="modal-icon">{{ configEditorTarget==='stripe' ? '💳' : configEditorTarget==='anthropic' ? '🔑' : '🅿' }}</span>
+          <h2>Config {{ configEditorTarget==='stripe' ? 'Stripe' : configEditorTarget==='anthropic' ? 'Anthropic API' : 'PayPal' }} de votre store</h2>
           <p class="modal-desc">
             Configurez vos clés pour recevoir les paiements de <strong>vos clients</strong>.
             Sauvegardé dans Firestore — actif immédiatement.
@@ -2120,6 +2281,117 @@ const setPageStyle = (type, value) => {
     </div>
   </Transition>
 
+
+  <!-- ══ MODAL PRODUITS TENDANCE ══ -->
+  <Transition name="modal">
+    <div v-if="showTrendModal" class="modal-overlay" @click.self="showTrendModal=false">
+      <div class="modal-box trend-modal">
+        <button class="modal-close" @click="showTrendModal=false">✕</button>
+
+        <!-- Header -->
+        <div class="modal-header">
+          <span class="modal-icon">🔥</span>
+          <h2>Produits Tendance</h2>
+          <p class="modal-desc">Recherchez les produits populaires sur internet et importez-les en un clic dans votre catalogue.</p>
+        </div>
+
+        <!-- Barre de recherche -->
+        <div class="trend-search-bar">
+          <input
+            v-model="trendQuery"
+            class="trend-input"
+            placeholder="Ex: bijoux femme, sneakers, accessoires maison, gadgets..."
+            @keydown.enter="searchTrendProducts"
+          />
+          <select v-model="trendLang" class="trend-lang-select">
+            <option value="fr">🇫🇷 FR</option>
+            <option value="en">🇬🇧 EN</option>
+            <option value="ar">🇸🇦 AR</option>
+            <option value="es">🇪🇸 ES</option>
+          </select>
+          <button class="btn-action primary trend-search-btn" @click="searchTrendProducts" :disabled="trendLoading || !trendQuery.trim()">
+            <span v-if="trendLoading" class="spinner"/>
+            <span>{{ trendLoading ? "Recherche..." : "🔍 Rechercher" }}</span>
+          </button>
+        </div>
+
+        <!-- Config manquante -->
+        <div v-if="!liveAnthropicConfig.apiKey || liveAnthropicConfig.apiKey.startsWith('sk-ant-VOTRE')" class="trend-config-warn">
+          <span>🔑</span>
+          <span>Clé API Anthropic non configurée.</span>
+          <button class="btn-action small" @click="openConfigEditor('anthropic'); showTrendModal=false">⚙ Configurer anthropic.js</button>
+        </div>
+
+        <!-- Erreur -->
+        <div v-if="trendError" class="trend-error">⚠️ {{ trendError }}</div>
+
+        <!-- Loading skeleton -->
+        <div v-if="trendLoading" class="trend-loading">
+          <div v-for="i in 4" :key="i" class="trend-skeleton"/>
+          <p class="trend-loading-msg">🌐 Recherche des tendances sur internet...</p>
+        </div>
+
+        <!-- Résultats -->
+        <div v-if="!trendLoading && trendResults.length" class="trend-results-area">
+          <div class="trend-results-header">
+            <span class="trend-count">{{ trendResults.length }} produits trouvés</span>
+            <button class="trend-select-all" @click="selectAllTrend">
+              {{ trendSelected.size === trendResults.length ? '✓ Tout désélectionner' : '☐ Tout sélectionner' }}
+            </button>
+          </div>
+
+          <div class="trend-grid">
+            <div
+              v-for="p in trendResults"
+              :key="p.id"
+              class="trend-card"
+              :class="{ selected: trendSelected.has(p.id) }"
+              @click="toggleTrendSelect(p.id)"
+            >
+              <div class="trend-card-check">
+                <span v-if="trendSelected.has(p.id)">✓</span>
+              </div>
+              <div class="trend-card-badge" v-if="p.badge">{{ p.badge }}</div>
+              <div class="trend-card-img">🛍️</div>
+              <div class="trend-card-body">
+                <div class="trend-card-name">{{ p.name }}</div>
+                <div class="trend-card-desc">{{ p.description }}</div>
+                <div class="trend-card-why" v-if="p.why">💡 {{ p.why }}</div>
+                <div class="trend-card-price">{{ p.price }} {{ p.currency }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section cible -->
+          <div class="trend-target">
+            <label class="trend-target-label">Importer dans :</label>
+            <select class="trend-target-select" v-model="trendTargetSection">
+              <option :value="null">Nouvelle section catalogue</option>
+              <option
+                v-for="(s, i) in currentPage.sections.filter(s => s.type === 'products')"
+                :key="s.id"
+                :value="s"
+              >Section catalogue {{ i + 1 }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="config-modal-actions" v-if="trendResults.length">
+          <button class="btn-action" @click="showTrendModal=false">Annuler</button>
+          <button
+            class="btn-action primary"
+            @click="importTrendProducts"
+            :disabled="!trendSelected.size"
+          >
+            ⬇ Importer {{ trendSelected.size > 0 ? trendSelected.size + ' produit(s)' : '' }}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </Transition>
+
   <!-- TOPBAR -->
   <header class="topbar">
     <div class="topbar-brand">
@@ -2149,6 +2421,7 @@ const setPageStyle = (type, value) => {
       <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
       <button class="btn-action icon-btn" @click="showLegalModal=true" title="Pages légales">⚖</button>
+      <button class="btn-action icon-btn trend-btn" @click="showTrendModal=true" title="Produits tendance">🔥</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -2931,4 +3204,176 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
   margin-bottom: 8px;
 }
 .legal-textarea:focus { outline: none; border-color: #6c63ff; }
+
+/* ══ MODAL PRODUITS TENDANCE ══════════════════════════════════════ */
+.trend-btn { background: linear-gradient(135deg, #ff6b35, #f7c59f) !important; color: #fff !important; }
+.trend-btn:hover { opacity: .88; }
+
+.trend-modal { max-width: 760px; width: 96vw; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+
+.trend-search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.trend-input {
+  flex: 1;
+  min-width: 200px;
+  background: #1a1a2e;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+}
+.trend-input:focus { outline: none; border-color: #ff6b35; }
+.trend-lang-select {
+  background: #1a1a2e;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #e2e8f0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.trend-search-btn { white-space: nowrap; }
+
+.trend-error {
+  background: #2d1b1b;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fca5a5;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* Loading */
+.trend-loading { padding: 12px 0; }
+.trend-skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 10px;
+  height: 80px;
+  margin-bottom: 10px;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.trend-loading-msg { text-align: center; color: #9ca3af; font-size: 13px; margin-top: 8px; }
+
+/* Résultats */
+.trend-results-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.trend-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.trend-count { font-size: 13px; color: #9ca3af; }
+.trend-select-all {
+  background: transparent;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+}
+.trend-select-all:hover { border-color: #6c63ff; color: #6c63ff; }
+
+.trend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.trend-card {
+  background: #1a1a2e;
+  border: 2px solid #1e293b;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  position: relative;
+  transition: all .18s;
+}
+.trend-card:hover { border-color: #ff6b35; transform: translateY(-2px); }
+.trend-card.selected { border-color: #6c63ff; background: #1e1b4b; }
+
+.trend-card-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6c63ff;
+  background: #0f172a;
+  transition: all .15s;
+}
+.trend-card.selected .trend-card-check { background: #6c63ff; border-color: #6c63ff; color: #fff; }
+
+.trend-card-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #ff6b35, #f7c59f);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.trend-card-img { font-size: 32px; text-align: center; margin: 8px 0; }
+.trend-card-name { font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
+.trend-card-desc { font-size: 12px; color: #94a3b8; line-height: 1.4; margin-bottom: 6px; }
+.trend-card-why { font-size: 11px; color: #6b7280; font-style: italic; margin-bottom: 6px; line-height: 1.4; }
+.trend-card-price { font-size: 15px; font-weight: 700; color: #10b981; }
+
+/* Section cible */
+.trend-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: #1a1a2e;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.trend-target-label { font-size: 13px; color: #94a3b8; white-space: nowrap; }
+.trend-target-select {
+  flex: 1;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: #e2e8f0;
+  font-size: 13px;
+  min-width: 160px;
+}
+
+.trend-config-warn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1c1a0e;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fbbf24;
+  font-size: 13px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.trend-config-warn span:first-child { font-size: 18px; }
+.trend-config-warn .btn-action { margin-left: auto; }
 </style>
