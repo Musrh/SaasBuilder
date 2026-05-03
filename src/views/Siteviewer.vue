@@ -81,7 +81,12 @@ const svT = computed(() => {
 const loading      = ref(true)
 const error        = ref("")
 const resolvedUid  = ref("")
-const siteMeta     = ref({})          // { name, logo }
+const siteMeta      = ref({})          // { name, logo }
+const showLegalPage  = ref(false)
+const legalPageType  = ref("")         // mentions | cgv | privacy
+
+const legalTitle = { mentions: "Mentions légales", cgv: "Conditions Générales de Vente", privacy: "Politique de confidentialité" }
+const openLegal  = (type) => { legalPageType.value = type; showLegalPage.value = true }
 const currentPageIndex = ref(0)
 
 // - Config paiement du store -----------------
@@ -1195,6 +1200,31 @@ const saveOrder = async (provider, transactionId) => {
       </template>
     </main>
 
+    <!-- ── FOOTER ── -->
+    <footer class="sv-footer" v-if="!loading && !error">
+      <p class="sv-footer-copy">© {{ new Date().getFullYear() }} {{ siteMeta.name || 'Mon Store' }}</p>
+      <nav class="sv-footer-links">
+        <button v-if="site.legal?.mentions" class="sv-footer-link" @click="openLegal('mentions')">Mentions légales</button>
+        <button v-if="site.legal?.cgv"      class="sv-footer-link" @click="openLegal('cgv')">CGV</button>
+        <button v-if="site.legal?.privacy"  class="sv-footer-link" @click="openLegal('privacy')">Confidentialité</button>
+      </nav>
+    </footer>
+
+    <!-- ── MODAL PAGE LÉGALE ── -->
+    <Transition name="sv-modal">
+      <div v-if="showLegalPage" class="sv-modal-overlay sv-legal-overlay" @click.self="showLegalPage=false">
+        <div class="sv-modal-box sv-legal-box">
+          <div class="sv-legal-header">
+            <h2 class="sv-legal-title">{{ legalTitle[legalPageType] }}</h2>
+            <button class="sv-modal-close" @click="showLegalPage=false">✕</button>
+          </div>
+          <div class="sv-legal-content">
+            <pre class="sv-legal-text">{{ site.legal?.[legalPageType] }}</pre>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- ── MODAL PANIER 2 ÉTAPES (panier → livraison → paiement) -->
     <Transition name="sv-modal">
       <div v-if="showCart" class="sv-modal-overlay sv-cart-overlay"
@@ -1800,4 +1830,79 @@ const saveOrder = async (provider, transactionId) => {
 .sv-pay-btn:hover   { background: var(--theme-accent-hover) !important; }
 .sv-form-btn        { background: var(--theme-accent) !important; border-radius: var(--theme-btn-radius) !important; }
 .sv-tab.active      { background: var(--theme-accent) !important; color: #fff !important; }
+
+/* ══ FOOTER ══════════════════════════════════════════════════════ */
+.sv-footer {
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  padding: 20px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.sv-footer-copy {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+}
+.sv-footer-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.sv-footer-link {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+  padding: 0;
+  transition: color .15s;
+}
+.sv-footer-link:hover { color: #374151; }
+
+/* ══ MODAL LÉGAL ══════════════════════════════════════════════════ */
+.sv-legal-overlay { z-index: 2000; }
+.sv-legal-box {
+  max-width: 640px;
+  width: 94vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.sv-legal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+.sv-legal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0;
+}
+.sv-legal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.sv-legal-text {
+  white-space: pre-wrap;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #374151;
+  margin: 0;
+}
 </style>
