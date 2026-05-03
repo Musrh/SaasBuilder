@@ -13,13 +13,6 @@ import Saasgenerator  from "./views/Saasgenerator.vue"
 
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
-// Routes réservées à l'application — ne doivent jamais être traitées comme des slugs publics
-const RESERVED_SLUGS = [
-  "saasgenerator", "dashboard", "auth", "slug-setup", "admin",
-  "orders", "panier", "payment-success", "payment-cancel",
-  "success", "cancel", "store-auth", "site", "not-found"
-]
-
 // Attente auth Firebase
 const waitForAuth = () => new Promise(resolve => {
   const auth = getAuth()
@@ -42,7 +35,7 @@ const routes = [
   { path: "/dashboard",  name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
 
   // ⚠️ Builder SaaS (DOIT rester accessible directement)
-  { path: "/saasgenerator", name: "saasgenerator", component: Saasgenerator, meta: { requiresAuth: true } },
+  { path: "/saasgenerator", name: "saasgenerator", component: Saasgenerator },
 
   // ======================
   // SITE PAR UID
@@ -70,20 +63,13 @@ const routes = [
   { path: "/panier", name: "panier", component: () => import("./views/Panier.vue") },
 
   // ======================
-  // SLUG PUBLIC
-  // ⚠️ Guard beforeEnter : rejette tout slug qui correspond à une route réservée
+  // SLUG PUBLIC (IMPORTANT)
   // ======================
   {
     path: "/:slug([a-z0-9][a-z0-9-]*)",
     name: "slug-site",
     component: SiteViewer,
     props: route => ({ slug: route.params.slug }),
-    beforeEnter: (to) => {
-      if (RESERVED_SLUGS.includes(to.params.slug)) {
-        // Renvoie vers 404 pour éviter que SiteViewer tente de charger un slug réservé
-        return { name: "not-found" }
-      }
-    },
   },
 
   // ======================
@@ -102,6 +88,10 @@ const router = createRouter({
 // GLOBAL GUARD
 // ======================
 router.beforeEach(async (to, from, next) => {
+
+  // ===== SAASGENERATOR — court-circuite waitForAuth pour éviter la race condition =====
+  // Le composant gère lui-même l'auth via onAuthStateChanged
+  if (to.name === "saasgenerator") return next()
 
   // ===== ADMIN =====
   if (to.meta.requiresAdmin) {
@@ -144,13 +134,7 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
-  // ===== SLUG PUBLIC — sécurité anti-collision =====
-  // Si une route nommée slug-site reçoit un slug réservé (ne devrait pas arriver
-  // grâce au beforeEnter, mais garde défensive supplémentaire)
-  if (to.name === "slug-site" && RESERVED_SLUGS.includes(to.params.slug)) {
-    return next({ name: "not-found" })
-  }
-
+  // ===== PUBLIC =====
   return next()
 })
 
