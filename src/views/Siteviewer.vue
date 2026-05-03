@@ -1134,7 +1134,7 @@ const saveOrder = async (provider, transactionId) => {
                 <div class="sv-product-desc">{{ p.description }}</div>
                 <div class="sv-product-footer">
                   <span class="sv-product-price">{{ p.price }}{{ p.currency }}</span>
-                  <button class="sv-product-btn" @click="addToCart(p)">{{ svT.buy }}</button>
+                  <span class="sv-product-btn-wrap"><button class="sv-product-btn" @click.stop="addToCart(p)">🛒 {{ svT?.buy || 'Acheter' }}</button></span>
                 </div>
               </div>
             </div>
@@ -1583,7 +1583,7 @@ const saveOrder = async (provider, transactionId) => {
 .sv-product-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:14px}
 .sv-product-footer{display:flex;align-items:center;justify-content:space-between}
 .sv-product-price{font-size:20px;font-weight:700;color:#6c63ff}
-.sv-product-btn{background:#6c63ff;color:white !important;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;display:flex;align-items:center;gap:6px;min-width:80px;justify-content:center}
+.sv-product-btn{background:#6c63ff !important;color:#fff !important;border:none !important;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s;display:flex;align-items:center;gap:6px;min-width:80px;justify-content:center;opacity:1 !important;visibility:visible !important}
 .sv-product-btn:hover{background:#5b52ee;transform:translateY(-1px)}
 /* FEATURES */
 .sv-features{padding:60px;background:#fafafa}
@@ -1835,7 +1835,7 @@ const saveOrder = async (provider, transactionId) => {
 .sv-hero-cta:hover  { background: var(--theme-accent-hover) !important; }
 .sv-product-card    { border-radius: var(--theme-card-radius) !important; box-shadow: var(--theme-card-shadow) !important; }
 .sv-product-price   { color: var(--theme-accent) !important; }
-.sv-product-btn     { background: var(--theme-accent) !important; border-radius: calc(var(--theme-btn-radius) * .6) !important; font-family: var(--theme-body-font) !important; color: white !important; }
+.sv-product-btn     { background: var(--theme-accent, #6c63ff) !important; border-radius: calc(var(--theme-btn-radius, 8px) * .6) !important; font-family: var(--theme-body-font, 'DM Sans',sans-serif) !important; color: #fff !important; opacity: 1 !important; visibility: visible !important; }
 .sv-product-btn:hover { background: var(--theme-accent-hover) !important; }
 .sv-nav             { background: var(--theme-nav-bg) !important; border-bottom-color: var(--theme-nav-border) !important; }
 .sv-cart-btn        { background: var(--theme-accent) !important; }
@@ -1918,5 +1918,41 @@ const saveOrder = async (provider, transactionId) => {
   line-height: 1.7;
   color: #374151;
   margin: 0;
+}
+
+/* ══ BOUTON ACHETER — isolation complète du style parent ══ */
+.sv-product-btn-wrap {
+  display: inline-block;
+  all: initial;
+}
+.sv-product-btn-wrap .sv-product-btn,
+.sv-product-btn {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  background: #6c63ff !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 9px 16px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  font-family: 'DM Sans', sans-serif !important;
+  min-width: 80px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  box-sizing: border-box !important;
+  line-height: 1.4 !important;
+  letter-spacing: normal !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  transition: background 0.15s !important;
+}
+.sv-product-btn-wrap .sv-product-btn:hover,
+.sv-product-btn:hover {
+  background: #5b52ee !important;
 }
 </style>
