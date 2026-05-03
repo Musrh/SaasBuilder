@@ -220,19 +220,29 @@ const loadSite = async () => {
   error.value    = ""
   debugInfo.value = ""
 
+  // ── Garde de sécurité : SiteViewer ne doit s'activer QUE sur les routes "site" et "slug-site"
+  // Si Vue Router l'a monté sur une autre route par erreur, on arrête immédiatement
+  // sans afficher d'erreur (composant silencieux).
+  const SITEVIEWER_ROUTES = ["site", "slug-site"]
+  if (route.name && !SITEVIEWER_ROUTES.includes(route.name)) {
+    loading.value = false
+    return
+  }
+
   // Résolution de l'identifiant (4 niveaux de fallback) :
   // 1. props.uid   -> route /site/:uid avec props:true
   // 2. props.slug  -> route /:slug avec props:true ou props fn
   // 3. route.params -> si props:true absent du routeur (défensif)
-  // 4. URL path    -> dernier recours (premier segment de pathname)
+  // 4. URL hash    -> dernier recours (segment après #/)
   const routeParam = route.params.uid
                   || route.params.slug
                   || (Array.isArray(route.params.pathMatch)
                       ? route.params.pathMatch[0]
                       : route.params.pathMatch)
                   || ""
-  const urlSlug = window.location.pathname.replace(/^\/+/, "").split("/")[0] || ""
-  const uid = (props.uid || props.slug || routeParam || urlSlug).trim()
+  // ⚠️ Avec createWebHashHistory, pathname = "/" donc on lit le hash à la place
+  const hashPath = window.location.hash.replace(/^#\//, "").split("/")[0] || ""
+  const uid = (props.uid || props.slug || routeParam || hashPath).trim()
 
   // Routes internes de l'application — ne jamais tenter de les charger comme sites publics
   const RESERVED_SLUGS = [
