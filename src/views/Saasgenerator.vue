@@ -7,6 +7,11 @@ import { stripeConfig, loadStripeSDK } from "./stripe.js"
 import { paypalConfig, loadPaypalSDK } from "./paypal.js"
 
 const site = ref({
+  legal: {
+    mentions: "",
+    cgv: "",
+    privacy: ""
+  },
   pages: [{
     id: 1, name: "Accueil", style: {},
     sections: [
@@ -36,7 +41,9 @@ const paymentSuccess = ref(false)
 const showConfigEditor = ref(false)
 const configEditorTarget = ref("stripe")
 const configEditorContent = ref("")
-const showExportModal = ref(false)
+const showExportModal  = ref(false)
+const showLegalModal   = ref(false)
+const legalTab         = ref("mentions") // mentions | cgv | privacy
 
 // ===== I18N =====
 const currentLang = ref("fr")
@@ -574,6 +581,8 @@ onMounted(() => {
         const d = snap.data()
         if (d.siteData)   site.value     = d.siteData
         if (d.siteName)   siteName.value = d.siteName
+        // Initialiser legal si absent des données sauvegardées (rétrocompat)
+        if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "" }
         if (d.siteLogo)   siteLogo.value = d.siteLogo
         if (!d.siteData) {
           const saved = localStorage.getItem("siteDataPro")
@@ -608,6 +617,58 @@ watch([() => showPaymentModal.value, () => paymentProvider.value], ([modalOpen, 
 const notify = (msg, type = "success") => {
   notifMsg.value = msg; notifType.value = type; showNotif.value = true
   setTimeout(() => showNotif.value = false, 2800)
+}
+
+const fillMentions = () => {
+  if (site.value.legal.mentions) return
+  site.value.legal.mentions = `Éditeur : ${siteName.value}
+Adresse : [Votre adresse]
+Email : [Votre email]
+Hébergeur : Vercel Inc. / Netlify Inc.
+SIRET : [Numéro si applicable]
+Directeur de publication : [Votre nom]`
+}
+
+const fillCgv = () => {
+  if (site.value.legal.cgv) return
+  site.value.legal.cgv = `Article 1 — Objet
+Les présentes CGV régissent les ventes réalisées sur le site ${siteName.value}.
+
+Article 2 — Prix
+Les prix sont indiqués TTC. Nous nous réservons le droit de modifier nos prix à tout moment.
+
+Article 3 — Paiement
+Le paiement est sécurisé via Stripe et/ou PayPal. Aucune donnée bancaire n'est conservée.
+
+Article 4 — Livraison
+Les délais de livraison sont indiqués sur chaque fiche produit.
+
+Article 5 — Rétractation
+Conformément à la législation en vigueur, vous disposez de 14 jours ouvrables pour exercer votre droit de rétractation.
+
+Article 6 — Litiges
+En cas de litige, une solution amiable sera recherchée avant toute action judiciaire.`
+}
+
+const fillPrivacy = () => {
+  if (site.value.legal.privacy) return
+  site.value.legal.privacy = `Politique de confidentialité — ${siteName.value}
+
+1. Collecte des données
+Nous collectons uniquement les données nécessaires : nom, email, adresse de livraison lors d'une commande.
+
+2. Utilisation
+Vos données sont utilisées exclusivement pour le traitement de vos commandes et ne sont jamais revendues.
+
+3. Vos droits (RGPD)
+Vous disposez d'un droit d'accès, de rectification et de suppression de vos données.
+Contactez-nous : [Votre email]
+
+4. Cookies
+Ce site utilise uniquement des cookies fonctionnels indispensables à son bon fonctionnement.
+
+5. Hébergement
+Les données sont hébergées en Europe par des prestataires conformes au RGPD.`
 }
 
 const saveSite = async () => {
@@ -1954,6 +2015,47 @@ const setPageStyle = (type, value) => {
     </div>
   </Transition>
 
+
+  <!-- MODAL PAGES LÉGALES -->
+  <Transition name="modal">
+    <div v-if="showLegalModal" class="modal-overlay" @click.self="showLegalModal=false">
+      <div class="modal-box legal-modal">
+        <button class="modal-close" @click="showLegalModal=false">✕</button>
+        <div class="modal-header">
+          <span class="modal-icon">⚖</span>
+          <h2>Pages légales</h2>
+          <p class="modal-desc">Ces pages seront affichées dans le footer de votre site.</p>
+        </div>
+        <div class="legal-tabs">
+          <button class="legal-tab" :class="{active:legalTab==='mentions'}" @click="legalTab='mentions'">📋 Mentions légales</button>
+          <button class="legal-tab" :class="{active:legalTab==='cgv'}"      @click="legalTab='cgv'">🛒 CGV</button>
+          <button class="legal-tab" :class="{active:legalTab==='privacy'}"  @click="legalTab='privacy'">🔒 Confidentialité</button>
+        </div>
+        <div class="legal-editor">
+          <div v-if="legalTab==='mentions'">
+            <p class="legal-hint">Informations sur l'éditeur, l'hébergeur, le responsable de publication.</p>
+            <textarea v-model="site.legal.mentions" class="legal-textarea" placeholder="Exemple :&#10;Éditeur : Votre Nom / Société&#10;Adresse : 10 rue Exemple, 75000 Paris&#10;Email : contact@monsite.com&#10;Hébergeur : Vercel Inc., San Francisco, CA&#10;SIRET : 000 000 000 00000 (si applicable)"/>
+            <button class="btn-action small" @click="fillMentions">✨ Pré-remplir</button>
+          </div>
+          <div v-if="legalTab==='cgv'">
+            <p class="legal-hint">Conditions Générales de Vente — obligatoires si vous vendez en ligne.</p>
+            <textarea v-model="site.legal.cgv" class="legal-textarea" placeholder="Article 1 — Objet&#10;Les présentes CGV régissent les ventes réalisées sur le site {{ siteName }}.&#10;&#10;Article 2 — Prix&#10;Les prix sont indiqués en euros TTC.&#10;&#10;Article 3 — Paiement&#10;Le paiement est sécurisé via Stripe / PayPal.&#10;&#10;Article 4 — Livraison&#10;...&#10;&#10;Article 5 — Rétractation&#10;Conformément à la loi, vous disposez de 14 jours pour vous rétracter."/>
+            <button class="btn-action small" @click="fillCgv">✨ Pré-remplir</button>
+          </div>
+          <div v-if="legalTab==='privacy'">
+            <p class="legal-hint">Politique de confidentialité — obligatoire (RGPD).</p>
+            <textarea v-model="site.legal.privacy" class="legal-textarea" placeholder="Collecte des données&#10;Nous collectons uniquement les données nécessaires au traitement de vos commandes.&#10;&#10;Utilisation&#10;Vos données ne sont jamais revendues à des tiers.&#10;&#10;Droits&#10;Vous pouvez demander la suppression de vos données en contactant : contact@monsite.com&#10;&#10;Cookies&#10;Ce site utilise des cookies fonctionnels uniquement."/>
+            <button class="btn-action small" @click="fillPrivacy">✨ Pré-remplir</button>
+          </div>
+        </div>
+        <div class="config-modal-actions">
+          <button class="btn-action" @click="showLegalModal=false">Fermer</button>
+          <button class="btn-action primary" @click="saveSite(); showLegalModal=false">💾 Sauvegarder</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
   <!-- TOPBAR -->
   <header class="topbar">
     <div class="topbar-brand">
@@ -1982,6 +2084,7 @@ const setPageStyle = (type, value) => {
       </select>
       <!-- 💳🅿 Stripe/PayPal masqués — Stripe Connect intégré pour Pro -->
       <button class="btn-action icon-btn" @click="showExportModal=true" :title="t.export">⬇</button>
+      <button class="btn-action icon-btn" @click="showLegalModal=true" title="Pages légales">⚖</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
@@ -2622,4 +2725,146 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .cart-actions{display:flex;gap:10px}
 .cart-actions .btn-action{flex:1;justify-content:center}
 .cart-checkout-btn{flex:2;margin-top:0}
+
+/* ══ PUBLIC PREVIEW OVERLAY ══════════════════════════════════════ */
+.public-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pub-preview-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 10001;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.pub-preview-close:hover { background: rgba(0,0,0,.75); }
+
+.pub-preview-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 52px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  z-index: 10000;
+  box-shadow: 0 1px 6px rgba(0,0,0,.07);
+}
+.pub-preview-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+.pub-preview-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.pub-preview-brand-icon {
+  font-size: 20px;
+  color: #6c63ff;
+}
+.pub-preview-brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  font-family: 'Playfair Display', serif;
+}
+.pub-preview-tabs {
+  display: flex;
+  gap: 4px;
+}
+.pub-preview-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #6b7280;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+.pub-preview-tab:hover { background: #f3f4f6; color: #111; }
+.pub-preview-tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
+
+.pub-preview-cart {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.pub-preview-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ══ MODAL LÉGAL ══════════════════════════════════════════════════ */
+.legal-modal { max-width: 680px; width: 95vw; }
+.legal-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  padding-bottom: 10px;
+}
+.legal-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #6b7280;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+.legal-tab:hover { background: #f3f4f6; color: #111; }
+.legal-tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
+.legal-editor { margin-bottom: 16px; }
+.legal-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+.legal-textarea {
+  width: 100%;
+  min-height: 220px;
+  background: #1a1a2e;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  line-height: 1.6;
+  resize: vertical;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+.legal-textarea:focus { outline: none; border-color: #6c63ff; }
 </style>
