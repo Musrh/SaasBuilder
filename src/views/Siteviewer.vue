@@ -1571,7 +1571,7 @@ const saveOrder = async (provider, transactionId) => {
 .sv-product-desc{font-size:13px;color:#6b7280;line-height:1.5;margin-bottom:14px}
 .sv-product-footer{display:flex;align-items:center;justify-content:space-between}
 .sv-product-price{font-size:20px;font-weight:700;color:#6c63ff}
-.sv-product-btn{background:#6c63ff;color:white;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;display:flex;align-items:center;gap:6px}
+.sv-product-btn{background:#6c63ff;color:white !important;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;display:flex;align-items:center;gap:6px;min-width:80px;justify-content:center}
 .sv-product-btn:hover{background:#5b52ee;transform:translateY(-1px)}
 /* FEATURES */
 .sv-features{padding:60px;background:#fafafa}
@@ -1823,7 +1823,7 @@ const saveOrder = async (provider, transactionId) => {
 .sv-hero-cta:hover  { background: var(--theme-accent-hover) !important; }
 .sv-product-card    { border-radius: var(--theme-card-radius) !important; box-shadow: var(--theme-card-shadow) !important; }
 .sv-product-price   { color: var(--theme-accent) !important; }
-.sv-product-btn     { background: var(--theme-accent) !important; border-radius: calc(var(--theme-btn-radius) * .6) !important; font-family: var(--theme-body-font) !important; }
+.sv-product-btn     { background: var(--theme-accent) !important; border-radius: calc(var(--theme-btn-radius) * .6) !important; font-family: var(--theme-body-font) !important; color: white !important; }
 .sv-product-btn:hover { background: var(--theme-accent-hover) !important; }
 .sv-nav             { background: var(--theme-nav-bg) !important; border-bottom-color: var(--theme-nav-border) !important; }
 .sv-cart-btn        { background: var(--theme-accent) !important; }
