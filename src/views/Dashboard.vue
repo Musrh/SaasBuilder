@@ -288,7 +288,7 @@
               <span class="db-published-dot"></span>
               <span>Publié sur </span>
               <a
-                :href="`https://mronlinestores.com/${userData.publishedSlug}`"
+                :href="`https://mronlinestores.com/#/${userData.publishedSlug}`"
                 target="_blank"
                 class="db-published-link"
               >
@@ -343,7 +343,7 @@
             <span class="db-action-icon">🌐</span>
             <div>
               <p class="db-action-title">Voir le store</p>
-              <p class="db-action-desc">mronlinestores.com/{{ userData.publishedSlug }}</p>
+              <p class="db-action-desc">mronlinestores.com/#/{{ userData.publishedSlug }}</p>
             </div>
           </button>
 
@@ -603,7 +603,7 @@ const toggleOrderDetail = (id) => {
 }
 
 const openStore = () => {
-  window.open(`https://mronlinestores.com/${userData.value.publishedSlug}`, "_blank")
+  window.open(`https://mronlinestores.com/#/${userData.value.publishedSlug}`, "_blank")
 }
 
 const goToBuilder = () => {
