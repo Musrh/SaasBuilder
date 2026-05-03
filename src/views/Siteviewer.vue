@@ -251,7 +251,7 @@ const loadSite = async () => {
     return
   }
 
-  console.log("SiteViewer: chargement uid/slug =", uid, "| props:", props.uid, props.slug, "| route:", routeParam, "| url:", urlSlug)
+  console.log("SiteViewer: chargement uid/slug =", uid, "| props:", props.uid, props.slug, "| route:", routeParam, "| hash:", hashSlug)
 
   try {
     // - Étape 1 : essayer comme UID Firestore direct ---
