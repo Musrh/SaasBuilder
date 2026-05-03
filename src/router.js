@@ -144,7 +144,13 @@ router.beforeEach(async (to, from, next) => {
     return next()
   }
 
-  // ===== PUBLIC =====
+  // ===== SLUG PUBLIC — sécurité anti-collision =====
+  // Si une route nommée slug-site reçoit un slug réservé (ne devrait pas arriver
+  // grâce au beforeEnter, mais garde défensive supplémentaire)
+  if (to.name === "slug-site" && RESERVED_SLUGS.includes(to.params.slug)) {
+    return next({ name: "not-found" })
+  }
+
   return next()
 })
 
