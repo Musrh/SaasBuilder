@@ -55,6 +55,14 @@ const props  = defineProps({
 const router = useRouter()
 const route  = useRoute()
 
+// ── SiteViewer ne doit s'afficher QUE sur ses propres routes ──
+// Si le router le monte par erreur sur /saasgenerator ou /dashboard,
+// isValidRoute = false → template entier masqué, loadSite jamais appelé.
+const VALID_ROUTE_NAMES = ["site", "slug-site"]
+const isValidRoute = computed(() =>
+  !route.name || VALID_ROUTE_NAMES.includes(String(route.name))
+)
+
 // - État global ------------------------
 const site         = ref(null)
 
@@ -989,7 +997,7 @@ const saveOrder = async (provider, transactionId) => {
 </script>
 
 <template>
-<div class="sv-root" :dir="svIsRtl ? 'rtl' : 'ltr'">
+<div v-if="isValidRoute" class="sv-root" :dir="svIsRtl ? 'rtl' : 'ltr'">
 
   <!-- LOADING -->
   <div v-if="loading" class="sv-loading">
