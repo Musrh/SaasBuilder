@@ -445,7 +445,7 @@
 import { ref, computed, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { auth, db } from "../firebase"
-import { doc, getDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
 const BACKEND     = "https://backendfinal-production-afd2.up.railway.app"
@@ -564,30 +564,31 @@ onMounted(() => {
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
-// Plan free → collection "forders"  (filtré par ownerUid)
-// Plan pro  → collection "orders"   (filtré par ownerUid)
+// ── Charger les commandes du propriétaire ──────────────────────
+// Interroge les deux collections (orders + forders) par ownerUid
+// et fusionne les résultats — sans orderBy pour éviter les index.
 const loadOrders = async (uid) => {
   ordersLoading.value = true
   try {
-    const plan    = userData.value?.plan || "free"
-    const colName = plan === "free" ? "forders" : "orders"
-    try {
-      const snap = await getDocs(
-        query(collection(db, colName), where("ownerUid", "==", uid), orderBy("createdAt", "desc"))
-      )
-      orders.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    } catch(e) {
-      // Fallback sans orderBy si l'index Firestore n'est pas encore créé
-      const snap = await getDocs(
-        query(collection(db, colName), where("ownerUid", "==", uid))
-      )
-      orders.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => {
-          const da  = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0)
-          const db_ = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0)
-          return db_ - da
-        })
+    const results = []
+    for (const colName of ["orders", "forders"]) {
+      try {
+        const snap = await getDocs(
+          query(collection(db, colName), where("ownerUid", "==", uid))
+        )
+        snap.docs.forEach(d => results.push({ id: d.id, _source: colName, ...d.data() }))
+      } catch(e) {
+        console.warn(`Erreur lecture ${colName}:`, e.code || e.message)
+      }
     }
+    // Tri par date décroissante (createdAt peut être Timestamp ou string ISO)
+    orders.value = results.sort((a, b) => {
+      const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0)
+      const db_ = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0)
+      return db_ - da
+    })
+  } catch(e) {
+    console.error("loadOrders:", e.message)
   } finally {
     ordersLoading.value = false
   }
