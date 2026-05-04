@@ -564,29 +564,30 @@ onMounted(() => {
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
+// Plan free → collection "forders"  (filtré par ownerUid)
+// Plan pro  → collection "orders"   (filtré par ownerUid)
 const loadOrders = async (uid) => {
   ordersLoading.value = true
   try {
-    // Chercher dans users/{uid}/orders (sous-collection)
-    const subSnap = await getDocs(
-      query(collection(db, "users", uid, "orders"), orderBy("createdAt", "desc"))
-    )
-    if (!subSnap.empty) {
-      orders.value = subSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-    } else {
-      // Fallback : collection globale orders filtrée par ownerUid
-      const globalSnap = await getDocs(
-        query(collection(db, "orders"), where("ownerUid", "==", uid), orderBy("createdAt", "desc"))
-      )
-      orders.value = globalSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-    }
-  } catch(e) {
-    // Fallback sans orderBy si index manquant
+    const plan    = userData.value?.plan || "free"
+    const colName = plan === "free" ? "forders" : "orders"
     try {
-      const snap = await getDocs(collection(db, "users", uid, "orders"))
+      const snap = await getDocs(
+        query(collection(db, colName), where("ownerUid", "==", uid), orderBy("createdAt", "desc"))
+      )
       orders.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-    } catch(e2) { console.warn("Commandes:", e2.message) }
+    } catch(e) {
+      // Fallback sans orderBy si l'index Firestore n'est pas encore créé
+      const snap = await getDocs(
+        query(collection(db, colName), where("ownerUid", "==", uid))
+      )
+      orders.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const da  = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0)
+          const db_ = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0)
+          return db_ - da
+        })
+    }
   } finally {
     ordersLoading.value = false
   }
