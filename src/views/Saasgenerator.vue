@@ -587,10 +587,18 @@ onMounted(() => {
   const sl = localStorage.getItem("siteLogo")
   if (sn) siteName.value = sn
   if (sl) siteLogo.value = sl
+  let firestoreLoaded = false   // ← flag : charger Firestore UNE SEULE FOIS
+
   onAuthStateChanged(auth, async (user) => {
     if (!user) return
     currentUser.value = user
     await loadSavedConfigs()
+
+    // Ne recharger Firestore que lors de la première auth
+    // (évite d'écraser les modifs en cours si Firebase refresh le token)
+    if (firestoreLoaded) return
+    firestoreLoaded = true
+
     try {
       const docRef = doc(db, "users", user.uid)
       const snap = await getDoc(docRef)
@@ -598,12 +606,14 @@ onMounted(() => {
         const d = snap.data()
         if (d.siteData)   site.value     = d.siteData
         if (d.siteName)   siteName.value = d.siteName
-        // Initialiser legal si absent des données sauvegardées (rétrocompat)
-        if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "", privacyPolicy: "", remboursement: "" }
-        // Ajouter les nouveaux champs si absent (migration)
-        if (!('privacyPolicy'  in site.value.legal)) site.value.legal.privacyPolicy  = ""
-        if (!('remboursement'  in site.value.legal)) site.value.legal.remboursement  = ""
         if (d.siteLogo)   siteLogo.value = d.siteLogo
+
+        // Rétrocompat : initialiser les champs nouveaux si absents
+        if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "", privacyPolicy: "", remboursement: "" }
+        if (!('privacyPolicy' in site.value.legal)) site.value.legal.privacyPolicy = ""
+        if (!('remboursement' in site.value.legal)) site.value.legal.remboursement = ""
+        if (!site.value.theme) site.value.theme = null
+
         if (!d.siteData) {
           const saved = localStorage.getItem("siteDataPro")
           if (saved) site.value = JSON.parse(saved)
@@ -612,6 +622,8 @@ onMounted(() => {
         const saved = localStorage.getItem("siteDataPro")
         if (saved) site.value = JSON.parse(saved)
       }
+      // Après chargement, marquer comme sauvegardé (pas de faux "unsaved")
+      isSaved.value = true
     } catch (e) {
       console.error("Erreur chargement Firestore :", e)
       notify(t.value.loadError, "error")
@@ -991,6 +1003,114 @@ const importScrapeProducts = () => {
   notifMsg.value  = toImport.length + " produit(s) importé(s) depuis le site !"
   notifType.value = "success"
   setTimeout(() => { showNotif.value = false }, 3000)
+}
+
+
+// ══ THÈMES ════════════════════════════════════════════════════════
+const BUILTIN_THEMES = [
+  { id:"default",   name:"Violet Pro",    accent:"#6c63ff", accentHover:"#5b52ee", bg:"#ffffff", text:"#111111", nav:"#1a1a2e",   navText:"#ffffff", btnRadius:8,  font:"'DM Sans',sans-serif",       fontDisplay:"DM Sans" },
+  { id:"ocean",     name:"Océan",         accent:"#0ea5e9", accentHover:"#0284c7", bg:"#f0f9ff", text:"#0c4a6e", nav:"#0c4a6e",   navText:"#ffffff", btnRadius:10, font:"'Inter',sans-serif",           fontDisplay:"Inter" },
+  { id:"forest",    name:"Forêt",         accent:"#16a34a", accentHover:"#15803d", bg:"#f0fdf4", text:"#14532d", nav:"#14532d",   navText:"#ffffff", btnRadius:6,  font:"'Poppins',sans-serif",         fontDisplay:"Poppins" },
+  { id:"sunset",    name:"Coucher Soleil",accent:"#f97316", accentHover:"#ea6c10", bg:"#fff7ed", text:"#431407", nav:"#431407",   navText:"#ffffff", btnRadius:12, font:"'Nunito',sans-serif",          fontDisplay:"Nunito" },
+  { id:"rose",      name:"Rose",          accent:"#e11d48", accentHover:"#be123c", bg:"#fff1f2", text:"#881337", nav:"#881337",   navText:"#ffffff", btnRadius:20, font:"'Playfair Display',serif",     fontDisplay:"Playfair Display" },
+  { id:"midnight",  name:"Minuit",        accent:"#8b5cf6", accentHover:"#7c3aed", bg:"#0f0f1a", text:"#e2e8f0", nav:"#0a0a14",  navText:"#e2e8f0", btnRadius:8,  font:"'Space Grotesk',sans-serif",   fontDisplay:"Space Grotesk" },
+  { id:"sand",      name:"Sable",         accent:"#d97706", accentHover:"#b45309", bg:"#fffbeb", text:"#451a03", nav:"#451a03",   navText:"#fffbeb", btnRadius:4,  font:"'Lora',serif",                 fontDisplay:"Lora" },
+  { id:"slate",     name:"Ardoise",       accent:"#475569", accentHover:"#334155", bg:"#f8fafc", text:"#0f172a", nav:"#1e293b",   navText:"#f1f5f9", btnRadius:6,  font:"'Roboto',sans-serif",          fontDisplay:"Roboto" },
+]
+
+const activeThemeId  = ref(site.value.theme?.id || "default")
+const showThemePanel = ref(false)
+const importThemeUrl = ref("")
+const importThemeLoading = ref(false)
+const importThemeError   = ref("")
+const customTheme = ref({
+  id: "custom", name: "Mon thème",
+  accent: "#6c63ff", accentHover: "#5b52ee",
+  bg: "#ffffff", text: "#111111",
+  nav: "#1a1a2e", navText: "#ffffff",
+  btnRadius: 8, font: "'DM Sans',sans-serif", fontDisplay: "DM Sans"
+})
+
+const applyThemeToSite = (theme) => {
+  activeThemeId.value = theme.id
+  site.value.theme = { ...theme }
+  // Appliquer les variables CSS au builder (aperçu immédiat)
+  const r = document.documentElement
+  r.style.setProperty("--theme-accent",      theme.accent)
+  r.style.setProperty("--theme-accent-hover",theme.accentHover)
+  r.style.setProperty("--theme-bg",          theme.bg)
+  r.style.setProperty("--theme-text",        theme.text)
+  r.style.setProperty("--theme-nav",         theme.nav)
+  r.style.setProperty("--theme-nav-text",    theme.navText)
+  r.style.setProperty("--theme-btn-radius",  theme.btnRadius + "px")
+  r.style.setProperty("--theme-body-font",   theme.font)
+  // Mettre à jour le style de la page courante pour cohérence
+  if (!currentPage.value.style) currentPage.value.style = {}
+  currentPage.value.style.backgroundColor = theme.bg
+  currentPage.value.style.color           = theme.text
+  currentPage.value.style.fontFamily      = theme.font
+  isSaved.value = false
+}
+
+const importThemeFromUrl = async () => {
+  const url = importThemeUrl.value.trim()
+  if (!url) return
+  const apiKey = liveAnthropicConfig.value.apiKey?.trim()
+  if (!apiKey || apiKey.startsWith("sk-ant-VOTRE")) {
+    importThemeError.value = "Clé API Anthropic requise pour importer un thème."
+    return
+  }
+  importThemeLoading.value = true
+  importThemeError.value   = ""
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 800,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content:
+          `Visite ce site web et extrait sa palette de couleurs et son style : ${url}
+Retourne UNIQUEMENT un objet JSON (sans texte, sans markdown) :
+{
+  "name": "Nom du thème inspiré du site",
+  "accent": "#hexcolor principalement utilisé pour les boutons/CTA",
+  "accentHover": "#hexcolor légèrement plus foncé que accent",
+  "bg": "#hexcolor couleur de fond principale",
+  "text": "#hexcolor couleur de texte principale",
+  "nav": "#hexcolor couleur de la navbar/header",
+  "navText": "#hexcolor couleur du texte de la navbar",
+  "btnRadius": nombre entier (rayon des boutons en px, entre 0 et 24),
+  "font": "nom de la font principale avec fallback CSS complet",
+  "fontDisplay": "nom court de la font pour affichage"
+}`
+        }]
+      })
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error.message)
+    const textBlock = data.content?.find(b => b.type === "text")
+    if (!textBlock) throw new Error("Pas de réponse")
+    const match = textBlock.text.match(/\{[\s\S]*\}/)
+    if (!match) throw new Error("Format invalide")
+    const imported = JSON.parse(match[0])
+    imported.id = "imported_" + Date.now()
+    customTheme.value = { ...customTheme.value, ...imported }
+    applyThemeToSite(customTheme.value)
+    importThemeError.value = ""
+    showNotif.value = true; notifMsg.value = "Thème importé depuis " + url.split("/")[2]; notifType.value = "success"
+    setTimeout(() => { showNotif.value = false }, 3000)
+  } catch(e) {
+    importThemeError.value = "Erreur : " + e.message
+  } finally {
+    importThemeLoading.value = false
+  }
 }
 
 const saveSite = async () => {
@@ -2668,8 +2788,79 @@ const setPageStyle = (type, value) => {
           </div>
         </div>
       </div>
-      <div v-if="sidebarTab==='style'" class="sidebar-content">
-        <p class="sidebar-label">{{ t.pageStyle }}</p>
+      <div v-if="sidebarTab==='style'" class="sidebar-content theme-panel">
+
+        <!-- ── THÈMES INTÉGRÉS ── -->
+        <p class="sidebar-label">🎨 Thèmes</p>
+        <div class="theme-grid">
+          <div
+            v-for="th in BUILTIN_THEMES" :key="th.id"
+            class="theme-card"
+            :class="{active: activeThemeId===th.id}"
+            @click="applyThemeToSite(th)"
+            :title="th.name"
+          >
+            <div class="theme-preview">
+              <div class="theme-preview-nav" :style="{background: th.nav}"/>
+              <div class="theme-preview-body" :style="{background: th.bg}">
+                <div class="theme-preview-btn" :style="{background: th.accent, borderRadius: th.btnRadius+'px'}"/>
+              </div>
+            </div>
+            <span class="theme-name">{{ th.name }}</span>
+            <span v-if="activeThemeId===th.id" class="theme-active-badge">✓</span>
+          </div>
+        </div>
+
+        <!-- ── THÈME PERSONNALISÉ ── -->
+        <p class="sidebar-label" style="margin-top:16px">✏️ Personnaliser</p>
+        <div class="prop-row"><label>Couleur principale</label>
+          <input type="color" v-model="customTheme.accent" class="color-input"/>
+        </div>
+        <div class="prop-row"><label>Fond</label>
+          <input type="color" v-model="customTheme.bg" class="color-input"/>
+        </div>
+        <div class="prop-row"><label>Texte</label>
+          <input type="color" v-model="customTheme.text" class="color-input"/>
+        </div>
+        <div class="prop-row"><label>Navbar</label>
+          <input type="color" v-model="customTheme.nav" class="color-input"/>
+        </div>
+        <div class="prop-row"><label>Texte navbar</label>
+          <input type="color" v-model="customTheme.navText" class="color-input"/>
+        </div>
+        <div class="prop-row"><label>Arrondi boutons</label>
+          <input type="range" min="0" max="24" v-model.number="customTheme.btnRadius" class="prop-range"/>
+          <span style="font-size:11px;color:#9ca3af">{{ customTheme.btnRadius }}px</span>
+        </div>
+        <div class="prop-row"><label>Police</label>
+          <select v-model="customTheme.font" class="prop-select">
+            <option value="'DM Sans',sans-serif">DM Sans</option>
+            <option value="'Inter',sans-serif">Inter</option>
+            <option value="'Poppins',sans-serif">Poppins</option>
+            <option value="'Nunito',sans-serif">Nunito</option>
+            <option value="Georgia,serif">Georgia</option>
+            <option value="'Playfair Display',serif">Playfair Display</option>
+            <option value="'Space Grotesk',sans-serif">Space Grotesk</option>
+          </select>
+        </div>
+        <button class="btn-action primary" style="width:100%;margin-top:8px" @click="applyThemeToSite(customTheme)">
+          ✓ Appliquer mon thème
+        </button>
+
+        <!-- ── IMPORTER DEPUIS URL ── -->
+        <p class="sidebar-label" style="margin-top:16px">🔗 Importer depuis un site</p>
+        <p style="font-size:11px;color:#9ca3af;margin-bottom:8px">Claude analyse les couleurs d'un site et crée un thème automatiquement.</p>
+        <div class="import-theme-bar">
+          <input v-model="importThemeUrl" class="prop-input" placeholder="https://www.exemple.com" @keydown.enter="importThemeFromUrl"/>
+          <button class="btn-action primary small" @click="importThemeFromUrl" :disabled="importThemeLoading">
+            <span v-if="importThemeLoading" class="spinner"/>
+            <span>{{ importThemeLoading ? '...' : '↓' }}</span>
+          </button>
+        </div>
+        <div v-if="importThemeError" class="import-theme-error">⚠️ {{ importThemeError }}</div>
+
+        <!-- ── COULEURS PAGE (legacy) ── -->
+        <p class="sidebar-label" style="margin-top:16px">{{ t.pageStyle }}</p>
         <div class="prop-row"><label>{{ t.bgColor }}</label><input type="color" :value="currentPage.style?.backgroundColor||'#ffffff'" @input="setPageStyle('bg',$event.target.value)" class="color-input"/></div>
         <div class="prop-row"><label>{{ t.textColorPage }}</label><input type="color" :value="currentPage.style?.color||'#111111'" @input="setPageStyle('color',$event.target.value)" class="color-input"/></div>
         <div class="prop-row">
@@ -2682,6 +2873,7 @@ const setPageStyle = (type, value) => {
             <option value="Verdana, sans-serif">{{ t.fontVerdana }}</option>
           </select>
         </div>
+
       </div>
     </aside>
 
