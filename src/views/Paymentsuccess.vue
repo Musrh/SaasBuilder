@@ -85,146 +85,58 @@
         </div>
       </template>
 
-    </div>
-  </div>
-</template>
 
 <script setup>
 import { ref, onMounted } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
-import { doc, collection, addDoc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore"
+import { doc, updateDoc } from "firebase/firestore"
 import { db } from "../firebase"
 
 const router    = useRouter()
 const route     = useRoute()
 const auth      = getAuth()
 const orderData = ref(null)
-const saving    = ref(true)
-const saved     = ref(false)
-const storeSlug = ref("")   // ← slug du store pour la redirection
+const storeSlug = ref("")
 
 onMounted(() => {
-  // ── 1. Lire pendingStripeOrder immédiatement (avant auth) ──
+  // 1. Lire la commande (juste pour l'affichage)
   const raw = localStorage.getItem("pendingStripeOrder")
-  if (raw) {
-    try { orderData.value = JSON.parse(raw) } catch(e) {}
-  }
+  if (raw) { try { orderData.value = JSON.parse(raw) } catch(e) {} }
 
-  // ── 1b. Récupérer le slug depuis query, localStorage ou orderData ──
+  // 2. Slug pour redirection
   storeSlug.value =
     route.query.slug ||
     localStorage.getItem("stripeSiteSlug") ||
     orderData.value?.slug ||
-    orderData.value?.storeSlug ||
-    ""
+    orderData.value?.storeSlug || ""
 
-  // ── 2. Attendre que Firebase Auth soit prêt ────────────────
+  // 3. Vider le panier (seule action persistante)
   onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      const ownerUid = localStorage.getItem("stripeOwnerUid")
-        || orderData.value?.ownerUid
+    const ownerUid = user?.uid
+      || localStorage.getItem("stripeOwnerUid")
+      || orderData.value?.ownerUid
 
-      if (ownerUid && orderData.value) {
-        await saveOrder(ownerUid, null)
-      }
-      saving.value = false
-      return
+    if (ownerUid) {
+      try {
+        await updateDoc(doc(db, "users", ownerUid), { cartSession: [] })
+      } catch (e) { console.warn("clear cart:", e.message) }
     }
 
-    const ownerUid = user.uid || orderData.value?.ownerUid
-
-    if (orderData.value && ownerUid) {
-      await saveOrder(ownerUid, user)
-    }
-    saving.value = false
+    // 4. Nettoyer
+    localStorage.removeItem("pendingStripeOrder")
+    localStorage.removeItem("stripeOwnerUid")
   })
 })
 
-// ── Sauvegarder la commande dans Firestore ──────────────────
-async function saveOrder(ownerUid, user) {
-  try {
-    const order = {
-      ...(orderData.value || {}),
-      ownerUid,
-      storeUid:  ownerUid,
-      clientId:  ownerUid,
-      status:    "paid",
-      provider:  "stripe",
-      createdAt: orderData.value?.createdAt || new Date().toISOString(),
-    }
-
-    // a. users/{uid}/orders/
-    try {
-      await addDoc(collection(db, "users", ownerUid, "orders"), order)
-      console.log("✅ Commande sauvegardée dans users/" + ownerUid + "/orders")
-    } catch(e) {
-      console.error("Erreur users/orders:", e.message)
-    }
-
-    // b. orders/ (collection racine)
-    try {
-      await addDoc(collection(db, "orders"), order)
-      console.log("✅ Commande sauvegardée dans orders/")
-    } catch(e) {
-      console.error("Erreur orders/:", e.message)
-    }
-
-    // c. Vider cartSession dans users/{uid}
-    try {
-      const userRef = doc(db, "users", ownerUid)
-      await updateDoc(userRef, { cartSession: [] })
-      console.log("🧹 CartSession vidée")
-    } catch(e) {
-      console.error("Erreur clear cartSession:", e.message)
-    }
-
-    // d. cmdclients — collection commandes client (pour profil client)
-    try {
-      const clientUid   = orderData.value?.clientUid   || user?.uid || ""
-      const clientEmail = orderData.value?.customerEmail || ""
-      const clientName  = orderData.value?.customerName  || ""
-      const storeUid    = ownerUid
-      const cmdEntry = {
-        ...(orderData.value || {}),
-        ownerUid,
-        storeUid,
-        clientUid,
-        clientEmail:     clientEmail.toLowerCase(),
-        clientName,
-        status:          "paid",
-        provider:        "stripe",
-        createdAt:       orderData.value?.createdAt || new Date().toISOString(),
-        savedAt:         new Date().toISOString(),
-      }
-      await addDoc(collection(db, "cmdclients"), cmdEntry)
-      console.log("✅ Commande sauvegardée dans cmdclients/")
-    } catch(e) {
-      console.error("Erreur cmdclients:", e.message)
-    }
-
-    saved.value = true
-
-  } catch(e) {
-    console.error("Erreur sauvegarde commande:", e)
-  } finally {
-    localStorage.removeItem("pendingStripeOrder")
-    localStorage.removeItem("stripeOwnerUid")
-    // On garde stripeSiteSlug jusqu'à la redirection, puis on le nettoie dans goBack
-  }
-}
-
-// ── MODIFIÉ : redirection vers le store via slug ────────────
 function goBack() {
   localStorage.removeItem("stripeSiteSlug")
-  if (storeSlug.value) {
-    router.push(`/site/${storeSlug.value}`)
-  } else {
-    router.push("/")
-  }
+  router.push(storeSlug.value ? `/site/${storeSlug.value}` : "/")
 }
 </script>
+      
 
+      
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@500;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
