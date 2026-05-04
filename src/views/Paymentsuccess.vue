@@ -150,7 +150,7 @@ onMounted(() => {
 
 function goBack() {
   localStorage.removeItem("stripeSiteSlug")
-  router.push(storeSlug.value ? `/site/${storeSlug.value}` : "/")
+  router.push(storeSlug.value ? `/${storeSlug.value}` : "/")
 }
 </script>
 
