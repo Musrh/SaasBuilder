@@ -491,11 +491,12 @@ const publishSite = async () => {
   try {
     // 1. Sauvegarder siteData + slug dans le document de l'utilisateur
     const userRef = doc(db, "users", uid)
+    const rawSiteData = JSON.parse(JSON.stringify(site.value))
     await setDoc(userRef, {
-      siteData:  site.value,
+      siteData:  rawSiteData,
       siteName:  siteName.value,
       siteLogo:  siteLogo.value,
-      siteTheme: (currentTheme?.value || null),
+      siteTheme: (rawSiteData.theme || null),
       publishedSlug: slug,
       publishedAt: new Date().toISOString(),
       customDomain: domain || null,
@@ -604,15 +605,16 @@ onMounted(() => {
       const snap = await getDoc(docRef)
       if (snap.exists()) {
         const d = snap.data()
-        if (d.siteData)   site.value     = d.siteData
-        if (d.siteName)   siteName.value = d.siteName
-        if (d.siteLogo)   siteLogo.value = d.siteLogo
-
-        // Rétrocompat : initialiser les champs nouveaux si absents
-        if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "", privacyPolicy: "", remboursement: "" }
-        if (!('privacyPolicy' in site.value.legal)) site.value.legal.privacyPolicy = ""
-        if (!('remboursement' in site.value.legal)) site.value.legal.remboursement = ""
-        if (!site.value.theme) site.value.theme = null
+        if (d.siteData) {
+          site.value = d.siteData
+          // Toujours garantir les champs nouveaux après chargement Firestore
+          if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "", privacyPolicy: "", remboursement: "" }
+          if (!site.value.legal.privacyPolicy) site.value.legal.privacyPolicy = ""
+          if (!site.value.legal.remboursement) site.value.legal.remboursement = ""
+          if (!site.value.theme) site.value.theme = null
+        }
+        if (d.siteName) siteName.value = d.siteName
+        if (d.siteLogo) siteLogo.value = d.siteLogo
 
         if (!d.siteData) {
           const saved = localStorage.getItem("siteDataPro")
@@ -1114,13 +1116,28 @@ Retourne UNIQUEMENT un objet JSON (sans texte, sans markdown) :
 }
 
 const saveSite = async () => {
-  if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
   if (isSaving.value) return
+  // Si currentUser pas encore chargé → attendre jusqu'à 3s
+  if (!currentUser.value) {
+    let waited = 0
+    await new Promise(resolve => {
+      const interval = setInterval(() => {
+        waited += 100
+        if (currentUser.value || waited >= 3000) {
+          clearInterval(interval)
+          resolve()
+        }
+      }, 100)
+    })
+  }
+  if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
   isSaving.value = true
   try {
     const docRef = doc(db, "users", currentUser.value.uid)
-    await setDoc(docRef, { siteData: site.value, siteName: siteName.value, siteLogo: siteLogo.value, siteTheme: (currentTheme?.value || null) }, { merge: true })
-    localStorage.setItem("siteDataPro", JSON.stringify(site.value))
+    // toRaw : convertir le Proxy Vue en plain object pour Firestore
+    const rawSite = JSON.parse(JSON.stringify(site.value))
+    await setDoc(docRef, { siteData: rawSite, siteName: siteName.value, siteLogo: siteLogo.value, siteTheme: (rawSite.theme || null) }, { merge: true })
+    localStorage.setItem("siteDataPro", JSON.stringify(rawSite))
     isSaved.value = true
     notify(t.value.saved)
   } catch (e) {
@@ -2482,7 +2499,7 @@ const setPageStyle = (type, value) => {
 
   <!-- MODAL PAGES LÉGALES -->
   <Transition name="modal">
-    <div v-if="showLegalModal" class="modal-overlay" @click.self="showLegalModal=false">
+    <div v-if="showLegalModal && site.legal" class="modal-overlay" @click.self="showLegalModal=false">
       <div class="modal-box legal-modal">
         <button class="modal-close" @click="showLegalModal=false">✕</button>
         <div class="modal-header">
@@ -2726,9 +2743,9 @@ const setPageStyle = (type, value) => {
         <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
       </div>
       <span class="save-status" :class="{saved:isSaved}">{{ isSaved ? t.saved : t.unsaved }}</span>
-      <button class="btn-action" @click="saveSite" :disabled="isSaving||!currentUser" :class="{saving:isSaving}">
+      <button class="btn-action" @click="saveSite" :disabled="isSaving" :class="{saving:isSaving}">
         <span v-if="isSaving" class="spinner"/>
-        <span>{{ isSaving ? t.saving : !currentUser ? t.notConnected : t.save }}</span>
+        <span>{{ isSaving ? t.saving : t.save }}</span>
       </button>
       <button class="btn-action primary" @click="mode=mode==='preview'?'edit':'preview'">
         {{ mode==='preview' ? t.edit : t.preview }}
@@ -3810,5 +3827,107 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
   border-radius: 6px;
   display: block;
   margin: 0 auto;
+}
+
+/* ══ THÈMES ══════════════════════════════════════════════════════ */
+.theme-panel { overflow-y: auto; max-height: calc(100vh - 120px); }
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.theme-card {
+  position: relative;
+  border: 2px solid #1e293b;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all .18s;
+  background: #0f172a;
+}
+.theme-card:hover { border-color: #6c63ff; transform: translateY(-2px); }
+.theme-card.active { border-color: #6c63ff; box-shadow: 0 0 0 2px #6c63ff44; }
+
+.theme-preview {
+  width: 100%;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.theme-preview-nav {
+  height: 14px;
+  flex-shrink: 0;
+}
+.theme-preview-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-preview-btn {
+  width: 28px;
+  height: 10px;
+}
+
+.theme-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-align: center;
+  padding: 5px 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.theme-card.active .theme-name { color: #6c63ff; }
+
+.theme-active-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #6c63ff;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prop-range { flex: 1; accent-color: #6c63ff; }
+.prop-input {
+  width: 100%;
+  background: #1a1a2e;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: #e2e8f0;
+  font-size: 12px;
+  margin-bottom: 6px;
+  box-sizing: border-box;
+  font-family: 'DM Sans', sans-serif;
+}
+.prop-input:focus { outline: none; border-color: #6c63ff; }
+
+.import-theme-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.import-theme-bar .prop-input { margin-bottom: 0; flex: 1; }
+.import-theme-error {
+  font-size: 11px;
+  color: #fca5a5;
+  background: #2d1b1b;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-top: 4px;
 }
 </style>
