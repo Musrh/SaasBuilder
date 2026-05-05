@@ -619,58 +619,67 @@ const toMs = (v) => {
   return new Date(v).getTime()                   // string ISO ou nombre
 }
 
-const loadOrders = async (uid) => {
+
+  const loadOrders = async (uid) => {
   ordersLoading.value = true
   const results = []
+  const slug = userData.value?.publishedSlug || null
 
-  // ── forders (plan Free) ─────────────────────────────────────
-  try {
-    const snap = await getDocs(
-      query(collection(db, "forders"), where("ownerUid", "==", uid))
-    )
-    snap.docs.forEach(d =>
-      results.push({ id: d.id, _source: "forders", ...d.data() })
-    )
-    console.log("📦 forders:", snap.size)
-  } catch(e) {
-    console.warn("⚠️ forders:", e.code, e.message)
-  }
-
-  // ── orders (plan Pro) ───────────────────────────────────────
+  // ── orders (Pro) — clé : ownerUid ───────────────────────────
   try {
     const snap = await getDocs(
       query(collection(db, "orders"), where("ownerUid", "==", uid))
     )
-    snap.docs.forEach(d =>
-      results.push({ id: d.id, _source: "orders", ...d.data() })
-    )
+    snap.docs.forEach(d => results.push({ id: d.id, _source: "orders", ...d.data() }))
     console.log("📦 orders:", snap.size)
-  } catch(e) {
+  } catch (e) {
     console.warn("⚠️ orders:", e.code, e.message)
   }
 
-  // ── Dédupliquer par sessionId Stripe (champ 'id' du doc Firestore)
-  // ET par combinaison email+montant+date pour éviter les doublons
-  // entre collections différentes (même commande enregistrée dans orders ET forders)
-  const seen     = new Set()
-  const seenSig  = new Set()
-  const unique   = results.filter(o => {
-    // Dédup par id Firestore
+  // ── forders (Free) — multi-champs car écrit côté client ─────
+  // On essaie successivement : ownerUid, sellerUid, userId, uid
+  const fordersFields = ["ownerUid", "sellerUid", "userId", "uid", "ownerId"]
+  for (const field of fordersFields) {
+    try {
+      const snap = await getDocs(
+        query(collection(db, "forders"), where(field, "==", uid))
+      )
+      if (snap.size > 0) {
+        snap.docs.forEach(d => results.push({ id: d.id, _source: "forders", ...d.data() }))
+        console.log(`📦 forders [${field}]:`, snap.size)
+      }
+    } catch (e) {
+      console.warn(`⚠️ forders [${field}]:`, e.code, e.message)
+    }
+  }
+
+  // ── forders fallback par siteSlug / storeSlug ───────────────
+  if (slug) {
+    for (const field of ["siteSlug", "storeSlug", "publishedSlug", "slug"]) {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "forders"), where(field, "==", slug))
+        )
+        if (snap.size > 0) {
+          snap.docs.forEach(d => results.push({ id: d.id, _source: "forders", ...d.data() }))
+          console.log(`📦 forders [${field}=${slug}]:`, snap.size)
+        }
+      } catch (e) {
+        console.warn(`⚠️ forders [${field}]:`, e.code, e.message)
+      }
+    }
+  }
+
+  // ── Dédup par id Firestore ──────────────────────────────────
+  const seen = new Set()
+  const unique = results.filter(o => {
     if (seen.has(o.id)) return false
     seen.add(o.id)
-    // Dédup par signature métier : email + total + createdAt
-    const sig = `${o.email||o.customerEmail||""}_${o.total||""}_${o.createdAt||""}`
-    if (seenSig.has(sig)) return false
-    seenSig.add(sig)
     return true
   })
 
-  console.log("📦 Total après dédup:", unique.length, "/ avant:", results.length)
-
-  // Tri par date décroissante
   orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
-  // Stats
   const pro  = orders.value.filter(o => o._source === "orders")
   const free = orders.value.filter(o => o._source === "forders")
   ordersStats.value = {
@@ -682,6 +691,9 @@ const loadOrders = async (uid) => {
 
   ordersLoading.value = false
 }
+
+
+  
 
 // ── Actions ────────────────────────────────────────────────────
 const toggleOrders = () => {
