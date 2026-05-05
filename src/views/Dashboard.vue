@@ -633,7 +633,7 @@ const loadOrders = async (uid) => {
     )
     console.log("📦 forders:", snap.size)
   } catch(e) {
-    console.error("❌ forders:", e.code, e.message)
+    console.warn("⚠️ forders:", e.code, e.message)
   }
 
   // ── orders (plan Pro) ───────────────────────────────────────
@@ -646,7 +646,7 @@ const loadOrders = async (uid) => {
     )
     console.log("📦 orders:", snap.size)
   } catch(e) {
-    console.error("❌ orders:", e.code, e.message)
+    console.warn("⚠️ orders:", e.code, e.message)
   }
 
   // ── Dédupliquer par sessionId Stripe (champ 'id' du doc Firestore)
