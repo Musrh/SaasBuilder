@@ -483,7 +483,7 @@
 import { ref, computed, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { auth, db } from "../firebase"
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
 const BACKEND     = "https://backendfinal-production-afd2.up.railway.app"
@@ -609,23 +609,47 @@ onMounted(() => {
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
-// Lit orders (Pro) + forders (Free) par ownerUid
+// Pro  → backendfinal  /api/orders/:uid
+// Free → backend-master /api/forders/:uid
+// Les deux en parallèle, fusionnés et triés par date
+const BACKEND_FREE = "https://backend-master-production-cf50.up.railway.app"
+const BACKEND_PRO  = "https://backendfinal-production-afd2.up.railway.app"
+
+const toMs = (v) => {
+  if (!v) return 0
+  if (v?.toDate)  return v.toDate().getTime()   // Timestamp Firestore
+  if (v?.seconds) return v.seconds * 1000        // Timestamp sérialisé
+  return new Date(v).getTime()                   // string ISO ou nombre
+}
+
 const loadOrders = async (uid) => {
   ordersLoading.value = true
   const results = []
 
-  for (const colName of ["orders", "forders"]) {
-    try {
-      const snap = await getDocs(
-        query(collection(db, colName), where("ownerUid", "==", uid))
-      )
-      snap.docs.forEach(d => {
-        results.push({ id: d.id, _source: colName, ...d.data() })
-      })
-      console.log(`📦 ${colName}: ${snap.size} commande(s) pour ${uid}`)
-    } catch(e) {
-      console.warn(`⚠️ ${colName}:`, e.code, e.message)
-    }
+  // ── Appels backend en parallèle ──────────────────────────────
+  const [resPro, resFree] = await Promise.allSettled([
+    fetch(`${BACKEND_PRO}/api/orders/${uid}`).then(r => r.json()),
+    fetch(`${BACKEND_FREE}/api/forders/${uid}`).then(r => r.json()),
+  ])
+
+  // Pro (orders)
+  if (resPro.status === "fulfilled" && resPro.value?.commandes) {
+    resPro.value.commandes.forEach(o => {
+      results.push({ ...o, _source: "orders" })
+    })
+    console.log(`📦 orders (Pro): ${resPro.value.commandes.length}`)
+  } else {
+    console.warn("⚠️ orders Pro:", resPro.reason || resPro.value)
+  }
+
+  // Free (forders)
+  if (resFree.status === "fulfilled" && resFree.value?.commandes) {
+    resFree.value.commandes.forEach(o => {
+      results.push({ ...o, _source: "forders" })
+    })
+    console.log(`📦 forders (Free): ${resFree.value.commandes.length}`)
+  } else {
+    console.warn("⚠️ forders Free:", resFree.reason || resFree.value)
   }
 
   // Dédupliquer par id
@@ -636,13 +660,7 @@ const loadOrders = async (uid) => {
     return true
   })
 
-  // Tri par date — supporte Timestamp Firestore, string ISO, et nombre
-  const toMs = (v) => {
-    if (!v) return 0
-    if (v?.toDate) return v.toDate().getTime()      // Firestore Timestamp
-    if (v?.seconds) return v.seconds * 1000          // Timestamp sérialisé
-    return new Date(v).getTime()                     // string ISO ou nombre
-  }
+  // Tri par date décroissante
   orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
   // Stats
