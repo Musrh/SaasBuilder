@@ -28,8 +28,8 @@ const routes = [
   // ======================
   // ROUTES PRINCIPALES
   // ======================
-  { path: "/", name: "home", component: PlanSelection },
-  { path: "/auth", name: "auth", component: AuthForm },
+ // { path: "/", name: "home", component: PlanSelection },
+  { path: "/", name: "auth", component: AuthForm },
 
   { path: "/slug-setup", name: "slug-setup", component: SlugSetup, meta: { requiresAuth: true } },
   { path: "/dashboard",  name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
