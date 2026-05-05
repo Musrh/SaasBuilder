@@ -623,29 +623,59 @@ const loadOrders = async (uid) => {
   ordersLoading.value = true
   const results = []
 
-  // Lire orders + forders en parallèle directement depuis Firestore
-  const [snapOrders, snapForders] = await Promise.allSettled([
-    getDocs(query(collection(db, "orders"),  where("ownerUid", "==", uid))),
-    getDocs(query(collection(db, "forders"), where("ownerUid", "==", uid))),
-  ])
+  console.log("🔍 loadOrders uid:", uid)
 
-  if (snapOrders.status === "fulfilled") {
-    snapOrders.value.docs.forEach(d =>
+  // ── Lire forders directement par ownerUid ──────────────────
+  try {
+    // Tentative 1 : lecture avec filtre ownerUid
+    const q = query(collection(db, "forders"), where("ownerUid", "==", uid))
+    const snap = await getDocs(q)
+    console.log("✅ forders OK — docs:", snap.size)
+    snap.docs.forEach(d => {
+      console.log("  forder doc:", d.id, d.data().email, d.data().ownerUid)
+      results.push({ id: d.id, _source: "forders", ...d.data() })
+    })
+  } catch(e) {
+    console.error("❌ forders ERREUR:", e.code, e.message)
+    // Tentative 2 : lecture sans filtre (test accès collection)
+    try {
+      const snap2 = await getDocs(collection(db, "forders"))
+      console.log("forders sans filtre — docs:", snap2.size)
+      snap2.docs
+        .filter(d => d.data().ownerUid === uid)
+        .forEach(d => results.push({ id: d.id, _source: "forders", ...d.data() }))
+    } catch(e2) {
+      console.error("❌ forders sans filtre:", e2.code, e2.message)
+    }
+  }
+
+  // ── Lire orders par ownerUid ────────────────────────────────
+  try {
+    const snap = await getDocs(
+      query(collection(db, "orders"), where("ownerUid", "==", uid))
+    )
+    console.log("✅ orders OK — docs:", snap.size)
+    snap.docs.forEach(d =>
       results.push({ id: d.id, _source: "orders", ...d.data() })
     )
-    console.log(`📦 orders: ${snapOrders.value.size}`)
-  } else {
-    console.warn("⚠️ orders:", snapOrders.reason?.code, snapOrders.reason?.message)
+  } catch(e) {
+    console.error("❌ orders ERREUR:", e.code, e.message)
   }
 
-  if (snapForders.status === "fulfilled") {
-    snapForders.value.docs.forEach(d =>
-      results.push({ id: d.id, _source: "forders", ...d.data() })
-    )
-    console.log(`📦 forders: ${snapForders.value.size}`)
-  } else {
-    console.warn("⚠️ forders:", snapForders.reason?.code, snapForders.reason?.message)
+  // ── Lire aussi users/{uid}/orders (sous-collection) ─────────
+  try {
+    const snap = await getDocs(collection(db, "users", uid, "orders"))
+    console.log("✅ users/orders OK — docs:", snap.size)
+    snap.docs.forEach(d => {
+      const data = d.data()
+      const src  = data.plan === "free" ? "forders" : "orders"
+      results.push({ id: d.id, _source: src, ...data })
+    })
+  } catch(e) {
+    console.warn("users/orders:", e.code, e.message)
   }
+
+  console.log("📦 Total résultats avant dédup:", results.length)
 
   // Dédupliquer
   const seen = new Set()
@@ -655,7 +685,7 @@ const loadOrders = async (uid) => {
     return true
   })
 
-  // Tri par date décroissante
+  // Tri par date
   orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
   // Stats
