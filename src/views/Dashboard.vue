@@ -99,9 +99,14 @@
             <div class="db-stat-body">
               <p class="db-stat-label">Commandes</p>
               <p class="db-stat-val db-val-purple">
-                {{ ordersLoading ? '...' : orders.length }}
+                {{ ordersLoading ? '...' : ordersStats.total }}
               </p>
-              <p class="db-stat-sub">{{ showOrders ? 'Masquer ▲' : 'Voir les commandes ▼' }}</p>
+              <p class="db-stat-sub" v-if="!ordersLoading && ordersStats.total > 0">
+                <span style="color:#22c55e">{{ ordersStats.pro }} Pro</span>
+                · <span style="color:#9ca3af">{{ ordersStats.free }} Free</span>
+                · {{ ordersStats.revenue }} €
+              </p>
+              <p class="db-stat-sub" v-else>{{ showOrders ? 'Masquer ▲' : 'Voir ▼' }}</p>
             </div>
           </div>
 
@@ -111,11 +116,29 @@
         <Transition name="db-slide">
           <div v-if="showOrders" class="db-orders-panel">
             <div class="db-orders-header">
-              <h2 class="db-orders-title">📦 Commandes clients</h2>
+              <div>
+                <h2 class="db-orders-title">📦 Commandes clients</h2>
+                <div class="db-orders-source-tabs">
+                  <button
+                    v-for="src in [
+                      {v:'all',    l:'Toutes', c: ordersStats.total},
+                      {v:'orders', l:'Pro',    c: ordersStats.pro},
+                      {v:'forders',l:'Free',   c: ordersStats.free}
+                    ]"
+                    :key="src.v"
+                    class="db-source-tab"
+                    :class="{active: orderSource === src.v}"
+                    @click="orderSource = src.v"
+                  >
+                    {{ src.l }}
+                    <span class="db-source-count">{{ src.c }}</span>
+                  </button>
+                </div>
+              </div>
               <div class="db-orders-filters">
                 <input
                   v-model="orderSearch"
-                  placeholder="Rechercher email, produit..."
+                  placeholder="Email, produit, slug..."
                   class="db-search-input"
                 />
                 <select v-model="orderFilter" class="db-filter-select">
@@ -123,6 +146,12 @@
                   <option value="paid">Payées</option>
                   <option value="pending">En attente</option>
                 </select>
+                <button
+                  class="db-btn db-btn-outline"
+                  @click="loadOrders(user.uid)"
+                  title="Actualiser"
+                  :disabled="ordersLoading"
+                >↻</button>
               </div>
             </div>
 
@@ -168,7 +197,13 @@
                   </div>
                   <div class="db-order-right">
                     <p class="db-order-total">{{ formatTotal(order) }}</p>
-                    <p class="db-order-provider">{{ order.provider || 'stripe' }}</p>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span
+                        class="db-order-plan-badge"
+                        :class="order._source === 'orders' ? 'db-plan-pro-badge' : 'db-plan-free-badge'"
+                      >{{ order._source === 'orders' ? 'PRO' : 'FREE' }}</span>
+                      <p class="db-order-provider">{{ order.provider || 'stripe' }}</p>
+                    </div>
                     <button
                       class="db-order-toggle"
                       @click="toggleOrderDetail(order.id)"
@@ -205,6 +240,9 @@
                       </div>
                     </div>
                     <p v-else class="db-no-items">Détail des articles non disponible</p>
+                    <div v-if="order.siteSlug || order.storeName" class="db-order-addr">
+                      🔗 <strong style="color:#a78bfa">{{ order.siteSlug || order.storeName }}</strong>
+                    </div>
                     <div v-if="order.customerAddress || order.adresseLivraison" class="db-order-addr">
                       📍 {{ order.customerAddress || order.adresseLivraison }}
                     </div>
@@ -467,6 +505,8 @@ const showOrders    = ref(false)
 const openOrderId   = ref(null)
 const orderSearch   = ref("")
 const orderFilter   = ref("")
+const orderSource   = ref("all")   // "all" | "orders" | "forders"
+const ordersStats   = ref({ total: 0, free: 0, pro: 0, revenue: 0 })
 
 // ── Computed plan ──────────────────────────────────────────────
 const planExpired = computed(() => {
@@ -526,14 +566,19 @@ const isProActive = computed(() => {
 // ── Commandes filtrées ─────────────────────────────────────────
 const filteredOrders = computed(() => {
   let list = [...orders.value]
+  // Filtre source : all | orders (Pro) | forders (Free)
+  if (orderSource.value !== "all") {
+    list = list.filter(o => o._source === orderSource.value)
+  }
   if (orderFilter.value) {
     list = list.filter(o => o.status === orderFilter.value)
   }
   if (orderSearch.value.trim()) {
     const q = orderSearch.value.toLowerCase()
     list = list.filter(o =>
-      (o.customerEmail || o.clientEmail || "").toLowerCase().includes(q) ||
+      (o.customerEmail || o.email       || "").toLowerCase().includes(q) ||
       (o.customerName  || o.clientName  || "").toLowerCase().includes(q) ||
+      (o.siteSlug      || "").toLowerCase().includes(q) ||
       (o.items || []).some(i => (i.name || "").toLowerCase().includes(q))
     )
   }
@@ -564,34 +609,54 @@ onMounted(() => {
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
-// ── Charger les commandes du propriétaire ──────────────────────
-// Interroge les deux collections (orders + forders) par ownerUid
-// et fusionne les résultats — sans orderBy pour éviter les index.
+// Lit orders (Pro) + forders (Free) par ownerUid
 const loadOrders = async (uid) => {
   ordersLoading.value = true
-  try {
-    const results = []
-    for (const colName of ["orders", "forders"]) {
-      try {
-        const snap = await getDocs(
-          query(collection(db, colName), where("ownerUid", "==", uid))
-        )
-        snap.docs.forEach(d => results.push({ id: d.id, _source: colName, ...d.data() }))
-      } catch(e) {
-        console.warn(`Erreur lecture ${colName}:`, e.code || e.message)
-      }
+  const results = []
+
+  for (const colName of ["orders", "forders"]) {
+    try {
+      const snap = await getDocs(
+        query(collection(db, colName), where("ownerUid", "==", uid))
+      )
+      snap.docs.forEach(d => {
+        results.push({ id: d.id, _source: colName, ...d.data() })
+      })
+      console.log(`📦 ${colName}: ${snap.size} commande(s) pour ${uid}`)
+    } catch(e) {
+      console.warn(`⚠️ ${colName}:`, e.code, e.message)
     }
-    // Tri par date décroissante (createdAt peut être Timestamp ou string ISO)
-    orders.value = results.sort((a, b) => {
-      const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0)
-      const db_ = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0)
-      return db_ - da
-    })
-  } catch(e) {
-    console.error("loadOrders:", e.message)
-  } finally {
-    ordersLoading.value = false
   }
+
+  // Dédupliquer par id
+  const seen = new Set()
+  const unique = results.filter(o => {
+    if (seen.has(o.id)) return false
+    seen.add(o.id)
+    return true
+  })
+
+  // Tri par date — supporte Timestamp Firestore, string ISO, et nombre
+  const toMs = (v) => {
+    if (!v) return 0
+    if (v?.toDate) return v.toDate().getTime()      // Firestore Timestamp
+    if (v?.seconds) return v.seconds * 1000          // Timestamp sérialisé
+    return new Date(v).getTime()                     // string ISO ou nombre
+  }
+  orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
+
+  // Stats
+  const pro  = orders.value.filter(o => o._source === "orders")
+  const free = orders.value.filter(o => o._source === "forders")
+  const rev  = orders.value.reduce((acc, o) => acc + parseFloat(o.total || 0), 0)
+  ordersStats.value = {
+    total:   orders.value.length,
+    pro:     pro.length,
+    free:    free.length,
+    revenue: rev.toFixed(2)
+  }
+
+  ordersLoading.value = false
 }
 
 // ── Actions ────────────────────────────────────────────────────
@@ -1150,4 +1215,40 @@ const exportOrdersCSV = () => {
 .db-btn-confirm:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
 .db-btn-confirm:disabled { opacity: .45; cursor: not-allowed; }
 .db-plan-note { text-align: center; font-size: 11px; color: #5a5a6a; margin-top: 10px; }
+
+/* ── Onglets source commandes ──────────────────────────────── */
+.db-orders-source-tabs {
+  display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;
+}
+.db-source-tab {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  color: #8a8a9a; font-size: 12px; font-weight: 600;
+  padding: 4px 12px; border-radius: 100px;
+  cursor: pointer; transition: .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.db-source-tab:hover { border-color: rgba(255,255,255,.2); color: #f0f0f0; }
+.db-source-tab.active {
+  background: rgba(108,99,255,.15);
+  border-color: rgba(108,99,255,.5);
+  color: #a78bfa;
+}
+.db-source-count {
+  background: rgba(255,255,255,.1);
+  font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 100px; color: #8a8a9a;
+}
+.db-source-tab.active .db-source-count {
+  background: rgba(108,99,255,.3); color: #a78bfa;
+}
+/* ── Badge plan Free/Pro ───────────────────────────────────── */
+.db-order-plan-badge {
+  font-size: 9px; font-weight: 800;
+  padding: 2px 6px; border-radius: 4px;
+  letter-spacing: .5px; text-transform: uppercase;
+}
+.db-plan-pro-badge  { background: rgba(108,99,255,.2); color: #a78bfa; }
+.db-plan-free-badge { background: rgba(156,163,175,.15); color: #9ca3af; }
 </style>
