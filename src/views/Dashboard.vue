@@ -623,69 +623,51 @@ const loadOrders = async (uid) => {
   ordersLoading.value = true
   const results = []
 
-  console.log("🔍 loadOrders uid:", uid)
-
-  // ── Lire forders directement par ownerUid ──────────────────
+  // ── forders (plan Free) ─────────────────────────────────────
   try {
-    // Tentative 1 : lecture avec filtre ownerUid
-    const q = query(collection(db, "forders"), where("ownerUid", "==", uid))
-    const snap = await getDocs(q)
-    console.log("✅ forders OK — docs:", snap.size)
-    snap.docs.forEach(d => {
-      console.log("  forder doc:", d.id, d.data().email, d.data().ownerUid)
+    const snap = await getDocs(
+      query(collection(db, "forders"), where("ownerUid", "==", uid))
+    )
+    snap.docs.forEach(d =>
       results.push({ id: d.id, _source: "forders", ...d.data() })
-    })
+    )
+    console.log("📦 forders:", snap.size)
   } catch(e) {
-    console.error("❌ forders ERREUR:", e.code, e.message)
-    // Tentative 2 : lecture sans filtre (test accès collection)
-    try {
-      const snap2 = await getDocs(collection(db, "forders"))
-      console.log("forders sans filtre — docs:", snap2.size)
-      snap2.docs
-        .filter(d => d.data().ownerUid === uid)
-        .forEach(d => results.push({ id: d.id, _source: "forders", ...d.data() }))
-    } catch(e2) {
-      console.error("❌ forders sans filtre:", e2.code, e2.message)
-    }
+    console.error("❌ forders:", e.code, e.message)
   }
 
-  // ── Lire orders par ownerUid ────────────────────────────────
+  // ── orders (plan Pro) ───────────────────────────────────────
   try {
     const snap = await getDocs(
       query(collection(db, "orders"), where("ownerUid", "==", uid))
     )
-    console.log("✅ orders OK — docs:", snap.size)
     snap.docs.forEach(d =>
       results.push({ id: d.id, _source: "orders", ...d.data() })
     )
+    console.log("📦 orders:", snap.size)
   } catch(e) {
-    console.error("❌ orders ERREUR:", e.code, e.message)
+    console.error("❌ orders:", e.code, e.message)
   }
 
-  // ── Lire aussi users/{uid}/orders (sous-collection) ─────────
-  try {
-    const snap = await getDocs(collection(db, "users", uid, "orders"))
-    console.log("✅ users/orders OK — docs:", snap.size)
-    snap.docs.forEach(d => {
-      const data = d.data()
-      const src  = data.plan === "free" ? "forders" : "orders"
-      results.push({ id: d.id, _source: src, ...data })
-    })
-  } catch(e) {
-    console.warn("users/orders:", e.code, e.message)
-  }
-
-  console.log("📦 Total résultats avant dédup:", results.length)
-
-  // Dédupliquer
-  const seen = new Set()
-  const unique = results.filter(o => {
+  // ── Dédupliquer par sessionId Stripe (champ 'id' du doc Firestore)
+  // ET par combinaison email+montant+date pour éviter les doublons
+  // entre collections différentes (même commande enregistrée dans orders ET forders)
+  const seen     = new Set()
+  const seenSig  = new Set()
+  const unique   = results.filter(o => {
+    // Dédup par id Firestore
     if (seen.has(o.id)) return false
     seen.add(o.id)
+    // Dédup par signature métier : email + total + createdAt
+    const sig = `${o.email||o.customerEmail||""}_${o.total||""}_${o.createdAt||""}`
+    if (seenSig.has(sig)) return false
+    seenSig.add(sig)
     return true
   })
 
-  // Tri par date
+  console.log("📦 Total après dédup:", unique.length, "/ avant:", results.length)
+
+  // Tri par date décroissante
   orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
   // Stats
