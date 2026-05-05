@@ -483,7 +483,7 @@
 import { ref, computed, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { auth, db } from "../firebase"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
 const BACKEND     = "https://backendfinal-production-afd2.up.railway.app"
@@ -609,11 +609,8 @@ onMounted(() => {
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
-// Pro  → backendfinal  /api/orders/:uid
-// Free → backend-master /api/forders/:uid
-// Les deux en parallèle, fusionnés et triés par date
-const BACKEND_FREE = "https://backend-master-production-cf50.up.railway.app"
-const BACKEND_PRO  = "https://backendfinal-production-afd2.up.railway.app"
+// Lecture directe Firestore — rules : ownerUid == auth.uid
+// collections : orders (Pro) + forders (Free)
 
 const toMs = (v) => {
   if (!v) return 0
@@ -626,33 +623,31 @@ const loadOrders = async (uid) => {
   ordersLoading.value = true
   const results = []
 
-  // ── Appels backend en parallèle ──────────────────────────────
-  const [resPro, resFree] = await Promise.allSettled([
-    fetch(`${BACKEND_PRO}/api/orders/${uid}`).then(r => r.json()),
-    fetch(`${BACKEND_FREE}/api/forders/${uid}`).then(r => r.json()),
+  // Lire orders + forders en parallèle directement depuis Firestore
+  const [snapOrders, snapForders] = await Promise.allSettled([
+    getDocs(query(collection(db, "orders"),  where("ownerUid", "==", uid))),
+    getDocs(query(collection(db, "forders"), where("ownerUid", "==", uid))),
   ])
 
-  // Pro (orders)
-  if (resPro.status === "fulfilled" && resPro.value?.commandes) {
-    resPro.value.commandes.forEach(o => {
-      results.push({ ...o, _source: "orders" })
-    })
-    console.log(`📦 orders (Pro): ${resPro.value.commandes.length}`)
+  if (snapOrders.status === "fulfilled") {
+    snapOrders.value.docs.forEach(d =>
+      results.push({ id: d.id, _source: "orders", ...d.data() })
+    )
+    console.log(`📦 orders: ${snapOrders.value.size}`)
   } else {
-    console.warn("⚠️ orders Pro:", resPro.reason || resPro.value)
+    console.warn("⚠️ orders:", snapOrders.reason?.code, snapOrders.reason?.message)
   }
 
-  // Free (forders)
-  if (resFree.status === "fulfilled" && resFree.value?.commandes) {
-    resFree.value.commandes.forEach(o => {
-      results.push({ ...o, _source: "forders" })
-    })
-    console.log(`📦 forders (Free): ${resFree.value.commandes.length}`)
+  if (snapForders.status === "fulfilled") {
+    snapForders.value.docs.forEach(d =>
+      results.push({ id: d.id, _source: "forders", ...d.data() })
+    )
+    console.log(`📦 forders: ${snapForders.value.size}`)
   } else {
-    console.warn("⚠️ forders Free:", resFree.reason || resFree.value)
+    console.warn("⚠️ forders:", snapForders.reason?.code, snapForders.reason?.message)
   }
 
-  // Dédupliquer par id
+  // Dédupliquer
   const seen = new Set()
   const unique = results.filter(o => {
     if (seen.has(o.id)) return false
@@ -666,12 +661,11 @@ const loadOrders = async (uid) => {
   // Stats
   const pro  = orders.value.filter(o => o._source === "orders")
   const free = orders.value.filter(o => o._source === "forders")
-  const rev  = orders.value.reduce((acc, o) => acc + parseFloat(o.total || 0), 0)
   ordersStats.value = {
     total:   orders.value.length,
     pro:     pro.length,
     free:    free.length,
-    revenue: rev.toFixed(2)
+    revenue: orders.value.reduce((acc, o) => acc + parseFloat(o.total || 0), 0).toFixed(2)
   }
 
   ordersLoading.value = false
