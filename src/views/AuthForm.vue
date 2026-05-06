@@ -166,7 +166,7 @@ import {
   signOut,
 } from "firebase/auth"
 
-  import logo from "@/assets/logo.png"
+  import logo from "../assets/logo.png"
 
 const route  = useRoute()
 const router = useRouter()
