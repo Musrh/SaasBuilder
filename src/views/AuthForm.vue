@@ -2,7 +2,7 @@
   <div class="af-root">
     <!-- Logo en haut à gauche -->
     <div class="af-topbar">
-      <img src="/logo.png" alt="SaasBuilder" class="af-logo" />
+      <img src="../public/logo.png" alt="SaasBuilder" class="af-logo" />
     </div>
 
     <div class="af-layout">
