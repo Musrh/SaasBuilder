@@ -2,7 +2,7 @@
   <div class="af-root">
     <!-- Logo en haut à gauche -->
     <div class="af-topbar">
-      <img src="../public/logo.png" alt="SaasBuilder" class="af-logo" />
+      <img :src="logo.png" alt="SaasBuilder" class="af-logo" />
     </div>
 
     <div class="af-layout">
@@ -165,6 +165,8 @@ import {
   sendPasswordResetEmail,
   signOut,
 } from "firebase/auth"
+
+  import logo from "@/assets/logo.png"
 
 const route  = useRoute()
 const router = useRouter()
