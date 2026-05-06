@@ -15,11 +15,10 @@ const site = ref({
     remboursement: ""
   },
   pages: [{
-    id: 1, name: "Accueil", style: {},
-    sections: [
-      { id: 1, type: "hero", content: "Créez votre site web\nen quelques minutes.", subtitle: "Une plateforme puissante, simple et élégante.", cta: "Commencer", style: {} },
-      { id: 2, type: "text", content: "Bienvenue sur notre plateforme.", style: {} }
-    ]
+    id: 1,
+    name: "Accueil",
+    style: {},
+    sections: []
   }]
 })
 
@@ -612,17 +611,17 @@ onMounted(() => {
           if (!site.value.legal.privacyPolicy) site.value.legal.privacyPolicy = ""
           if (!site.value.legal.remboursement) site.value.legal.remboursement = ""
           if (!site.value.theme) site.value.theme = null
+          // Garantir qu'au moins une page existe (sans imposer de sections)
+          if (!Array.isArray(site.value.pages) || site.value.pages.length === 0) {
+            site.value.pages = [{ id: Date.now(), name: "Accueil", style: {}, sections: [] }]
+          }
         }
         if (d.siteName) siteName.value = d.siteName
         if (d.siteLogo) siteLogo.value = d.siteLogo
-
-        if (!d.siteData) {
-          const saved = localStorage.getItem("siteDataPro")
-          if (saved) site.value = JSON.parse(saved)
-        }
+        // Pas de fallback localStorage : un nouveau propriétaire démarre avec un site vierge
       } else {
-        const saved = localStorage.getItem("siteDataPro")
-        if (saved) site.value = JSON.parse(saved)
+        // Nouveau propriétaire : on garde le site vide initialisé en ref()
+        // (pas de récupération localStorage d'un autre compte)
       }
       // Après chargement, marquer comme sauvegardé (pas de faux "unsaved")
       isSaved.value = true
