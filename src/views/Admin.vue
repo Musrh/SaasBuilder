@@ -169,9 +169,17 @@
 
               <!-- Statut -->
               <td>
-                <span :class="owner.active === false ? 'adm-status-off' : 'adm-status-on'">
-                  {{ owner.active === false ? 'Désactivé' : 'Actif' }}
-                </span>
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <span :class="owner.active === false ? 'adm-status-off' : 'adm-status-on'">
+                    {{ owner.active === false ? 'Désactivé' : 'Actif' }}
+                  </span>
+                  <!-- Compte Firestore=true mais expiry dépassé → cron pas encore tourné -->
+                  <span
+                    v-if="owner._rawActive && !owner.active && owner.plan !== 'free'"
+                    class="adm-status-pending"
+                    title="Expiré — sera désactivé au prochain cron (1h00)"
+                  >⏳ À suspendre</span>
+                </div>
               </td>
 
               <!-- Actions -->
@@ -200,6 +208,17 @@
                 <!-- Prolonger expiration -->
                 <button class="adm-btn-extend" @click="extendExpiry(owner, 30)" title="Prolonger de 30 jours">
                   +30j
+                </button>
+
+                <!-- Suspendre maintenant si expiré mais Firestore encore actif -->
+                <button
+                  v-if="owner._rawActive && !owner.active && owner.plan !== 'free'"
+                  class="adm-btn-suspend-now"
+                  @click="suspendNow(owner)"
+                  :disabled="toggling === owner.id"
+                  title="Appliquer la suspension maintenant"
+                >
+                  🔒 Suspendre
                 </button>
               </td>
             </tr>
@@ -283,19 +302,30 @@ const loadOwners = async () => {
   loading.value = true
   try {
     const snap = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc")))
-    owners.value = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      // Normaliser les champs manquants
-      email:         d.data().email         || "—",
-      plan:          d.data().plan          || "free",
-      paye:          d.data().paye          || false,
-      active:        d.data().active        !== false, // true par défaut
-      subscriptionActive: d.data().subscriptionActive === true,
-      createdAt:     d.data().createdAt     || null,
-      expiry:        d.data().expiry        || null,
-      publishedSlug: d.data().publishedSlug || "",
-    }))
+    owners.value = snap.docs.map(d => {
+      const data   = d.data()
+      const expiry = data.expiry || null
+      const now    = Date.now()
+
+      // Statut réel = active ET (free OU expiry non dépassé)
+      const firestoreActive = data.active !== false
+      const notExpired      = !expiry || data.plan === "free" || expiry > now
+      const effectiveActive = firestoreActive && notExpired
+
+      return {
+        id: d.id,
+        ...data,
+        email:         data.email         || "—",
+        plan:          data.plan          || "free",
+        paye:          data.paye          || false,
+        active:        effectiveActive,           // statut réel calculé
+        _rawActive:    firestoreActive,            // valeur brute Firestore
+        subscriptionActive: data.subscriptionActive === true,
+        createdAt:     data.createdAt     || null,
+        expiry,
+        publishedSlug: data.publishedSlug || "",
+      }
+    })
   } catch(e) {
     showToast("Erreur chargement : " + e.message, "error")
   } finally {
@@ -437,6 +467,30 @@ const showToast = (msg, type = "success") => {
 }
 
 // ── Déclencher la vérification des comptes expirés ─────────────
+// ── Suspendre immédiatement un compte expiré ────────────────────
+const suspendNow = async (owner) => {
+  toggling.value = owner.id
+  try {
+    await updateDoc(doc(db, "users", owner.id), {
+      active:             false,
+      subscriptionActive: false,
+      paye:               false,
+      suspendedAt:        Date.now(),
+      suspendedReason:    "expiry",
+    })
+    const idx = owners.value.findIndex(o => o.id === owner.id)
+    if (idx !== -1) {
+      owners.value[idx].active     = false
+      owners.value[idx]._rawActive = false
+    }
+    showToast(`🔒 ${owner.email} suspendu`)
+  } catch(e) {
+    showToast("Erreur : " + e.message, "error")
+  } finally {
+    toggling.value = null
+  }
+}
+
 const runCheckExpiry = async () => {
   checkExpiryLoading.value = true
   try {
@@ -604,4 +658,31 @@ td{padding:12px 16px;vertical-align:middle}
 .adm-btn-check-expiry{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#fbbf24;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .adm-btn-check-expiry:hover:not(:disabled){background:rgba(245,158,11,.22)}
 .adm-btn-check-expiry:disabled{opacity:.5;cursor:not-allowed}
+
+/* Statut en attente de suspension */
+.adm-status-pending {
+  background: rgba(245,158,11,.12);
+  color: #fbbf24;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Bouton suspendre maintenant */
+.adm-btn-suspend-now {
+  background: rgba(239,68,68,.12);
+  border: 1px solid rgba(239,68,68,.3);
+  color: #f87171;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .2s;
+  white-space: nowrap;
+}
+.adm-btn-suspend-now:hover:not(:disabled) { background: rgba(239,68,68,.22); }
+.adm-btn-suspend-now:disabled { opacity: .5; cursor: not-allowed; }
 </style>
