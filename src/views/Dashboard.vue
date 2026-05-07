@@ -157,8 +157,25 @@
               <p>Chargement des commandes...</p>
             </div>
 
+            <!-- ── Panneau de diagnostic (à retirer une fois que tout fonctionne) ── -->
+            <div v-if="!ordersLoading && debugInfo" class="db-debug-panel">
+              <p class="db-debug-title">🔍 Diagnostic</p>
+              <p>UID&nbsp;: <code>{{ debugInfo.uid }}</code></p>
+              <p>Plan détecté&nbsp;: <code>{{ debugInfo.plan }}</code></p>
+              <p>
+                forders&nbsp;:
+                <span v-if="debugInfo.errorForders" style="color:#f87171">❌ {{ debugInfo.errorForders }}</span>
+                <span v-else style="color:#86efac">✓ {{ debugInfo.forders }} doc(s)</span>
+              </p>
+              <p>
+                orders&nbsp;:
+                <span v-if="debugInfo.errorOrders" style="color:#f87171">❌ {{ debugInfo.errorOrders }}</span>
+                <span v-else style="color:#86efac">✓ {{ debugInfo.orders }} doc(s)</span>
+              </p>
+            </div>
+
             <!-- Erreur Firestore -->
-            <div v-else-if="ordersError" class="db-orders-error">
+            <div v-if="!ordersLoading && ordersError" class="db-orders-error">
               <span>⚠️</span>
               <p>{{ ordersError }}</p>
             </div>
@@ -509,6 +526,7 @@ const openOrderId   = ref(null)
 const orderSearch   = ref("")
 const orderFilter   = ref("")
 const ordersStats   = ref({ total: 0, free: 0, pro: 0, revenue: 0 })
+const debugInfo     = ref(null)   // panneau de diagnostic temporaire
 
 // ── Computed plan ──────────────────────────────────────────────
 const planExpired = computed(() => {
@@ -607,48 +625,68 @@ onMounted(() => {
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
-// Plan Free  → collection "forders" filtrée par ownerUid
-// Plan Pro   → collection "orders"  filtrée par ownerUid
-// Le plan est passé en paramètre pour éviter tout problème de timing.
+// Interroge les DEUX collections en parallèle et affiche tout ce qui est trouvé.
+// Le plan détermine la source principale, mais les deux sont essayées.
 
 const toMs = (v) => {
   if (!v) return 0
-  if (v?.toDate)  return v.toDate().getTime()   // Timestamp Firestore
-  if (v?.seconds) return v.seconds * 1000        // Timestamp sérialisé
-  return new Date(v).getTime()                   // string ISO ou nombre
+  if (v?.toDate)  return v.toDate().getTime()
+  if (v?.seconds) return v.seconds * 1000
+  return new Date(v).getTime()
 }
 
 const loadOrders = async (uid, plan) => {
   ordersLoading.value = true
   ordersError.value   = ""
-  const results       = []
+  debugInfo.value     = null
 
-  // Priorité : paramètre explicite → userData → "free"
   const currentPlan = plan ?? userData.value?.plan ?? "free"
-  const isPro       = currentPlan !== "free"
-  const colName     = isPro ? "orders" : "forders"
+  const log = { uid, plan: currentPlan, forders: null, orders: null, errorForders: null, errorOrders: null }
 
+  const results = []
+
+  // ── forders (plan Free) ─────────────────────────────────────
   try {
     const snap = await getDocs(
-      query(collection(db, colName), where("ownerUid", "==", uid))
+      query(collection(db, "forders"), where("ownerUid", "==", uid))
     )
+    log.forders = snap.size
     snap.docs.forEach(d =>
-      results.push({ id: d.id, _source: colName, ...d.data() })
+      results.push({ id: d.id, _source: "forders", ...d.data() })
     )
   } catch(e) {
-    const code = e.code || ""
-    if (code === "permission-denied") {
-      ordersError.value = `Accès refusé à la collection "${colName}". Vérifiez les règles Firestore.`
-    } else {
-      ordersError.value = `Erreur lors du chargement des commandes : ${code || e.message}`
-    }
-    console.error(`⚠️ ${colName}:`, e.code, e.message)
+    log.errorForders = `${e.code || e.message}`
   }
 
-  // Tri par date décroissante
-  orders.value = results.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
+  // ── orders (plan Pro) ───────────────────────────────────────
+  try {
+    const snap = await getDocs(
+      query(collection(db, "orders"), where("ownerUid", "==", uid))
+    )
+    log.orders = snap.size
+    snap.docs.forEach(d =>
+      results.push({ id: d.id, _source: "orders", ...d.data() })
+    )
+  } catch(e) {
+    log.errorOrders = `${e.code || e.message}`
+  }
 
-  // Stats
+  debugInfo.value = log
+
+  // Dédupliquer par id Firestore
+  const seen   = new Set()
+  const unique = results.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true })
+
+  // Tri par date décroissante
+  orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
+
+  if (orders.value.length === 0 && (log.errorForders || log.errorOrders)) {
+    ordersError.value = [
+      log.errorForders ? `forders : ${log.errorForders}` : "",
+      log.errorOrders  ? `orders : ${log.errorOrders}`   : "",
+    ].filter(Boolean).join(" | ")
+  }
+
   ordersStats.value = {
     total:   orders.value.length,
     pro:     orders.value.filter(o => o._source === "orders").length,
@@ -969,6 +1007,15 @@ const exportOrdersCSV = () => {
   border-radius: 10px; color: #fca5a5; font-size: 13px;
 }
 .db-orders-error span { font-size: 18px; flex-shrink: 0; }
+.db-debug-panel {
+  margin: 12px 16px;
+  background: rgba(255,255,255,.04);
+  border: 1px dashed rgba(255,255,255,.15);
+  border-radius: 10px; padding: 12px 16px;
+  font-size: 12px; color: #8a8a9a; display: flex; flex-direction: column; gap: 4px;
+}
+.db-debug-title { font-weight: 700; color: #c4b5fd; margin-bottom: 4px; }
+.db-debug-panel code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; color: #f0f0f0; font-size: 11px; }
 
 /* Cartes commandes */
 .db-orders-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
