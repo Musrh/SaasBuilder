@@ -65,6 +65,13 @@
             <div class="adm-stat-label">Désactivés</div>
           </div>
         </div>
+        <div class="adm-stat-card adm-stat-warning" @click="filterPlan=''; search='expiring'">
+          <span class="adm-stat-icon">⚠️</span>
+          <div>
+            <div class="adm-stat-val adm-stat-val-warn">{{ expiringSoon.length }}</div>
+            <div class="adm-stat-label">Expirent dans 7j</div>
+          </div>
+        </div>
       </div>
 
       <!-- Barre de recherche -->
@@ -81,6 +88,15 @@
           <option value="premium">Premium</option>
         </select>
         <button class="adm-btn-refresh" @click="loadOwners">🔄 Actualiser</button>
+        <button
+          class="adm-btn-check-expiry"
+          @click="runCheckExpiry"
+          :disabled="checkExpiryLoading"
+          title="Désactiver les comptes expirés maintenant"
+        >
+          <span v-if="checkExpiryLoading" class="adm-spinner-sm"/>
+          <span v-else>⏰ Vérifier expirés</span>
+        </button>
         <button class="adm-btn-export" @click="exportCSV" title="Exporter en CSV">📥 Export CSV</button>
       </div>
 
@@ -130,9 +146,10 @@
 
               <!-- Date expiration -->
               <td class="adm-td-date">
-                <span :class="isExpired(owner.expiry) ? 'adm-expired' : 'adm-valid'">
+                <span :class="isExpired(owner.expiry) ? 'adm-expired' : isExpiringSoon(owner.expiry) ? 'adm-expiring-soon' : 'adm-valid'">
                   {{ owner.expiry ? formatDate(owner.expiry) : '—' }}
-                  <span v-if="isExpired(owner.expiry)" class="adm-exp-badge">Expiré</span>
+                  <span v-if="isExpired(owner.expiry)"      class="adm-exp-badge">Expiré</span>
+                  <span v-else-if="isExpiringSoon(owner.expiry)" class="adm-exp-badge adm-exp-soon">⚠ 7j</span>
                 </span>
               </td>
 
@@ -225,17 +242,38 @@ const toggling    = ref(null)
 const toast       = ref("")
 const toastType   = ref("success")
 
+const BACKEND          = "https://backendfinal-production-afd2.up.railway.app"
+const checkExpiryLoading = ref(false)
+
 const isAdmin = computed(() =>
   ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase())
 )
 
+// Comptes qui expirent dans les 7 prochains jours (actifs, plan payant)
+const expiringSoon = computed(() => {
+  const now  = Date.now()
+  const in7d = now + 7 * 24 * 60 * 60 * 1000
+  return owners.value.filter(o =>
+    o.active !== false &&
+    o.plan !== "free" &&
+    o.expiry &&
+    o.expiry > now &&
+    o.expiry <= in7d
+  )
+})
+
 const filteredOwners = computed(() => {
   let list = owners.value
   const s  = search.value.toLowerCase()
-  if (s) list = list.filter(o =>
-    (o.email||"").toLowerCase().includes(s) ||
-    (o.publishedSlug||"").toLowerCase().includes(s)
-  )
+  // Filtre spécial "expiring" : afficher seulement les comptes qui expirent bientôt
+  if (s === "expiring") {
+    list = expiringSoon.value
+  } else if (s) {
+    list = list.filter(o =>
+      (o.email||"").toLowerCase().includes(s) ||
+      (o.publishedSlug||"").toLowerCase().includes(s)
+    )
+  }
   if (filterPlan.value) list = list.filter(o => (o.plan||"free") === filterPlan.value)
   return list
 })
@@ -383,7 +421,12 @@ const formatDate = (ts) => {
   return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" })
 }
 
-const isExpired = (expiry) => expiry && expiry < Date.now()
+const isExpired     = (expiry) => expiry && expiry < Date.now()
+const isExpiringSoon = (expiry) => {
+  if (!expiry) return false
+  const now = Date.now()
+  return expiry > now && expiry <= now + 7 * 24 * 60 * 60 * 1000
+}
 
 let toastTimer = null
 const showToast = (msg, type = "success") => {
@@ -391,6 +434,32 @@ const showToast = (msg, type = "success") => {
   toastType.value = type
   if (toastTimer) clearTimeout(toastTimer)
   toastTimer = setTimeout(() => { toast.value = "" }, 3000)
+}
+
+// ── Déclencher la vérification des comptes expirés ─────────────
+const runCheckExpiry = async () => {
+  checkExpiryLoading.value = true
+  try {
+    const idToken = await auth.currentUser?.getIdToken()
+    const res     = await fetch(`${BACKEND}/api/admin/check-expiry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    showToast(
+      data.disabled > 0
+        ? `🔒 ${data.disabled} compte(s) désactivé(s) sur ${data.checked} vérifié(s)`
+        : `✅ Aucun compte expiré parmi ${data.checked} vérifié(s)`
+    )
+    // Recharger la liste pour refléter les changements
+    await loadOwners()
+  } catch(e) {
+    showToast("Erreur : " + e.message, "error")
+  } finally {
+    checkExpiryLoading.value = false
+  }
 }
 
 const logout = async () => {
@@ -521,4 +590,18 @@ td{padding:12px 16px;vertical-align:middle}
 .adm-td-orders{text-align:center}
 .adm-orders-badge{background:rgba(108,99,255,.15);color:#6c63ff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px;border:1px solid rgba(108,99,255,.3)}
 
+
+/* Stat warning (expirés bientôt) */
+.adm-stat-warning{cursor:pointer;border-color:rgba(245,158,11,.25)!important}
+.adm-stat-warning:hover{border-color:rgba(245,158,11,.5)!important;background:rgba(245,158,11,.05)!important}
+.adm-stat-val-warn{color:#fbbf24}
+
+/* Badge expire bientôt */
+.adm-expiring-soon{color:#fbbf24}
+.adm-exp-soon{background:rgba(245,158,11,.15);color:#fbbf24;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px}
+
+/* Bouton check-expiry */
+.adm-btn-check-expiry{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#fbbf24;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.adm-btn-check-expiry:hover:not(:disabled){background:rgba(245,158,11,.22)}
+.adm-btn-check-expiry:disabled{opacity:.5;cursor:not-allowed}
 </style>
