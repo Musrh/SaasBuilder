@@ -568,10 +568,6 @@ const isProActive = computed(() => {
 // ── Commandes filtrées ─────────────────────────────────────────
 const filteredOrders = computed(() => {
   let list = [...orders.value]
-  // Filtre source : all | orders (Pro) | forders (Free)
-  if (orderSource.value !== "all") {
-    list = list.filter(o => o._source === orderSource.value)
-  }
   if (orderFilter.value) {
     list = list.filter(o => o.status === orderFilter.value)
   }
