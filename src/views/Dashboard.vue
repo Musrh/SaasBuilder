@@ -157,23 +157,6 @@
               <p>Chargement des commandes...</p>
             </div>
 
-            <!-- ── Panneau de diagnostic (à retirer une fois que tout fonctionne) ── -->
-            <div v-if="!ordersLoading && debugInfo" class="db-debug-panel">
-              <p class="db-debug-title">🔍 Diagnostic</p>
-              <p>UID&nbsp;: <code>{{ debugInfo.uid }}</code></p>
-              <p>Plan détecté&nbsp;: <code>{{ debugInfo.plan }}</code></p>
-              <p>
-                forders&nbsp;:
-                <span v-if="debugInfo.errorForders" style="color:#f87171">❌ {{ debugInfo.errorForders }}</span>
-                <span v-else style="color:#86efac">✓ {{ debugInfo.forders }} doc(s)</span>
-              </p>
-              <p>
-                orders&nbsp;:
-                <span v-if="debugInfo.errorOrders" style="color:#f87171">❌ {{ debugInfo.errorOrders }}</span>
-                <span v-else style="color:#86efac">✓ {{ debugInfo.orders }} doc(s)</span>
-              </p>
-            </div>
-
             <!-- Erreur Firestore -->
             <div v-if="!ordersLoading && ordersError" class="db-orders-error">
               <span>⚠️</span>
@@ -526,7 +509,6 @@ const openOrderId   = ref(null)
 const orderSearch   = ref("")
 const orderFilter   = ref("")
 const ordersStats   = ref({ total: 0, free: 0, pro: 0, revenue: 0 })
-const debugInfo     = ref(null)   // panneau de diagnostic temporaire
 
 // ── Computed plan ──────────────────────────────────────────────
 const planExpired = computed(() => {
@@ -638,10 +620,9 @@ const toMs = (v) => {
 const loadOrders = async (uid, plan) => {
   ordersLoading.value = true
   ordersError.value   = ""
-  debugInfo.value     = null
 
   const currentPlan = plan ?? userData.value?.plan ?? "free"
-  const log = { uid, plan: currentPlan, forders: null, orders: null, errorForders: null, errorOrders: null }
+  const log = { errorForders: null, errorOrders: null }
 
   const results = []
 
@@ -670,8 +651,6 @@ const loadOrders = async (uid, plan) => {
   } catch(e) {
     log.errorOrders = `${e.code || e.message}`
   }
-
-  debugInfo.value = log
 
   // Dédupliquer par id Firestore
   const seen   = new Set()
@@ -1007,15 +986,6 @@ const exportOrdersCSV = () => {
   border-radius: 10px; color: #fca5a5; font-size: 13px;
 }
 .db-orders-error span { font-size: 18px; flex-shrink: 0; }
-.db-debug-panel {
-  margin: 12px 16px;
-  background: rgba(255,255,255,.04);
-  border: 1px dashed rgba(255,255,255,.15);
-  border-radius: 10px; padding: 12px 16px;
-  font-size: 12px; color: #8a8a9a; display: flex; flex-direction: column; gap: 4px;
-}
-.db-debug-title { font-weight: 700; color: #c4b5fd; margin-bottom: 4px; }
-.db-debug-panel code { background: rgba(255,255,255,.08); padding: 1px 6px; border-radius: 4px; color: #f0f0f0; font-size: 11px; }
 
 /* Cartes commandes */
 .db-orders-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
