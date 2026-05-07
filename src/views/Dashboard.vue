@@ -144,7 +144,7 @@
                 </select>
                 <button
                   class="db-btn db-btn-outline"
-                  @click="loadOrders(user.uid)"
+                  @click="loadOrders(user.uid, userData?.plan ?? 'free')"
                   title="Actualiser"
                   :disabled="ordersLoading"
                 >↻</button>
@@ -155,6 +155,12 @@
             <div v-if="ordersLoading" class="db-orders-loading">
               <div class="db-spinner db-spinner-sm"></div>
               <p>Chargement des commandes...</p>
+            </div>
+
+            <!-- Erreur Firestore -->
+            <div v-else-if="ordersError" class="db-orders-error">
+              <span>⚠️</span>
+              <p>{{ ordersError }}</p>
             </div>
 
             <!-- Aucune commande -->
@@ -497,11 +503,11 @@ const planLoading    = ref(false)
 // ── Commandes ──────────────────────────────────────────────────
 const orders        = ref([])
 const ordersLoading = ref(false)
+const ordersError   = ref("")
 const showOrders    = ref(false)
 const openOrderId   = ref(null)
 const orderSearch   = ref("")
 const orderFilter   = ref("")
-const orderSource   = ref("all")   // "all" | "orders" | "forders"
 const ordersStats   = ref({ total: 0, free: 0, pro: 0, revenue: 0 })
 
 // ── Computed plan ──────────────────────────────────────────────
@@ -599,14 +605,15 @@ onMounted(() => {
       if (snap.exists()) userData.value = snap.data()
     } catch(e) { console.error(e) }
     loading.value = false
-    // Charger les commandes en arrière-plan
-    loadOrders(u.uid)
+    // Charger les commandes en passant le plan explicitement (évite le problème de timing)
+    loadOrders(u.uid, userData.value?.plan ?? "free")
   })
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
 // Plan Free  → collection "forders" filtrée par ownerUid
 // Plan Pro   → collection "orders"  filtrée par ownerUid
+// Le plan est passé en paramètre pour éviter tout problème de timing.
 
 const toMs = (v) => {
   if (!v) return 0
@@ -615,49 +622,41 @@ const toMs = (v) => {
   return new Date(v).getTime()                   // string ISO ou nombre
 }
 
-const loadOrders = async (uid) => {
+const loadOrders = async (uid, plan) => {
   ordersLoading.value = true
-  const results = []
+  ordersError.value   = ""
+  const results       = []
 
-  const plan  = userData.value?.plan || "free"
-  const isPro = plan !== "free"
+  // Priorité : paramètre explicite → userData → "free"
+  const currentPlan = plan ?? userData.value?.plan ?? "free"
+  const isPro       = currentPlan !== "free"
+  const colName     = isPro ? "orders" : "forders"
 
-  if (isPro) {
-    // ── Plan Pro → collection "orders" ───────────────────────
-    try {
-      const snap = await getDocs(
-        query(collection(db, "orders"), where("ownerUid", "==", uid))
-      )
-      snap.docs.forEach(d =>
-        results.push({ id: d.id, _source: "orders", ...d.data() })
-      )
-    } catch(e) {
-      console.warn("⚠️ orders:", e.code, e.message)
+  try {
+    const snap = await getDocs(
+      query(collection(db, colName), where("ownerUid", "==", uid))
+    )
+    snap.docs.forEach(d =>
+      results.push({ id: d.id, _source: colName, ...d.data() })
+    )
+  } catch(e) {
+    const code = e.code || ""
+    if (code === "permission-denied") {
+      ordersError.value = `Accès refusé à la collection "${colName}". Vérifiez les règles Firestore.`
+    } else {
+      ordersError.value = `Erreur lors du chargement des commandes : ${code || e.message}`
     }
-  } else {
-    // ── Plan Free → collection "forders" ─────────────────────
-    try {
-      const snap = await getDocs(
-        query(collection(db, "forders"), where("ownerUid", "==", uid))
-      )
-      snap.docs.forEach(d =>
-        results.push({ id: d.id, _source: "forders", ...d.data() })
-      )
-    } catch(e) {
-      console.warn("⚠️ forders:", e.code, e.message)
-    }
+    console.error(`⚠️ ${colName}:`, e.code, e.message)
   }
 
   // Tri par date décroissante
   orders.value = results.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
   // Stats
-  const pro  = orders.value.filter(o => o._source === "orders")
-  const free = orders.value.filter(o => o._source === "forders")
   ordersStats.value = {
     total:   orders.value.length,
-    pro:     pro.length,
-    free:    free.length,
+    pro:     orders.value.filter(o => o._source === "orders").length,
+    free:    orders.value.filter(o => o._source === "forders").length,
     revenue: orders.value.reduce((acc, o) => acc + parseFloat(o.total || 0), 0).toFixed(2)
   }
 
@@ -967,6 +966,13 @@ const exportOrdersCSV = () => {
   gap: 10px; padding: 40px 20px; color: #5a5a6a;
 }
 .db-orders-empty span { font-size: 36px; opacity: .5; }
+.db-orders-error {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 16px 20px; margin: 12px 16px;
+  background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
+  border-radius: 10px; color: #fca5a5; font-size: 13px;
+}
+.db-orders-error span { font-size: 18px; flex-shrink: 0; }
 
 /* Cartes commandes */
 .db-orders-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
