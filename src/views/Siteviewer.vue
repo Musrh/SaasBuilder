@@ -902,9 +902,16 @@ const saveOrder = async (provider, transactionId) => {
       <div class="sv-suspended-icon">🔒</div>
       <h2 class="sv-suspended-title">Site temporairement indisponible</h2>
       <p class="sv-suspended-msg">
-        Ce site est actuellement suspendu.<br>
-        Si vous êtes le propriétaire, veuillez contacter le support pour régulariser votre abonnement.
+        Ce site est actuellement suspendu suite à un abonnement expiré ou non réglé.
       </p>
+
+      <!-- Bouton principal : accès dashboard pour renouveler -->
+      <a href="https://mronlinestores.com/#/auth" class="sv-suspended-login">
+        🔑 Propriétaire ? Connectez-vous pour renouveler
+      </a>
+
+      <div class="sv-suspended-divider">ou</div>
+
       <a href="https://mronlinestores.com" class="sv-suspended-back">← Retour à l'accueil</a>
     </div>
   </div>
@@ -1333,8 +1340,11 @@ const saveOrder = async (provider, transactionId) => {
 .sv-suspended-icon{font-size:56px;margin-bottom:16px}
 .sv-suspended-title{font-family:'Playfair Display',serif;font-size:24px;color:#1a1a2e;margin-bottom:12px}
 .sv-suspended-msg{font-size:15px;color:#6b7280;line-height:1.7;margin-bottom:28px}
-.sv-suspended-back{display:inline-block;background:#6c63ff;color:white;text-decoration:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all .15s}
-.sv-suspended-back:hover{background:#5b52ee;transform:translateY(-1px)}
+.sv-suspended-login{display:block;background:#6c63ff;color:white;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center}
+.sv-suspended-login:hover{background:#5b52ee;transform:translateY(-1px);box-shadow:0 4px 14px rgba(108,99,255,.35)}
+.sv-suspended-divider{font-size:12px;color:#d1d5db;margin:10px 0;text-align:center}
+.sv-suspended-back{display:block;color:#9ca3af;text-decoration:none;padding:8px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;transition:color .15s;text-align:center}
+.sv-suspended-back:hover{color:#6b7280}
 
 /* LOADING / ERROR */
 .sv-loading,.sv-error{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#6b7280;text-align:center;padding:20px}
