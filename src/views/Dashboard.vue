@@ -31,6 +31,30 @@
 
       <template v-else>
 
+        <!-- ── COMPTE SUSPENDU (active: false) ───────────────────── -->
+        <Transition name="db-fade">
+          <div v-if="accountSuspended" class="db-suspended-overlay">
+            <div class="db-suspended-card">
+              <div class="db-suspended-icon">🔒</div>
+              <h2 class="db-suspended-title">Compte suspendu</h2>
+              <p class="db-suspended-msg">
+                Votre compte a été suspendu car votre abonnement a expiré ou n'a pas été réglé.<br>
+                Renouvelez votre abonnement Pro pour réactiver votre store et accéder au builder.
+              </p>
+              <button
+                class="db-suspended-pay-btn"
+                @click="payToReactivate"
+                :disabled="planLoading"
+              >
+                <span v-if="planLoading">⏳ Redirection vers le paiement...</span>
+                <span v-else>💳 Régler mon abonnement Pro — 10€/mois</span>
+              </button>
+              <p class="db-suspended-note">Paiement sécurisé via Stripe · Réactivation immédiate</p>
+              <button class="db-suspended-logout" @click="logout">Déconnexion</button>
+            </div>
+          </div>
+        </Transition>
+
         <!-- Plan expiré -->
         <div v-if="planExpired && userData?.plan !== 'free'" class="db-alert-expired">
           <span class="db-alert-icon">⚠️</span>
@@ -510,6 +534,11 @@ const orderSearch   = ref("")
 const orderFilter   = ref("")
 const ordersStats   = ref({ total: 0, free: 0, pro: 0, revenue: 0 })
 
+// ── Compte suspendu (active === false dans Firestore) ──────────
+const accountSuspended = computed(() =>
+  userData.value !== null && userData.value?.active === false
+)
+
 // ── Computed plan ──────────────────────────────────────────────
 const planExpired = computed(() => {
   if (!userData.value) return false
@@ -697,6 +726,33 @@ const goToBuilder = () => {
   
 
 const goToPlans = () => { showPlanModal.value = true }
+
+// Paiement direct depuis la modale de suspension (toujours plan Pro)
+const payToReactivate = async () => {
+  planLoading.value = true
+  try {
+    const res  = await fetch(`${BACKEND}/create-billing-session`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email:    user.value.email,
+        plan:     "pro",
+        ownerUid: user.value.uid,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.url) {
+      alert(data.error || "Erreur lors de la création de la session de paiement")
+      return
+    }
+    window.location.href = data.url
+  } catch(err) {
+    console.error("payToReactivate:", err)
+    alert("Erreur réseau. Vérifiez votre connexion.")
+  } finally {
+    planLoading.value = false
+  }
+}
 
 // Confirme et lance le paiement Stripe pour le plan choisi
 const confirmPlan = async () => {
@@ -889,6 +945,46 @@ const exportOrdersCSV = () => {
 @keyframes db-spin { to { transform: rotate(360deg); } }
 
 /* ── Alert expiré ──────────────────────────────────────────── */
+/* ── Compte suspendu ─────────────────────────────────────────── */
+.db-suspended-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(10,10,20,.85);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.db-suspended-card {
+  background: #1a1a2e; border: 1px solid rgba(239,68,68,.25);
+  border-radius: 20px; padding: 48px 40px; max-width: 460px; width: 100%;
+  text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+}
+.db-suspended-icon { font-size: 52px; margin-bottom: 16px; }
+.db-suspended-title {
+  font-size: 22px; font-weight: 700; color: #f0f0f0; margin-bottom: 12px;
+}
+.db-suspended-msg {
+  font-size: 14px; color: #8a8a9a; line-height: 1.7; margin-bottom: 28px;
+}
+.db-suspended-pay-btn {
+  width: 100%; padding: 15px; margin-bottom: 10px;
+  background: linear-gradient(135deg, #6c63ff, #a78bfa);
+  color: white; border: none; border-radius: 12px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: all .2s;
+}
+.db-suspended-pay-btn:hover:not(:disabled) {
+  transform: translateY(-1px); box-shadow: 0 6px 20px rgba(108,99,255,.4);
+}
+.db-suspended-pay-btn:disabled { opacity: .6; cursor: not-allowed; }
+.db-suspended-note { font-size: 11px; color: #5a5a6a; margin-bottom: 20px; }
+.db-suspended-logout {
+  background: none; border: none; color: #5a5a6a;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+  text-decoration: underline; transition: color .15s;
+}
+.db-suspended-logout:hover { color: #9ca3af; }
+.db-fade-enter-active, .db-fade-leave-active { transition: opacity .25s ease; }
+.db-fade-enter-from, .db-fade-leave-to { opacity: 0; }
+
 .db-alert-expired {
   display: flex; align-items: center; gap: 14px;
   background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
