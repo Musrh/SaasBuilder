@@ -2,7 +2,7 @@
   <div class="af-root">
     <!-- Logo en haut à gauche -->
     <div class="af-topbar">
-      <img :src="logo" alt="SaasBuilder" class="af-logo" />
+      <img src="/logo.png" alt="SaasBuilder" class="af-logo" />
     </div>
 
     <div class="af-layout">
@@ -93,6 +93,7 @@
             <p class="af-sub">Accédez à votre espace SaasBuilder</p>
           </div>
 
+          <template v-if="!disabledUser">
           <div class="af-field">
             <label class="af-label">Email</label>
             <input
@@ -127,36 +128,50 @@
             </button>
           </div>
 
+          </template><!-- /v-if !disabledUser -->
+
           <div v-if="errorMsg" class="af-error">{{ errorMsg }}</div>
           <div v-if="successMsg" class="af-success">{{ successMsg }}</div>
-          <div v-if="disabledMsg" class="af-disabled">🚫 {{ disabledMsg }}</div>
+          <!-- Compte suspendu : proposer le renouvellement -->
+          <div v-if="disabledUser" class="af-suspended-card">
+            <div class="af-suspended-icon">🔒</div>
+            <h3 class="af-suspended-title">Compte suspendu</h3>
+            <p class="af-suspended-msg">{{ disabledMsg }}</p>
+            <p class="af-suspended-sub">
+              Renouvelez votre abonnement pour retrouver l'accès à votre store et vos données.
+            </p>
+            <button
+              class="af-btn af-btn-renew"
+              @click="renewPayment"
+              :disabled="renewLoading"
+            >
+              <span v-if="renewLoading" class="af-spinner-sm"/>
+              {{ renewLoading ? 'Redirection...' : '💳 Renouveler mon abonnement' }}
+            </button>
+            <button
+              class="af-suspended-logout"
+              @click="signOut(auth); disabledUser = null; disabledMsg = ''"
+            >
+              Se connecter avec un autre compte
+            </button>
+          </div>
+          <div v-else-if="disabledMsg" class="af-disabled">🚫 {{ disabledMsg }}</div>
 
           <div v-if="loading" class="af-loading">
             <div class="af-spinner"></div>
             <span>Chargement...</span>
           </div>
 
-          <div v-if="pendingVerification" class="af-verify-banner">
-            <div class="af-verify-icon">📧</div>
-            <div class="af-verify-text">
-              <strong>Vérifiez votre boîte mail</strong>
-              <span>Cliquez sur le lien dans l'email envoyé à <em>{{ email }}</em> pour activer votre compte.</span>
-            </div>
-            <button @click="resendVerification" :disabled="loading" class="af-btn-resend">
-              Renvoyer l'email
-            </button>
-          </div>
-
-          <div class="af-actions">
+          <div class="af-actions" v-if="!disabledUser">
             <button @click="login" :disabled="loading" class="af-btn af-btn-login">
               🔑 Se connecter
             </button>
-            <button @click="register" :disabled="loading || pendingVerification" class="af-btn af-btn-register">
+            <button @click="register" :disabled="loading" class="af-btn af-btn-register">
               ✨ S'inscrire
             </button>
           </div>
 
-          <button @click="goToPlans" class="af-back">
+          <button @click="goToPlans" class="af-back" v-if="!disabledUser">
             ← Retour au choix du plan
           </button>
         </div>
@@ -174,24 +189,21 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  sendEmailVerification,
   signOut,
 } from "firebase/auth"
-
-import logo from "../assets/logo.png"
 
 const route  = useRoute()
 const router = useRouter()
 
-const email               = ref("")
-const password            = ref("")
-const selectedPlan        = ref("free")
-const loading             = ref(false)
-const errorMsg            = ref("")
-const successMsg          = ref("")
-const disabledMsg         = ref("")
-const pendingVerification = ref(false)
-const unverifiedUser      = ref(null)
+const email        = ref("")
+const password     = ref("")
+const selectedPlan = ref("free")
+const loading      = ref(false)
+const renewLoading = ref(false)
+const disabledUser = ref(null)   // { uid, email, plan } si compte désactivé
+const errorMsg     = ref("")
+const successMsg   = ref("")
+const disabledMsg  = ref("")
 
 const API_URL     = "https://backendfinal-production-afd2.up.railway.app"
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
@@ -215,8 +227,10 @@ const redirectUser = async (user) => {
     const data   = snap.data()
     const active = data.active !== false
     if (!active) {
-      disabledMsg.value = "Votre compte a été désactivé. Contactez l'administrateur."
-      await signOut(auth)
+      // Ne pas déconnecter — conserver la session pour permettre le renouvellement
+      const plan = data.plan || "pro"
+      disabledUser.value = { uid: user.uid, email: user.email, plan }
+      disabledMsg.value  = `Votre compte a été suspendu pour non-paiement.`
       return
     }
     const redirectTo = route.query.redirect
@@ -233,16 +247,8 @@ const redirectUser = async (user) => {
 
 const login = async () => {
   errorMsg.value = ""; successMsg.value = ""; disabledMsg.value = ""; loading.value = true
-  pendingVerification.value = false; unverifiedUser.value = null
   try {
     const cred = await signInWithEmailAndPassword(auth, email.value.trim(), password.value)
-    if (!cred.user.emailVerified && !ADMIN_EMAILS.includes(cred.user.email?.toLowerCase() || "")) {
-      unverifiedUser.value = cred.user
-      pendingVerification.value = true
-      await signOut(auth)
-      errorMsg.value = "Votre adresse email n'est pas encore vérifiée. Consultez votre boîte mail ou renvoyez l'email ci-dessous."
-      return
-    }
     await redirectUser(cred.user)
   } catch(err) {
     const msgs = {
@@ -285,11 +291,18 @@ const register = async () => {
     localStorage.setItem("user", JSON.stringify({ uid, email: user.email, plan: selectedPlan.value }))
     localStorage.setItem("planChoisi", selectedPlan.value)
 
-    await sendEmailVerification(user)
-    await signOut(auth)
-    pendingVerification.value = true
-    successMsg.value = "Compte créé ! Un email de vérification a été envoyé à " + user.email + ". Veuillez vérifier votre boîte mail avant de vous connecter."
-    return
+    if (selectedPlan.value === "pro" || selectedPlan.value === "basic") {
+      const res  = await fetch(`${API_URL}/create-billing-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email, plan: selectedPlan.value, ownerUid: uid }),
+      })
+      const data = await res.json()
+      if (data.url) { window.location.href = data.url; return }
+      errorMsg.value = "Erreur paiement : impossible de créer la session Stripe."
+      return
+    }
+    router.push("/dashboard")
   } catch(err) {
     const msgs = {
       "auth/email-already-in-use": "Email déjà utilisé. Connectez-vous.",
@@ -298,6 +311,33 @@ const register = async () => {
     }
     errorMsg.value = msgs[err.code] || ("Erreur : " + err.message)
   } finally { loading.value = false }
+}
+
+// ── Renouveler le paiement (compte suspendu) ────────────────────
+const renewPayment = async () => {
+  if (!disabledUser.value) return
+  renewLoading.value = true
+  try {
+    const res  = await fetch(`${API_URL}/create-billing-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email:    disabledUser.value.email,
+        plan:     disabledUser.value.plan || "pro",
+        ownerUid: disabledUser.value.uid,
+      }),
+    })
+    const data = await res.json()
+    if (data.url) {
+      window.location.href = data.url
+      return
+    }
+    errorMsg.value = "Impossible de créer la session de paiement."
+  } catch(e) {
+    errorMsg.value = "Erreur réseau : " + e.message
+  } finally {
+    renewLoading.value = false
+  }
 }
 
 const forgotPassword = async () => {
@@ -316,34 +356,6 @@ const forgotPassword = async () => {
       "auth/user-not-found": "Aucun compte associé à cet email.",
       "auth/invalid-email":  "Email invalide.",
       "auth/too-many-requests": "Trop de tentatives. Réessayez plus tard.",
-    }
-    errorMsg.value = msgs[err.code] || ("Erreur : " + err.message)
-  } finally { loading.value = false }
-}
-
-const resendVerification = async () => {
-  errorMsg.value = ""; successMsg.value = ""; loading.value = true
-  try {
-    if (unverifiedUser.value) {
-      await sendEmailVerification(unverifiedUser.value)
-      successMsg.value = "Email de vérification renvoyé. Vérifiez votre boîte mail."
-      return
-    }
-    const cred = await signInWithEmailAndPassword(auth, email.value.trim(), password.value)
-    if (!cred.user.emailVerified) {
-      unverifiedUser.value = cred.user
-      await sendEmailVerification(cred.user)
-      await signOut(auth)
-      successMsg.value = "Email de vérification renvoyé. Vérifiez votre boîte mail."
-    } else {
-      await redirectUser(cred.user)
-    }
-  } catch(err) {
-    const msgs = {
-      "auth/too-many-requests":  "Trop de tentatives. Réessayez plus tard.",
-      "auth/invalid-credential": "Email ou mot de passe incorrect.",
-      "auth/wrong-password":     "Mot de passe incorrect.",
-      "auth/user-not-found":     "Email introuvable.",
     }
     errorMsg.value = msgs[err.code] || ("Erreur : " + err.message)
   } finally { loading.value = false }
@@ -547,42 +559,6 @@ const goToPlans = () => router.push("/")
 .af-spinner { width: 18px; height: 18px; border: 2px solid rgba(167,139,250,.3); border-top-color: #a78bfa; border-radius: 50%; animation: af-spin .7s linear infinite; }
 @keyframes af-spin { to { transform: rotate(360deg); } }
 
-.af-verify-banner {
-  background: rgba(99,179,237,.1);
-  border: 1px solid rgba(99,179,237,.35);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.af-verify-icon { font-size: 28px; text-align: center; }
-.af-verify-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: center;
-}
-.af-verify-text strong { font-size: 14px; color: #90cdf4; font-weight: 700; }
-.af-verify-text span   { font-size: 12px; color: rgba(255,255,255,.6); line-height: 1.5; }
-.af-verify-text em     { color: #90cdf4; font-style: normal; }
-.af-btn-resend {
-  background: rgba(99,179,237,.18);
-  border: 1px solid rgba(99,179,237,.4);
-  color: #90cdf4;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: background .2s, color .2s;
-  align-self: center;
-}
-.af-btn-resend:hover:not(:disabled) { background: rgba(99,179,237,.3); color: #fff; }
-.af-btn-resend:disabled { opacity: .5; cursor: not-allowed; }
-
 .af-actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .af-btn {
   width: 100%;
@@ -639,5 +615,59 @@ const goToPlans = () => router.push("/")
   .af-card  { padding: 28px 20px; border-radius: 20px; }
   .af-title { font-size: 20px; }
   .af-emoji { font-size: 40px; }
+}
+
+/* ── Carte compte suspendu ─────────────────────────────────────── */
+.af-suspended-card {
+  background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.25);
+  border-radius: 16px;
+  padding: 24px 20px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.af-suspended-icon  { font-size: 36px; margin-bottom: 10px; }
+.af-suspended-title {
+  font-size: 17px; font-weight: 700; color: #fff;
+  margin-bottom: 8px;
+}
+.af-suspended-msg {
+  font-size: 14px; color: #fca5a5;
+  margin-bottom: 8px;
+}
+.af-suspended-sub {
+  font-size: 12px; color: rgba(255,255,255,.45);
+  line-height: 1.5; margin-bottom: 18px;
+}
+.af-btn-renew {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border: none; border-radius: 12px;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 4px 16px rgba(16,185,129,.3);
+  transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 10px;
+}
+.af-btn-renew:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16,185,129,.4);
+}
+.af-btn-renew:disabled { opacity: .6; cursor: not-allowed; }
+.af-suspended-logout {
+  background: none; border: none;
+  color: rgba(255,255,255,.35); font-size: 12px;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  padding: 6px; transition: color .15s; width: 100%;
+}
+.af-suspended-logout:hover { color: rgba(255,255,255,.6); }
+.af-spinner-sm {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  border-radius: 50%; animation: af-spin .7s linear infinite;
 }
 </style>
