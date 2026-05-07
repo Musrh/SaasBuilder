@@ -102,9 +102,10 @@
                 {{ ordersLoading ? '...' : ordersStats.total }}
               </p>
               <p class="db-stat-sub" v-if="!ordersLoading && ordersStats.total > 0">
-                <span style="color:#22c55e">{{ ordersStats.pro }} Pro</span>
-                · <span style="color:#9ca3af">{{ ordersStats.free }} Free</span>
-                · {{ ordersStats.revenue }} €
+                {{ ordersStats.revenue }} €
+                · <span :style="userData?.plan !== 'free' ? 'color:#a78bfa' : 'color:#9ca3af'">
+                    {{ (userData?.plan || 'free') !== 'free' ? 'Plan Pro' : 'Plan Free' }}
+                  </span>
               </p>
               <p class="db-stat-sub" v-else>{{ showOrders ? 'Masquer ▲' : 'Voir ▼' }}</p>
             </div>
@@ -120,19 +121,14 @@
                 <h2 class="db-orders-title">📦 Commandes clients</h2>
                 <div class="db-orders-source-tabs">
                   <button
-                    v-for="src in [
-                      {v:'all',    l:'Toutes', c: ordersStats.total},
-                      {v:'orders', l:'Pro',    c: ordersStats.pro},
-                      {v:'forders',l:'Free',   c: ordersStats.free}
-                    ]"
-                    :key="src.v"
-                    class="db-source-tab"
-                    :class="{active: orderSource === src.v}"
-                    @click="orderSource = src.v"
+                    class="db-source-tab active"
                   >
-                    {{ src.l }}
-                    <span class="db-source-count">{{ src.c }}</span>
+                    {{ (userData?.plan || 'free') !== 'free' ? '⚡ Pro' : '🆓 Free' }}
+                    <span class="db-source-count">{{ ordersStats.total }}</span>
                   </button>
+                  <span class="db-source-label">
+                    {{ (userData?.plan || 'free') !== 'free' ? 'collection orders' : 'collection forders' }}
+                  </span>
                 </div>
               </div>
               <div class="db-orders-filters">
@@ -609,8 +605,8 @@ onMounted(() => {
 })
 
 // ── Charger les commandes du propriétaire ──────────────────────
-// Lecture directe Firestore — rules : ownerUid == auth.uid
-// collections : orders (Pro) + forders (Free)
+// Plan Free  → collection "forders" filtrée par ownerUid
+// Plan Pro   → collection "orders"  filtrée par ownerUid
 
 const toMs = (v) => {
   if (!v) return 0
@@ -619,67 +615,43 @@ const toMs = (v) => {
   return new Date(v).getTime()                   // string ISO ou nombre
 }
 
-
-  const loadOrders = async (uid) => {
+const loadOrders = async (uid) => {
   ordersLoading.value = true
   const results = []
-  const slug = userData.value?.publishedSlug || null
 
-  // ── orders (Pro) — clé : ownerUid ───────────────────────────
-  try {
-    const snap = await getDocs(
-      query(collection(db, "orders"), where("ownerUid", "==", uid))
-    )
-    snap.docs.forEach(d => results.push({ id: d.id, _source: "orders", ...d.data() }))
-    console.log("📦 orders:", snap.size)
-  } catch (e) {
-    console.warn("⚠️ orders:", e.code, e.message)
-  }
+  const plan  = userData.value?.plan || "free"
+  const isPro = plan !== "free"
 
-  // ── forders (Free) — multi-champs car écrit côté client ─────
-  // On essaie successivement : ownerUid, sellerUid, userId, uid
-  const fordersFields = ["ownerUid", "sellerUid", "userId", "uid", "ownerId"]
-  for (const field of fordersFields) {
+  if (isPro) {
+    // ── Plan Pro → collection "orders" ───────────────────────
     try {
       const snap = await getDocs(
-        query(collection(db, "forders"), where(field, "==", uid))
+        query(collection(db, "orders"), where("ownerUid", "==", uid))
       )
-      if (snap.size > 0) {
-        snap.docs.forEach(d => results.push({ id: d.id, _source: "forders", ...d.data() }))
-        console.log(`📦 forders [${field}]:`, snap.size)
-      }
-    } catch (e) {
-      console.warn(`⚠️ forders [${field}]:`, e.code, e.message)
+      snap.docs.forEach(d =>
+        results.push({ id: d.id, _source: "orders", ...d.data() })
+      )
+    } catch(e) {
+      console.warn("⚠️ orders:", e.code, e.message)
+    }
+  } else {
+    // ── Plan Free → collection "forders" ─────────────────────
+    try {
+      const snap = await getDocs(
+        query(collection(db, "forders"), where("ownerUid", "==", uid))
+      )
+      snap.docs.forEach(d =>
+        results.push({ id: d.id, _source: "forders", ...d.data() })
+      )
+    } catch(e) {
+      console.warn("⚠️ forders:", e.code, e.message)
     }
   }
 
-  // ── forders fallback par siteSlug / storeSlug ───────────────
-  if (slug) {
-    for (const field of ["siteSlug", "storeSlug", "publishedSlug", "slug"]) {
-      try {
-        const snap = await getDocs(
-          query(collection(db, "forders"), where(field, "==", slug))
-        )
-        if (snap.size > 0) {
-          snap.docs.forEach(d => results.push({ id: d.id, _source: "forders", ...d.data() }))
-          console.log(`📦 forders [${field}=${slug}]:`, snap.size)
-        }
-      } catch (e) {
-        console.warn(`⚠️ forders [${field}]:`, e.code, e.message)
-      }
-    }
-  }
+  // Tri par date décroissante
+  orders.value = results.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
-  // ── Dédup par id Firestore ──────────────────────────────────
-  const seen = new Set()
-  const unique = results.filter(o => {
-    if (seen.has(o.id)) return false
-    seen.add(o.id)
-    return true
-  })
-
-  orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
-
+  // Stats
   const pro  = orders.value.filter(o => o._source === "orders")
   const free = orders.value.filter(o => o._source === "forders")
   ordersStats.value = {
@@ -691,9 +663,6 @@ const toMs = (v) => {
 
   ordersLoading.value = false
 }
-
-
-  
 
 // ── Actions ────────────────────────────────────────────────────
 const toggleOrders = () => {
@@ -1278,6 +1247,11 @@ const exportOrdersCSV = () => {
 }
 .db-source-tab.active .db-source-count {
   background: rgba(108,99,255,.3); color: #a78bfa;
+}
+.db-source-label {
+  font-size: 10px; color: #5a5a6a;
+  align-self: center; font-style: italic;
+  padding-left: 4px;
 }
 /* ── Badge plan Free/Pro ───────────────────────────────────── */
 .db-order-plan-badge {
