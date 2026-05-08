@@ -1,151 +1,149 @@
 <template>
-  <div class="af-root">
-    <!-- Logo en haut à gauche -->
-    <div class="af-topbar">
-      <img :src="logo" alt="SaasBuilder" class="af-logo" />
-    </div>
-
-    <div class="af-layout">
-      <!-- Colonne gauche : présentation + offres -->
-      <div class="af-left">
-        <h1 class="af-hero-title">
-          Créez votre boutique en ligne en minutes
-        </h1>
-        <p class="af-hero-sub">
-          Lancez un store professionnel sans écrire une ligne de code.
-        </p>
-
-        <!-- Features -->
-        <div class="af-features">
-          <div class="af-feature">
-            <div class="af-feature-icon">🏗️</div>
-            <div>
-              <div class="af-feature-title">Builder visuel</div>
-              <div class="af-feature-desc">Glissez-déposez vos sections. Aucun code requis.</div>
-            </div>
-          </div>
-          <div class="af-feature">
-            <div class="af-feature-icon">💳</div>
-            <div>
-              <div class="af-feature-title">Paiements intégrés</div>
-              <div class="af-feature-desc">Stripe Connect pour recevoir les paiements directement.</div>
-            </div>
-          </div>
-          <div class="af-feature">
-            <div class="af-feature-icon">📦</div>
-            <div>
-              <div class="af-feature-title">Gestion commandes</div>
-              <div class="af-feature-desc">Dashboard complet pour suivre vos ventes en temps réel.</div>
-            </div>
-          </div>
-          <div class="af-feature">
-            <div class="af-feature-icon">🌍</div>
-            <div>
-              <div class="af-feature-title">Multi-langues</div>
-              <div class="af-feature-desc">Votre store en Français, Anglais, Arabe et Espagnol.</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Badges -->
-        <div class="af-badges">
-          <span class="af-badge">🔒 Paiement sécurisé</span>
-          <span class="af-badge">⚡ Sans engagement</span>
-          <span class="af-badge">🛟 Support inclus</span>
-        </div>
-
-        <!-- Offres -->
-        <h2 class="af-offers-title">Nos offres</h2>
-        <div class="af-plans">
-          <div class="af-plan">
-            <div class="af-plan-name">Gratuit</div>
-            <div class="af-plan-price">0€<span>/mois</span></div>
-            <div class="af-plan-tag">Pour commencer sans risque</div>
-            <ul class="af-plan-list">
-              <li class="ok">✓ Builder visuel</li>
-              <li class="no">✗ Paiements clients</li>
-              <li class="no">✗ Multi-pages</li>
-              <li class="no">✗ Catalogue produits</li>
-            </ul>
-          </div>
-          <div class="af-plan af-plan-pro">
-            <div class="af-plan-badge">Recommandé</div>
-            <div class="af-plan-name">Pro</div>
-            <div class="af-plan-price">5€<span>/mois</span></div>
-            <div class="af-plan-tag">Tout ce qu'il vous faut pour vendre</div>
-            <ul class="af-plan-list">
-              <li class="ok">✓ Pages illimitées</li>
-              <li class="ok">✓ Builder complet</li>
-              <li class="ok">✓ Paiements Stripe</li>
-              <li class="ok">✓ Catalogue produits</li>
-              <li class="ok">✓ Support prioritaire</li>
-            </ul>
-          </div>
-        </div>
+  <div class="app-container">
+    <div class="af-root main-content">
+      <!-- Logo en haut à gauche -->
+      <div class="af-topbar">
+        <img :src="logo" alt="SaasBuilder" class="af-logo" />
       </div>
 
-      <!-- Colonne droite : formulaire -->
-      <div class="af-right">
-        <div class="af-card">
-          <div class="af-header">
-            <div class="af-emoji">👋</div>
-            <h2 class="af-title">Connexion / Inscription</h2>
-            <p class="af-sub">Accédez à votre espace SaasBuilder</p>
+      <div class="af-layout">
+        <!-- ───────── Colonne gauche : présentation + offres ───────── -->
+        <div class="af-left">
+          <h1 class="af-hero-title">Créez votre boutique en ligne en minutes</h1>
+          <p class="af-hero-sub">
+            Lancez un store professionnel sans écrire une ligne de code.
+          </p>
+
+          <!-- Features -->
+          <div class="af-features">
+            <div class="af-feature">
+              <div class="af-feature-icon">🏗️</div>
+              <div>
+                <div class="af-feature-title">Builder visuel</div>
+                <div class="af-feature-desc">Glissez-déposez vos sections. Aucun code requis.</div>
+              </div>
+            </div>
+            <div class="af-feature">
+              <div class="af-feature-icon">💳</div>
+              <div>
+                <div class="af-feature-title">Paiements intégrés</div>
+                <div class="af-feature-desc">Stripe Connect pour recevoir les paiements directement.</div>
+              </div>
+            </div>
+            <div class="af-feature">
+              <div class="af-feature-icon">📦</div>
+              <div>
+                <div class="af-feature-title">Gestion commandes</div>
+                <div class="af-feature-desc">Dashboard complet pour suivre vos ventes en temps réel.</div>
+              </div>
+            </div>
+            <div class="af-feature">
+              <div class="af-feature-icon">🌍</div>
+              <div>
+                <div class="af-feature-title">Multi-langues</div>
+                <div class="af-feature-desc">Votre store en Français, Anglais, Arabe et Espagnol.</div>
+              </div>
+            </div>
           </div>
 
-          <template v-if="!disabledUser">
-          <div class="af-field">
-            <label class="af-label">Email</label>
-            <input
-              v-model="email"
-              type="email"
-              placeholder="votre@email.com"
-              class="af-input"
-              autocomplete="email"
-            />
+          <!-- Badges -->
+          <div class="af-badges">
+            <span class="af-badge">🔒 Paiement sécurisé</span>
+            <span class="af-badge">⚡ Sans engagement</span>
+            <span class="af-badge">🛟 Support inclus</span>
           </div>
 
-          <div class="af-field">
-            <label class="af-label">Mot de passe</label>
-            <input
-              v-model="password"
-              type="password"
-              placeholder="••••••••"
-              class="af-input"
-              autocomplete="current-password"
-            />
+          <!-- Offres -->
+          <h2 class="af-offers-title">Nos offres</h2>
+          <div class="af-plans">
+            <div class="af-plan">
+              <div class="af-plan-name">Gratuit</div>
+              <div class="af-plan-price">0€<span>/mois</span></div>
+              <div class="af-plan-tag">Pour commencer sans risque</div>
+              <ul class="af-plan-list">
+                <li class="ok">✓ Builder visuel</li>
+                <li class="no">✗ Paiements clients</li>
+                <li class="no">✗ Multi-pages</li>
+                <li class="no">✗ Catalogue produits</li>
+              </ul>
+            </div>
+            <div class="af-plan af-plan-pro">
+              <div class="af-plan-badge">Recommandé</div>
+              <div class="af-plan-name">Pro</div>
+              <div class="af-plan-price">5€<span>/mois</span></div>
+              <div class="af-plan-tag">Tout ce qu'il vous faut pour vendre</div>
+              <ul class="af-plan-list">
+                <li class="ok">✓ Pages illimitées</li>
+                <li class="ok">✓ Builder complet</li>
+                <li class="ok">✓ Paiements Stripe</li>
+                <li class="ok">✓ Catalogue produits</li>
+                <li class="ok">✓ Support prioritaire</li>
+              </ul>
+            </div>
           </div>
+        </div>
 
-          <!-- Mot de passe oublié -->
-          <div class="af-forgot-row">
-            <button
-              type="button"
-              class="af-forgot"
-              :disabled="loading"
-              @click="forgotPassword"
-            >
-              Mot de passe oublié ?
-            </button>
-          </div>
-          </template><!-- /!disabledUser -->
+        <!-- ───────── Colonne droite : formulaire ───────── -->
+        <div class="af-right">
+          <div class="af-card">
+            <div class="af-header">
+              <div class="af-emoji">👋</div>
+              <h2 class="af-title">Connexion / Inscription</h2>
+              <p class="af-sub">Accédez à votre espace SaasBuilder</p>
+            </div>
 
-          <div v-if="errorMsg" class="af-error">{{ errorMsg }}</div>
-          <div v-if="successMsg" class="af-success">{{ successMsg }}</div>
-          <!-- Compte suspendu : carte de renouvellement -->
-          <template v-if="disabledUser">
-            <div class="af-suspended-card">
-              <div class="af-suspended-icon">🔒</div>
-              <h3 class="af-suspended-title">Compte suspendu</h3>
-              <p class="af-suspended-msg">{{ disabledMsg }}</p>
-              <p class="af-suspended-sub">
-                Renouvelez votre abonnement pour retrouver l'accès à votre store et vos données.
-              </p>
+            <template v-if="!disabledUser">
+              <div class="af-field">
+                <label class="af-label">Email</label>
+                <input
+                  v-model="email"
+                  type="email"
+                  placeholder="votre@email.com"
+                  class="af-input"
+                  autocomplete="email"
+                />
+              </div>
+
+              <div class="af-field">
+                <label class="af-label">Mot de passe</label>
+                <input
+                  v-model="password"
+                  type="password"
+                  placeholder="••••••••"
+                  class="af-input"
+                  autocomplete="current-password"
+                />
+              </div>
+
+              <div class="af-forgot-row">
+                <button
+                  type="button"
+                  class="af-forgot"
+                  :disabled="loading"
+                  @click="forgotPassword"
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+
+              <div v-if="errorMsg" class="af-error">{{ errorMsg }}</div>
+              <div v-if="successMsg" class="af-success">{{ successMsg }}</div>
+            </template>
+
+            <!-- Compte suspendu -->
+            <div v-if="disabledUser" class="af-suspended-card">
+              <div class="af-suspended-icon">🚫</div>
+              <div class="af-suspended-title">Compte suspendu</div>
+              <div class="af-suspended-msg">{{ disabledMsg }}</div>
+              <div class="af-suspended-sub">
+                Renouvelez votre abonnement pour réactiver votre compte.
+              </div>
               <button
-                class="af-btn af-btn-renew"
+                class="af-btn-renew"
                 @click="renewPayment"
                 :disabled="renewLoading"
               >
-                <span v-if="renewLoading" class="af-spinner-sm"/>
+                <span v-if="renewLoading" class="af-spinner-sm" />
                 {{ renewLoading ? 'Redirection...' : '💳 Renouveler mon abonnement' }}
               </button>
               <button
@@ -155,96 +153,91 @@
                 Se connecter avec un autre compte
               </button>
             </div>
-          </template>
-          <div v-else-if="disabledMsg" class="af-disabled">🚫 {{ disabledMsg }}</div>
 
-          <div v-if="loading && !disabledUser" class="af-loading">
-            <div class="af-spinner"></div>
-            <span>Chargement...</span>
-          </div>
-
-          <div v-if="pendingVerification && !disabledUser" class="af-verify-banner">
-            <div class="af-verify-icon">📧</div>
-            <div class="af-verify-text">
-              <strong>Vérifiez votre boîte mail</strong>
-              <span>Cliquez sur le lien dans l'email envoyé à <em>{{ email }}</em> pour activer votre compte.</span>
+            <div v-if="loading" class="af-loading">
+              <div class="af-spinner" />
+              Chargement...
             </div>
-            <button @click="resendVerification" :disabled="loading" class="af-btn-resend">
-              Renvoyer l'email
+
+            <!-- Vérification email -->
+            <div v-if="pendingVerification" class="af-verify-banner">
+              <div class="af-verify-icon">📧</div>
+              <div class="af-verify-text">
+                <strong>Vérifiez votre boîte mail</strong>
+                <span>Cliquez sur le lien dans l'email envoyé à <em>{{ email }}</em> pour activer votre compte.</span>
+              </div>
+              <button @click="resendVerification" :disabled="loading" class="af-btn-resend">
+                Renvoyer l'email
+              </button>
+            </div>
+
+            <div v-if="!disabledUser" class="af-actions">
+              <button @click="login" :disabled="loading" class="af-btn af-btn-login">
+                🔑 Se connecter
+              </button>
+              <button @click="register" :disabled="loading || pendingVerification" class="af-btn af-btn-register">
+                ✨ S'inscrire
+              </button>
+            </div>
+
+            <button @click="goToPlans" class="af-back" v-if="!disabledUser">
+              ← Retour au choix du plan
             </button>
           </div>
-
-          <div class="af-actions" v-if="!disabledUser">
-            <button @click="login" :disabled="loading" class="af-btn af-btn-login">
-              🔑 Se connecter
-            </button>
-            <button @click="register" :disabled="loading || pendingVerification" class="af-btn af-btn-register">
-              ✨ S'inscrire
-            </button>
-          </div>
-
-          <button @click="goToPlans" class="af-back" v-if="!disabledUser">
-            ← Retour au choix du plan
-          </button>
         </div>
       </div>
     </div>
-    
+
+    <!-- ───────── FOOTER ───────── -->
+    <footer class="ps-footer">
+      <div class="ps-footer-inner">
+        <div class="ps-footer-brand">
+          © {{ new Date().getFullYear() }} SaasBuilder
+        </div>
+        <nav class="ps-footer-links">
+          <router-link to="/privacy-policy">Privacy Policy</router-link>
+          <router-link to="/remboursement">Remboursement</router-link>
+          <router-link to="/confidentialite">Confidentialité</router-link>
+          <router-link to="/mentions-legales">Mentions légales</router-link>
+          <router-link to="/conditions-generales">Conditions générales</router-link>
+        </nav>
+      </div>
+    </footer>
   </div>
-
-<!-- ── FOOTER ─────────────────────────────────────────────── -->
-<div class="app-container">
-  <main class="main-content">
-    <router-view />
-  </main>
-
-  <!-- FOOTER -->
-  <footer class="ps-footer">
-    <p class="ps-footer-brand">© {{ new Date().getFullYear() }} SaasBuilder</p>
-    <nav class="ps-footer-links">
-      <router-link to="/privacy-policy">Privacy Policy</router-link>
-      <router-link to="/remboursement">Remboursement</router-link>
-      <router-link to="/confidentialite">Confidentialité</router-link>
-      <router-link to="/mentions">Mentions légales</router-link>
-      <router-link to="/conditions">Conditions générales</router-link>
-    </nav>
-  </footer>
-</div>
-  
 </template>
 
 <script setup>
 import { ref, onMounted } from "vue"
-import { useRoute, useRouter } from "vue-router"
-import { db, auth } from "../firebase"
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { useRouter, useRoute } from "vue-router"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signOut,
 } from "firebase/auth"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { auth, db } from "@/firebase"
+import logo from "/logo.png"
 
-import logo from "../assets/logo.png"
+const API_URL = import.meta.env.VITE_API_URL || ""
 
-const route  = useRoute()
 const router = useRouter()
+const route  = useRoute()
 
-const email               = ref("")
-const password            = ref("")
-const selectedPlan        = ref("free")
-const loading             = ref(false)
-const errorMsg            = ref("")
-const successMsg          = ref("")
-const disabledMsg         = ref("")
-const pendingVerification = ref(false)
-const unverifiedUser      = ref(null)
-const renewLoading        = ref(false)
-const disabledUser        = ref(null)   // { uid, email, plan } si compte suspendu
+const email                = ref("")
+const password             = ref("")
+const errorMsg             = ref("")
+const successMsg           = ref("")
+const disabledMsg          = ref("")
+const loading              = ref(false)
+const renewLoading         = ref(false)
+const pendingVerification  = ref(false)
+const unverifiedUser       = ref(null)
+const disabledUser         = ref(null)
+const selectedPlan         = ref("free")
 
-const API_URL     = "https://backendfinal-production-afd2.up.railway.app"
-const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
+const ADMIN_EMAILS = ["admin@gmail.com", "musrh@gmail.com"]
 
 onMounted(() => {
   selectedPlan.value =
@@ -265,7 +258,6 @@ const redirectUser = async (user) => {
     const data   = snap.data()
     const active = data.active !== false
     if (!active) {
-      // Conserver la session pour permettre le renouvellement du paiement
       disabledUser.value = { uid: user.uid, email: user.email, plan: data.plan || "pro" }
       disabledMsg.value  = "Votre compte a été suspendu pour non-paiement."
       return
@@ -351,7 +343,6 @@ const register = async () => {
   } finally { loading.value = false }
 }
 
-// ── Renouveler le paiement (compte suspendu) ────────────────────
 const renewPayment = async () => {
   if (!disabledUser.value) return
   renewLoading.value = true
@@ -430,11 +421,17 @@ const goToPlans = () => router.push("/")
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-.af-root {
+.app-container {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(135deg, #0f0f1a 0%, #1a1040 50%, #0f0f1a 100%);
-  padding: 24px 16px 48px;
   font-family: 'DM Sans', sans-serif;
+}
+.main-content { flex: 1; }
+
+.af-root {
+  padding: 24px 16px 48px;
 }
 
 /* Topbar logo */
@@ -556,7 +553,7 @@ const goToPlans = () => router.push("/")
 .af-plan-list .ok { color: #86efac; }
 .af-plan-list .no { color: rgba(255,255,255,.35); }
 
-/* Right card (formulaire existant) */
+/* Right card */
 .af-right { display: flex; justify-content: center; }
 .af-card {
   width: 100%;
@@ -596,25 +593,18 @@ const goToPlans = () => router.push("/")
   background: rgba(108,99,255,.12);
 }
 
-/* Forgot password */
 .af-forgot-row { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .af-forgot {
-  background: none;
-  border: none;
-  color: #a78bfa;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  padding: 4px 2px;
-  transition: color .15s;
+  background: none; border: none;
+  color: #a78bfa; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  padding: 4px 2px; transition: color .15s;
 }
 .af-forgot:hover:not(:disabled) { color: #c4b5fd; text-decoration: underline; }
 .af-forgot:disabled { opacity: .5; cursor: not-allowed; }
 
 .af-error    { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.35); color: #fca5a5; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; text-align: center; }
 .af-success  { background: rgba(34,197,94,.12);  border: 1px solid rgba(34,197,94,.3);  color: #86efac; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; text-align: center; }
-.af-disabled { background: rgba(234,179,8,.12);  border: 1px solid rgba(234,179,8,.3);  color: #fde68a; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; text-align: center; }
 
 .af-loading { display: flex; align-items: center; justify-content: center; gap: 10px; color: #a78bfa; font-size: 13px; margin-bottom: 14px; }
 .af-spinner { width: 18px; height: 18px; border: 2px solid rgba(167,139,250,.3); border-top-color: #a78bfa; border-radius: 50%; animation: af-spin .7s linear infinite; }
@@ -624,56 +614,36 @@ const goToPlans = () => router.push("/")
   background: rgba(99,179,237,.1);
   border: 1px solid rgba(99,179,237,.35);
   border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  padding: 14px 16px; margin-bottom: 16px;
+  display: flex; flex-direction: column; gap: 10px;
 }
 .af-verify-icon { font-size: 28px; text-align: center; }
-.af-verify-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: center;
-}
+.af-verify-text { display: flex; flex-direction: column; gap: 4px; text-align: center; }
 .af-verify-text strong { font-size: 14px; color: #90cdf4; font-weight: 700; }
 .af-verify-text span   { font-size: 12px; color: rgba(255,255,255,.6); line-height: 1.5; }
 .af-verify-text em     { color: #90cdf4; font-style: normal; }
 .af-btn-resend {
   background: rgba(99,179,237,.18);
   border: 1px solid rgba(99,179,237,.4);
-  color: #90cdf4;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 10px;
-  cursor: pointer;
+  color: #90cdf4; font-size: 13px; font-weight: 700;
+  padding: 8px 16px; border-radius: 10px; cursor: pointer;
   font-family: 'DM Sans', sans-serif;
-  transition: background .2s, color .2s;
-  align-self: center;
+  transition: background .2s, color .2s; align-self: center;
 }
 .af-btn-resend:hover:not(:disabled) { background: rgba(99,179,237,.3); color: #fff; }
 .af-btn-resend:disabled { opacity: .5; cursor: not-allowed; }
 
 .af-actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .af-btn {
-  width: 100%;
-  padding: 14px;
-  border: none;
-  border-radius: 13px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: all .2s;
+  width: 100%; padding: 14px; border: none; border-radius: 13px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all .2s;
 }
 .af-btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
 
 .af-btn-login {
   background: linear-gradient(135deg, #6c63ff, #4f46e5);
-  color: #fff;
-  box-shadow: 0 4px 20px rgba(108,99,255,.4);
+  color: #fff; box-shadow: 0 4px 20px rgba(108,99,255,.4);
 }
 .af-btn-login:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(108,99,255,.5); }
 
@@ -685,43 +655,19 @@ const goToPlans = () => router.push("/")
 .af-btn-register:hover:not(:disabled) { background: rgba(255,255,255,.14); color: #fff; }
 
 .af-back {
-  display: block;
-  width: 100%;
-  background: none;
-  border: none;
-  color: rgba(255,255,255,.4);
-  font-size: 13px;
-  cursor: pointer;
-  text-align: center;
-  font-family: 'DM Sans', sans-serif;
-  padding: 8px;
-  transition: color .15s;
+  display: block; width: 100%; background: none; border: none;
+  color: rgba(255,255,255,.4); font-size: 13px; cursor: pointer;
+  text-align: center; font-family: 'DM Sans', sans-serif;
+  padding: 8px; transition: color .15s;
 }
 .af-back:hover { color: rgba(255,255,255,.75); }
 
-/* Responsive */
-@media (max-width: 960px) {
-  .af-layout { grid-template-columns: 1fr; gap: 32px; }
-  .af-card { position: static; }
-}
-@media (max-width: 560px) {
-  .af-features, .af-plans { grid-template-columns: 1fr; }
-  .af-hero-title { font-size: 28px; }
-}
-@media (max-width: 480px) {
-  .af-card  { padding: 28px 20px; border-radius: 20px; }
-  .af-title { font-size: 20px; }
-  .af-emoji { font-size: 40px; }
-}
-
-/* ── Carte compte suspendu ─────────────────────────────────────── */
+/* Compte suspendu */
 .af-suspended-card {
   background: rgba(239,68,68,.08);
   border: 1px solid rgba(239,68,68,.25);
-  border-radius: 16px;
-  padding: 24px 20px;
-  text-align: center;
-  margin-bottom: 16px;
+  border-radius: 16px; padding: 24px 20px;
+  text-align: center; margin-bottom: 16px;
 }
 .af-suspended-icon  { font-size: 36px; margin-bottom: 10px; }
 .af-suspended-title { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 8px; }
@@ -732,8 +678,8 @@ const goToPlans = () => router.push("/")
   width: 100%; padding: 13px;
   background: linear-gradient(135deg, #10b981, #059669);
   color: #fff; border: none; border-radius: 12px;
-  font-size: 14px; font-weight: 700;
-  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
   box-shadow: 0 4px 16px rgba(16,185,129,.3);
   transition: all .2s;
   display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -756,21 +702,56 @@ const goToPlans = () => router.push("/")
   border-radius: 50%; animation: af-spin .7s linear infinite;
 }
 
-.app-container {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.main-content {
-  flex: 1;
-}
-
+/* ───────── FOOTER ───────── */
 .ps-footer {
-  background: #111;
-  color: #fff;
-  padding: 20px;
-  text-align: center;
+  background: #0a0a14;
+  border-top: 1px solid rgba(255,255,255,.08);
+  color: rgba(255,255,255,.7);
+  padding: 24px 16px;
+  font-family: 'DM Sans', sans-serif;
 }
-  
+.ps-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.ps-footer-brand {
+  font-size: 13px;
+  color: rgba(255,255,255,.55);
+}
+.ps-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.ps-footer-links a {
+  color: rgba(255,255,255,.7);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color .15s;
+}
+.ps-footer-links a:hover { color: #c4b5fd; text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 960px) {
+  .af-layout { grid-template-columns: 1fr; gap: 32px; }
+  .af-card { position: static; }
+}
+@media (max-width: 640px) {
+  .ps-footer-inner { flex-direction: column; text-align: center; }
+}
+@media (max-width: 560px) {
+  .af-features, .af-plans { grid-template-columns: 1fr; }
+  .af-hero-title { font-size: 28px; }
+}
+@media (max-width: 480px) {
+  .af-card  { padding: 28px 20px; border-radius: 20px; }
+  .af-title { font-size: 20px; }
+  .af-emoji { font-size: 40px; }
+}
 </style>
