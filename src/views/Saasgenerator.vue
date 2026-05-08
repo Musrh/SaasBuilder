@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from "vue"
 import { db, auth } from "../firebase.js"
 import { doc, getDoc, setDoc } from "firebase/firestore"
-import { onAuthStateChanged } from "firebase/auth"
+import { onAuthStateChanged, signOut } from "firebase/auth" 
 import { stripeConfig, loadStripeSDK } from "./stripe.js"
 import { paypalConfig, loadPaypalSDK } from "./paypal.js"
 
@@ -28,6 +28,7 @@ const activeSectionIndex = ref(null)
 const isSaved = ref(true)
 const isSaving = ref(false)
 const currentUser = ref(null)
+const userPlan    = ref("free")   // "free" | "pro" — chargé depuis Firestore
 const showPageMenu = ref(false)
 const sidebarTab = ref("sections")
 const showNotif = ref(false)
@@ -617,6 +618,7 @@ onMounted(() => {
           }
         }
         if (d.siteName) siteName.value = d.siteName
+        if (d.plan)     userPlan.value    = d.plan || "free"   // ← lire le vrai plan
         if (d.siteLogo) siteLogo.value = d.siteLogo
         // Pas de fallback localStorage : un nouveau propriétaire démarre avec un site vierge
       } else {
@@ -1111,6 +1113,16 @@ Retourne UNIQUEMENT un objet JSON (sans texte, sans markdown) :
     importThemeError.value = "Erreur : " + e.message
   } finally {
     importThemeLoading.value = false
+  }
+}
+
+// ── Déconnexion ──────────────────────────────────────────────────
+const signOutUser = async () => {
+  try {
+    await signOut(auth)
+    router.push("/auth")
+  } catch(e) {
+    console.error("signOut:", e.message)
   }
 }
 
@@ -2716,7 +2728,10 @@ const setPageStyle = (type, value) => {
         <span v-else class="brand-icon">◈</span>
       </label>
       <input v-model="siteName" class="brand-name-input" :placeholder="t.siteNamePlaceholder" :title="t.siteNameLabel"/>
-      <span class="brand-badge">Pro</span>
+      <span
+        class="brand-badge"
+        :class="userPlan === 'pro' ? 'brand-badge-pro' : 'brand-badge-free'"
+      >{{ userPlan === 'pro' ? '⭐ Pro' : '🆓 Free' }}</span>
     </div>
     <nav class="page-tabs">
       <button v-for="(p,i) in site.pages" :key="p.id" class="page-tab" :class="{active:currentPageIndex===i}" @click="goToPage(i)" @dblclick="renamingPageIndex=i">
@@ -2727,6 +2742,23 @@ const setPageStyle = (type, value) => {
       <button class="page-tab add-tab" @click="addPage">+</button>
     </nav>
     <div class="topbar-actions" :dir="isRtl?'rtl':'ltr'">
+
+      <!-- Retour Dashboard -->
+      <button class="btn-action btn-dashboard" @click="$router.push('/dashboard')" title="Retour au Dashboard">
+        🏠 Dashboard
+      </button>
+
+      <!-- Connexion / Déconnexion -->
+      <div class="topbar-user" v-if="currentUser">
+        <span class="topbar-user-email">{{ currentUser.email?.split('@')[0] }}</span>
+        <button class="btn-action btn-logout" @click="signOutUser" title="Se déconnecter">
+          ⎋ Déconnexion
+        </button>
+      </div>
+      <button v-else class="btn-action btn-login" @click="$router.push('/auth')" title="Se connecter">
+        🔑 Connexion
+      </button>
+
       <button class="btn-action cart-btn" @click="showCart=true" v-if="cartCount>0">
         🛒 <span class="cart-badge">{{ cartCount }}</span>
       </button>
@@ -4000,4 +4032,47 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 }
 .prev-nav-tab:hover  { background: #f3f4f6; color: #111; }
 .prev-nav-tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
+
+/* ── Badge plan dynamique ─────────────────────────────────────── */
+.brand-badge-pro  { background: linear-gradient(135deg,#6c63ff,#4f46e5)!important; color:#fff!important; }
+.brand-badge-free { background: rgba(156,163,175,.2)!important; color:#9ca3af!important; font-size:10px!important; }
+
+/* ── Bouton Dashboard ─────────────────────────────────────────── */
+.btn-dashboard {
+  background: rgba(99,102,241,.1);
+  border: 1px solid rgba(99,102,241,.25) !important;
+  color: #818cf8 !important;
+  font-size: 12px !important;
+  padding: 6px 10px !important;
+  white-space: nowrap;
+}
+.btn-dashboard:hover { background: rgba(99,102,241,.2) !important; }
+
+/* ── Topbar user (email + déconnexion) ───────────────────────── */
+.topbar-user {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.topbar-user-email {
+  font-size: 11px; color: #9ca3af;
+  max-width: 90px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.btn-logout {
+  background: rgba(239,68,68,.1) !important;
+  border: 1px solid rgba(239,68,68,.2) !important;
+  color: #f87171 !important;
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+}
+.btn-logout:hover { background: rgba(239,68,68,.2) !important; }
+.btn-login {
+  background: rgba(16,185,129,.1) !important;
+  border: 1px solid rgba(16,185,129,.2) !important;
+  color: #34d399 !important;
+  font-size: 12px !important;
+}
 </style>
