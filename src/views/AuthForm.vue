@@ -748,4 +748,11 @@ const goToPlans = () => router.push("/")
   border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
   border-radius: 50%; animation: af-spin .7s linear infinite;
 }
+
+  .ps-footer {
+  background: #111;
+  color: #fff;
+  padding: 20px;
+  text-align: center;
+  }
 </style>
