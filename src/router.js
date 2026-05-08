@@ -10,6 +10,7 @@ import Dashboard      from "./views/Dashboard.vue"
 import SiteViewer     from "./views/Siteviewer.vue"
 import NotFound       from "./views/NotFound.vue"
 import Saasgenerator  from "./views/Saasgenerator.vue"
+import Admin  from "./views/Admin.vue"
 
 import Privacy  from "./views/PrivacyPolicy.vue"
 import Remboursement  from "./views/Remboursement.vue"
@@ -39,6 +40,7 @@ const routes = [
   // ======================
  // { path: "/", name: "home", component: PlanSelection },
   { path: "/", name: "auth", component: AuthForm },
+  { path: "/admin", component: Admin },
 
   { path: "/privacy",component: Privacy },
   { path: "/remboursement", component: Remboursement },
