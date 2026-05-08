@@ -189,7 +189,21 @@
         </div>
       </div>
     </div>
+    
   </div>
+
+<!-- ── FOOTER ─────────────────────────────────────────────── -->
+    <footer class="ps-footer">
+      <p class="ps-footer-brand">© {{ new Date().getFullYear() }} SaasBuilder</p>
+      <nav class="ps-footer-links">
+        <router-link to="/privacy-policy">Privacy Policy</router-link>
+        <router-link to="/remboursement">Remboursement</router-link>
+        <router-link to="/confidentialite">Confidentialité</router-link>
+        <router-link to="/mentions">Mentions légales</router-link>
+        <router-link to="/conditions">Conditions générales</router-link>
+      </nav>
+    </footer>
+  
 </template>
 
 <script setup>
