@@ -11,6 +11,12 @@ import SiteViewer     from "./views/Siteviewer.vue"
 import NotFound       from "./views/NotFound.vue"
 import Saasgenerator  from "./views/Saasgenerator.vue"
 
+import Privacy  from "./views/Privacy-policy.vue"
+import Remboursement  from "./views/Remboursement.vue"
+import Conditions  from "./views/Conditions.vue"
+import Mentions  from "./views/Mentions.vue"
+
+
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
 // Attente auth Firebase
@@ -31,6 +37,11 @@ const routes = [
  // { path: "/", name: "home", component: PlanSelection },
   { path: "/", name: "auth", component: AuthForm },
 
+  { path: "/privacy",component: Privacy },
+  { path: "/remboursement", component: Remboursement },
+  { path: "/conditions", component: Conditions },
+  { path: "/mentions", component: Mentions },
+ 
   { path: "/slug-setup", name: "slug-setup", component: SlugSetup, meta: { requiresAuth: true } },
   { path: "/dashboard",  name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
 
