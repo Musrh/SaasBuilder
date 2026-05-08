@@ -1119,10 +1119,15 @@ Retourne UNIQUEMENT un objet JSON (sans texte, sans markdown) :
 // ── Déconnexion ──────────────────────────────────────────────────
 const signOutUser = async () => {
   try {
+    currentUser.value = null
+    userPlan.value    = "free"
+    firestoreLoaded   = false   // permettre rechargement au prochain login
     await signOut(auth)
-    router.push("/auth")
+    // Forcer rechargement complet pour éviter état résiduel
+    window.location.href = "/#/auth"
   } catch(e) {
     console.error("signOut:", e.message)
+    window.location.href = "/#/auth"
   }
 }
 
@@ -2732,6 +2737,19 @@ const setPageStyle = (type, value) => {
         class="brand-badge"
         :class="userPlan === 'pro' ? 'brand-badge-pro' : 'brand-badge-free'"
       >{{ userPlan === 'pro' ? '⭐ Pro' : '🆓 Free' }}</span>
+      <!-- Boutons aperçu toujours visibles sur mobile -->
+      <div class="brand-quick-btns">
+        <button
+          class="btn-action bqb"
+          @click="mode = mode==='preview' ? 'edit' : 'preview'"
+          :title="mode==='preview' ? t.edit : t.preview"
+        >{{ mode==='preview' ? '✏️' : '👁' }}</button>
+        <button
+          class="btn-action bqb"
+          @click="showPublicPreview=true"
+          title="Aperçu public"
+        >🔍</button>
+      </div>
     </div>
     <nav class="page-tabs">
       <button v-for="(p,i) in site.pages" :key="p.id" class="page-tab" :class="{active:currentPageIndex===i}" @click="goToPage(i)" @dblclick="renamingPageIndex=i">
@@ -2741,6 +2759,8 @@ const setPageStyle = (type, value) => {
       </button>
       <button class="page-tab add-tab" @click="addPage">+</button>
     </nav>
+
+
     <div class="topbar-actions" :dir="isRtl?'rtl':'ltr'">
 
       <!-- Retour Dashboard -->
@@ -2771,16 +2791,13 @@ const setPageStyle = (type, value) => {
       <button class="btn-action icon-btn trend-btn" @click="showTrendModal=true" title="Produits tendance">🔥</button>
       <div class="pub-btn-group">
         <button class="btn-action publish-btn" @click="showPublishModal=true">🌐 {{ t.publish }}</button>
-        <button class="btn-action preview-pub-btn" @click="showPublicPreview=true" title="Aperçu public">👁</button>
       </div>
       <span class="save-status" :class="{saved:isSaved}">{{ isSaved ? t.saved : t.unsaved }}</span>
       <button class="btn-action" @click="saveSite" :disabled="isSaving" :class="{saving:isSaving}">
         <span v-if="isSaving" class="spinner"/>
         <span>{{ isSaving ? t.saving : t.save }}</span>
       </button>
-      <button class="btn-action primary" @click="mode=mode==='preview'?'edit':'preview'">
-        {{ mode==='preview' ? t.edit : t.preview }}
-      </button>
+
     </div>
   </header>
 
@@ -3223,7 +3240,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .export-badge{position:absolute;top:10px;right:10px;background:var(--accent);color:white;font-size:9px;font-weight:700;padding:2px 7px;border-radius:100px;text-transform:uppercase}
 .export-note{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px;color:var(--text2);line-height:1.6}
 .export-note strong{color:var(--text)}
-.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--topbar-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;padding:0 16px}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:var(--topbar-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;padding:0 16px;overflow:hidden}
 .topbar-brand{display:flex;align-items:center;gap:8px;min-width:var(--sidebar-w);padding-right:16px;border-right:1px solid var(--border)}
 .brand-icon{font-size:20px;color:var(--accent)}
 .brand-name{font-family:'Playfair Display',serif;font-size:17px;font-weight:600;letter-spacing:-.3px}
@@ -4074,5 +4091,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
   border: 1px solid rgba(16,185,129,.2) !important;
   color: #34d399 !important;
   font-size: 12px !important;
+}
+
+
+/* ── Boutons aperçu dans brand (toujours visibles) ────────────── */
+.brand-quick-btns {
+  display: flex;
+  gap: 4px;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.bqb {
+  padding: 5px 8px !important;
+  font-size: 14px !important;
+  border-radius: 8px !important;
+  flex-shrink: 0;
 }
 </style>
