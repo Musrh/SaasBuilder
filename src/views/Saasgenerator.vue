@@ -1124,10 +1124,10 @@ const signOutUser = async () => {
     firestoreLoaded   = false   // permettre rechargement au prochain login
     await signOut(auth)
     // Forcer rechargement complet pour éviter état résiduel
-    window.location.href = "/#/auth"
+    window.location.href = "/#/auth?logout=1"
   } catch(e) {
     console.error("signOut:", e.message)
-    window.location.href = "/#/auth"
+    window.location.href = "/#/auth?logout=1"
   }
 }
 
