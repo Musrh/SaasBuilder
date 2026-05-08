@@ -3037,6 +3037,25 @@ const setPageStyle = (type, value) => {
         <!-- PREVIEW -->
         <template v-else>
           <div class="preview-mode">
+
+            <!-- ── Nav du site dans l'aperçu interne ── -->
+            <nav class="prev-site-nav" :style="{background: site.theme?.nav || '#fff'}" v-if="site.pages?.length > 1">
+              <div class="prev-nav-brand">
+                <img v-if="siteLogo" :src="siteLogo" class="prev-nav-logo" alt="logo"/>
+                <span v-else class="prev-nav-icon">◈</span>
+                <span class="prev-nav-name" :style="{color: site.theme?.navText || '#1a1a2e'}">{{ siteName }}</span>
+              </div>
+              <div class="prev-nav-pages">
+                <button
+                  v-for="(p, i) in site.pages" :key="p.id"
+                  class="prev-nav-tab"
+                  :class="{active: currentPageIndex === i}"
+                  :style="currentPageIndex === i ? {background: site.theme?.accent || '#6c63ff', color: '#fff'} : {color: site.theme?.navText || '#6b7280'}""
+                  @click="currentPageIndex = i"
+                >{{ p.name }}</button>
+              </div>
+            </nav>
+
             <div v-for="s in currentPage.sections" :key="s.id">
               <div v-if="s.type==='hero'" class="prev-hero" :style="s.style">
                 <h1 class="prev-hero-title">{{ s.content }}</h1>
@@ -3480,20 +3499,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .pub-preview-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  height: 52px;
+  gap: 8px;
+  padding: 0 12px;
+  min-height: 52px;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
   z-index: 10000;
   box-shadow: 0 1px 6px rgba(0,0,0,.07);
+  flex-wrap: wrap;
 }
 .pub-preview-brand-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-right: auto;
+  flex-shrink: 0;
 }
 .pub-preview-logo {
   width: 32px;
@@ -3515,6 +3535,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .pub-preview-tabs {
   display: flex;
   gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-width: 0;
 }
 .pub-preview-tab {
   background: transparent;
@@ -3929,4 +3953,51 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
   padding: 6px 8px;
   margin-top: 4px;
 }
+
+/* ── Nav dans le mode aperçu interne ──────────────────────────── */
+.prev-site-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 54px;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.prev-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.prev-nav-logo {
+  width: 28px; height: 28px;
+  object-fit: contain; border-radius: 6px;
+}
+.prev-nav-icon { font-size: 18px; color: #6c63ff; }
+.prev-nav-name {
+  font-size: 15px; font-weight: 700;
+  color: #1a1a2e; font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+.prev-nav-pages {
+  display: flex; gap: 4px; flex-wrap: wrap; flex: 1;
+}
+.prev-nav-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #6b7280;
+  font-size: 13px; padding: 5px 12px;
+  border-radius: 6px; cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.prev-nav-tab:hover  { background: #f3f4f6; color: #111; }
+.prev-nav-tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
 </style>
