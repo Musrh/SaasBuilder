@@ -193,16 +193,23 @@
   </div>
 
 <!-- ── FOOTER ─────────────────────────────────────────────── -->
-    <footer class="ps-footer">
-      <p class="ps-footer-brand">© {{ new Date().getFullYear() }} SaasBuilder</p>
-      <nav class="ps-footer-links">
-        <router-link to="/privacy-policy">Privacy Policy</router-link>
-        <router-link to="/remboursement">Remboursement</router-link>
-        <router-link to="/confidentialite">Confidentialité</router-link>
-        <router-link to="/mentions">Mentions légales</router-link>
-        <router-link to="/conditions">Conditions générales</router-link>
-      </nav>
-    </footer>
+<div class="app-container">
+  <main class="main-content">
+    <router-view />
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="ps-footer">
+    <p class="ps-footer-brand">© {{ new Date().getFullYear() }} SaasBuilder</p>
+    <nav class="ps-footer-links">
+      <router-link to="/privacy-policy">Privacy Policy</router-link>
+      <router-link to="/remboursement">Remboursement</router-link>
+      <router-link to="/confidentialite">Confidentialité</router-link>
+      <router-link to="/mentions">Mentions légales</router-link>
+      <router-link to="/conditions">Conditions générales</router-link>
+    </nav>
+  </footer>
+</div>
   
 </template>
 
@@ -749,10 +756,21 @@ const goToPlans = () => router.push("/")
   border-radius: 50%; animation: af-spin .7s linear infinite;
 }
 
-  .ps-footer {
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+}
+
+.ps-footer {
   background: #111;
   color: #fff;
   padding: 20px;
   text-align: center;
-  }
+}
+  
 </style>
