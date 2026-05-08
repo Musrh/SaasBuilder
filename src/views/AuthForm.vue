@@ -218,7 +218,7 @@ import {
 } from "firebase/auth"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/firebase"
-import logo from "/logo.png"
+import logo from "../assets/logo.png"
 
 const API_URL = import.meta.env.VITE_API_URL || ""
 
