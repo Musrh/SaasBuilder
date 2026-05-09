@@ -190,6 +190,22 @@
       </div>
     </div>
   </div>
+  
+    <!-- ───────── FOOTER ───────── -->
+    <footer class="ps-footer">
+      <div class="ps-footer-inner">
+        <div class="ps-footer-brand">
+          © {{ new Date().getFullYear() }} SaasBuilder
+        </div>
+        <nav class="ps-footer-links">
+          <router-link to="/privacy-policy">Privacy Policy</router-link>
+          <router-link to="/remboursement">Remboursement</router-link>
+          <router-link to="/confidentialite">Confidentialité</router-link>
+          <router-link to="/mentions-legales">Mentions légales</router-link>
+          <router-link to="/conditions-generales">Conditions générales</router-link>
+        </nav>
+      </div>
+    </footer>
 </template>
 
 <script setup>
@@ -771,4 +787,40 @@ const goToPlans = () => router.push("/")
   border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
   border-radius: 50%; animation: af-spin .7s linear infinite;
 }
+
+  /* ───────── FOOTER ───────── */
+.ps-footer {
+  background: #0a0a14;
+  border-top: 1px solid rgba(255,255,255,.08);
+  color: rgba(255,255,255,.7);
+  padding: 24px 16px;
+  font-family: 'DM Sans', sans-serif;
+}
+.ps-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.ps-footer-brand {
+  font-size: 13px;
+  color: rgba(255,255,255,.55);
+}
+.ps-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.ps-footer-links a {
+  color: rgba(255,255,255,.7);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color .15s;
+}
+.ps-footer-links a:hover { color: #c4b5fd; text-decoration: underline; }
+  
 </style>
