@@ -563,7 +563,8 @@ import { auth, db } from "../firebase"
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
-const BACKEND     = "https://backendfinal-production-afd2.up.railway.app"
+const BACKEND      = "https://backendfinal-production-afd2.up.railway.app"  // paiements clients des stores
+const BACKEND_SAAS = "https://backendsaas-production.up.railway.app"              // abonnements propriétaires → MrOnlineStores
 
 const router      = useRouter()
 const user        = ref(null)
@@ -857,7 +858,7 @@ const goToPlans = () => { showPlanModal.value = true }
 const payToReactivate = async () => {
   planLoading.value = true
   try {
-    const res  = await fetch(`${BACKEND}/create-billing-session`, {
+    const res  = await fetch(`${BACKEND_SAAS}/create-billing-session`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -886,7 +887,7 @@ const confirmPlan = async () => {
   if (isProActive.value && planChoix.value === 'pro') return
   planLoading.value = true
   try {
-    const res  = await fetch(`${BACKEND}/create-billing-session`, {
+    const res  = await fetch(`${BACKEND_SAAS}/create-billing-session`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -918,7 +919,7 @@ const renewPlan = () => {
 // ── Upgrade vers Pro — logique originale ─────────────────────
 const upgradeToPro = async () => {
   try {
-    const res  = await fetch(`${BACKEND}/create-billing-session`, {
+    const res  = await fetch(`${BACKEND_SAAS}/create-billing-session`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
