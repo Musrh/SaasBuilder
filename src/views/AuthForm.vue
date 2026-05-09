@@ -203,6 +203,8 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   signOut,
+  onAuthStateChanged,
+  getAuth,
 } from "firebase/auth"
 
 // Logo depuis dossier public (pas assets)
@@ -226,42 +228,44 @@ const disabledUser        = ref(null)   // { uid, email, plan } si compte suspen
 const API_URL     = "https://backendfinal-production-afd2.up.railway.app"
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
-onMounted(async () => {
+onMounted(() => {
   selectedPlan.value =
     route.query.plan ||
     localStorage.getItem("planChoisi") ||
     "free"
 
-  // Si on arrive avec ?logout=1 → signOut propre et afficher le formulaire
+  // Si ?logout=1 → signOut silencieux + afficher le formulaire
   if (route.query.logout === "1") {
-    try { await signOut(auth) } catch(e) {}
-    return
+    signOut(auth).catch(() => {})
+    return   // stop ici, afficher le formulaire normalement
   }
 
-  // Si l'user est déjà connecté et arrive sur /auth → le rediriger
-  const { getAuth, onAuthStateChanged } = await import("firebase/auth")
+  // Si user déjà connecté → rediriger (sans import dynamique)
   const fireAuth = getAuth()
   const unsub = onAuthStateChanged(fireAuth, async (user) => {
-    unsub()
-    if (!user) return
-    // User connecté → vérifier son statut
+    unsub()  // écouter une seule fois
+    if (!user) return  // pas connecté → afficher le formulaire
+
     try {
       const snap = await getDoc(doc(db, "users", user.uid))
       if (!snap.exists()) { router.push("/dashboard"); return }
       const data = snap.data()
+
       if (data.active === false) {
         disabledUser.value = { uid: user.uid, email: user.email, plan: data.plan || "pro" }
         disabledMsg.value  = "Votre compte a été suspendu pour non-paiement."
         return
       }
-      // Compte actif → rediriger vers dashboard
-      const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
+
       if (ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
         window.location.href = "https://mronlinestores.com/#/admin"
         return
       }
+
       router.push("/dashboard")
-    } catch(e) { console.warn("onMounted auth check:", e.message) }
+    } catch(e) {
+      console.warn("onMounted auth check:", e.message)
+    }
   })
 })
 
