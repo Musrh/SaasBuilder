@@ -58,7 +58,7 @@ const routes = [
   // ADMIN
   // ======================
   { path: "/admin",         name: "admin",         component: () => import("./views/Admin.vue"),        meta: { requiresAdmin: true } },
-  { path: "/admin/restore", name: "admin-restore", component: () => import("./views/AdminRestore.vue"), meta: { requiresAdmin: true } },
+ // { path: "/admin/restore", name: "admin-restore", component: () => import("./views/AdminRestore.vue"), meta: { requiresAdmin: true } },
 
   // ======================
   // STORE CLIENT
