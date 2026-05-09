@@ -3,23 +3,18 @@ import { createRouter, createWebHashHistory } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getFirestore, doc, getDoc } from "firebase/firestore"
 
-import PlanSelection  from "./views/PlanSelection.vue"
 import SlugSetup      from "./views/Slugsetup.vue"
 import AuthForm       from "./views/AuthForm.vue"
 import Dashboard      from "./views/Dashboard.vue"
 import SiteViewer     from "./views/Siteviewer.vue"
 import NotFound       from "./views/NotFound.vue"
 import Saasgenerator  from "./views/Saasgenerator.vue"
-import Admin  from "./views/Admin.vue"
 
-import Privacy  from "./views/PrivacyPolicy.vue"
+import Privacy        from "./views/PrivacyPolicy.vue"
 import Remboursement  from "./views/Remboursement.vue"
-import Conditions  from "./views/Conditions.vue"
-import Mentions  from "./views/Mentions.vue"
-import Confidentialite  from "./views/Confidentialite.vue"
-
-
-
+import Conditions     from "./views/Conditions.vue"
+import Mentions       from "./views/Mentions.vue"
+import Confidentialite from "./views/Confidentialite.vue"
 
 const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 
@@ -27,7 +22,6 @@ const ADMIN_EMAILS = ["musmamon@gmail.com", "musrh@gmail.com"]
 const waitForAuth = () => new Promise(resolve => {
   const auth = getAuth()
   if (auth.currentUser) return resolve(auth.currentUser)
-
   const unsub = onAuthStateChanged(auth, user => {
     unsub()
     resolve(user)
@@ -35,58 +29,69 @@ const waitForAuth = () => new Promise(resolve => {
 })
 
 const routes = [
+
   // ======================
-  // ROUTES PRINCIPALES
+  // PAGE D'ACCUEIL = AuthForm
   // ======================
- // { path: "/", name: "home", component: PlanSelection },
   { path: "/", name: "auth", component: AuthForm },
-  { path: "/admin", component: Admin },
 
-  { path: "/privacy",component: Privacy },
-  { path: "/remboursement", component: Remboursement },
-  { path: "/conditions", component: Conditions },
-  { path: "/mentions", component: Mentions },
-  { path: "/confidentialite", component: Confidentialite },
- 
-  { path: "/slug-setup", name: "slug-setup", component: SlugSetup, meta: { requiresAuth: true } },
-  { path: "/dashboard",  name: "dashboard",  component: Dashboard,  meta: { requiresAuth: true } },
+  // ======================
+  // PAGES LÉGALES (publiques)
+  // ======================
+  { path: "/privacy",          name: "privacy",          component: Privacy },
+  { path: "/remboursement",    name: "remboursement",    component: Remboursement },
+  { path: "/conditions",       name: "conditions",       component: Conditions },
+  { path: "/mentions",         name: "mentions",         component: Mentions },
+  { path: "/confidentialite",  name: "confidentialite",  component: Confidentialite },
 
-  // ⚠️ Builder SaaS (DOIT rester accessible directement)
+  // ======================
+  // ESPACE PROPRIÉTAIRE
+  // ======================
+  { path: "/slug-setup",    name: "slug-setup",    component: SlugSetup,    meta: { requiresAuth: true } },
+  { path: "/dashboard",     name: "dashboard",     component: Dashboard,    meta: { requiresAuth: true } },
+  { path: "/orders",        name: "orders",        component: () => import("./views/Orders.vue"), meta: { requiresAuth: true } },
+
+  // ⚠️ Builder SaaS — gère son auth en interne
   { path: "/saasgenerator", name: "saasgenerator", component: Saasgenerator },
 
   // ======================
-  // SITE PAR UID
+  // ADMIN
   // ======================
-  { path: "/site/:uid", name: "site", component: SiteViewer, props: true },
+  { path: "/admin",         name: "admin",         component: () => import("./views/Admin.vue"),        meta: { requiresAdmin: true } },
+  { path: "/admin/restore", name: "admin-restore", component: () => import("./views/AdminRestore.vue"), meta: { requiresAdmin: true } },
 
   // ======================
-  // AUTH STORE CLIENT
+  // STORE CLIENT
   // ======================
-  { path: "/store-auth", name: "store-auth", component: () => import("./views/Storeauth.vue") },
+  { path: "/site/:uid",   name: "site",       component: SiteViewer, props: true },
+  { path: "/store-auth",  name: "store-auth", component: () => import("./views/Storeauth.vue") },
+  { path: "/panier",      name: "panier",     component: () => import("./views/Panier.vue") },
 
   // ======================
   // PAIEMENT
   // ======================
   { path: "/payment-success", name: "payment-success", component: () => import("./views/Paymentsuccess.vue") },
   { path: "/payment-cancel",  name: "payment-cancel",  component: () => import("./views/Paymentcancel.vue") },
-  { path: "/success", name: "success", component: () => import("./views/Success.vue") },
-  { path: "/cancel",  name: "cancel",  component: () => import("./views/Cancel.vue") },
+  { path: "/success",         name: "success",         component: () => import("./views/Success.vue") },
+  { path: "/cancel",          name: "cancel",          component: () => import("./views/Cancel.vue") },
 
   // ======================
-  // ADMIN / ORDERS
-  // ======================
-  { path: "/admin",  name: "admin",  component: () => import("./views/Admin.vue"),  meta: { requiresAdmin: true } },
-  { path: "/orders", name: "orders", component: () => import("./views/Orders.vue"), meta: { requiresAuth: true } },
-  { path: "/panier", name: "panier", component: () => import("./views/Panier.vue") },
-
-  // ======================
-  // SLUG PUBLIC (IMPORTANT)
+  // SLUG PUBLIC
+  // ⚠️ Doit rester AVANT 404 et APRÈS toutes les routes nommées
   // ======================
   {
     path: "/:slug([a-z0-9][a-z0-9-]*)",
     name: "slug-site",
     component: SiteViewer,
     props: route => ({ slug: route.params.slug }),
+    beforeEnter: (to) => {
+      // Bloquer les slugs qui correspondent à des routes internes
+      const RESERVED = ["privacy","remboursement","conditions","mentions",
+                        "confidentialite","dashboard","admin","saasgenerator",
+                        "orders","panier","success","cancel","store-auth",
+                        "slug-setup","site","payment-success","payment-cancel"]
+      if (RESERVED.includes(to.params.slug)) return { name: "not-found" }
+    }
   },
 
   // ======================
@@ -106,44 +111,36 @@ const router = createRouter({
 // ======================
 router.beforeEach(async (to, from, next) => {
 
-  // ===== SAASGENERATOR — court-circuite waitForAuth pour éviter la race condition =====
-  // Le composant gère lui-même l'auth via onAuthStateChanged
+  // ===== SAASGENERATOR — accès direct sans waitForAuth =====
   if (to.name === "saasgenerator") return next()
 
   // ===== ADMIN =====
   if (to.meta.requiresAdmin) {
     const user = await waitForAuth()
-
     if (!user) return next({ name: "auth" })
     if (!ADMIN_EMAILS.includes(user.email?.toLowerCase())) {
       return next({ name: "not-found" })
     }
-
     return next()
   }
 
   // ===== AUTH REQUIRED =====
   if (to.meta.requiresAuth) {
     const user = await waitForAuth()
-
     if (!user) {
       return next({ name: "auth", query: { redirect: to.fullPath } })
     }
 
-    // SaaS builder toujours autorisé
-    if (to.name === "saasgenerator") return next()
-
-    // Vérif compte (dashboard + setup)
+    // Vérif compte suspendu (dashboard + setup)
     if (to.name === "dashboard" || to.name === "slug-setup") {
       try {
-        const db = getFirestore()
+        const db   = getFirestore()
         const snap = await getDoc(doc(db, "users", user.uid))
-
         if (snap.exists() && snap.data().active === false) {
-          await getAuth().signOut()
+          // Ne pas signOut — laisser AuthForm gérer la suspension
           return next({ name: "auth" })
         }
-      } catch (e) {
+      } catch(e) {
         console.error("Router error:", e.message)
       }
     }
