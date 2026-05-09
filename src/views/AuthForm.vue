@@ -198,11 +198,11 @@
           © {{ new Date().getFullYear() }} SaasBuilder
         </div>
         <nav class="ps-footer-links">
-          <router-link to="/privacy-policy">Privacy Policy</router-link>
+          <router-link to="/privacy">Privacy Policy</router-link>
           <router-link to="/remboursement">Remboursement</router-link>
           <router-link to="/confidentialite">Confidentialité</router-link>
-          <router-link to="/mentions-legales">Mentions légales</router-link>
-          <router-link to="/conditions-generales">Conditions générales</router-link>
+          <router-link to="/mentions">Mentions légales</router-link>
+          <router-link to="/conditions">Conditions générales</router-link>
         </nav>
       </div>
     </footer>
