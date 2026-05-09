@@ -1119,15 +1119,21 @@ Retourne UNIQUEMENT un objet JSON (sans texte, sans markdown) :
 // ── Déconnexion ──────────────────────────────────────────────────
 const signOutUser = async () => {
   try {
+    // Réinitialiser l'état local immédiatement
     currentUser.value = null
     userPlan.value    = "free"
-    firestoreLoaded   = false   // permettre rechargement au prochain login
+    firestoreLoaded   = false
+
+    // signOut Firebase
     await signOut(auth)
-    // Forcer rechargement complet pour éviter état résiduel
-    window.location.href = "/#/auth?logout=1"
   } catch(e) {
     console.error("signOut:", e.message)
-    window.location.href = "/#/auth?logout=1"
+  } finally {
+    // Forcer un rechargement complet de la page sur /auth
+    // setTimeout pour laisser Firebase terminer le signOut
+    setTimeout(() => {
+      window.location.replace("/#/")
+    }, 300)
   }
 }
 
@@ -2775,7 +2781,7 @@ const setPageStyle = (type, value) => {
           ⎋ Déconnexion
         </button>
       </div>
-      <button v-else class="btn-action btn-login" @click="$router.push('/auth')" title="Se connecter">
+      <button v-else class="btn-action btn-login" @click="$router.push('/')" title="Se connecter">
         🔑 Connexion
       </button>
 
