@@ -503,57 +503,6 @@
     </div>
   </Transition>
 
-  <!-- ── MODAL CHOIX DU PAYS (Stripe Connect) ─────────────────── -->
-  <Transition name="db-fade">
-    <div v-if="showCountryModal" class="db-modal-overlay" @click.self="showCountryModal=false">
-      <div class="db-modal-box db-country-modal-box">
-
-        <button class="db-modal-close" @click="showCountryModal=false">✕</button>
-
-        <div class="db-modal-header">
-          <span class="db-modal-icon">🌍</span>
-          <h2 class="db-modal-title">Choisir votre pays</h2>
-          <p class="db-modal-sub">Sélectionnez le pays dans lequel votre entreprise est légalement active</p>
-        </div>
-
-        <input
-          v-model="countrySearch"
-          class="db-country-search"
-          placeholder="🔍 Rechercher un pays..."
-        />
-
-        <div class="db-country-list">
-          <button
-            v-for="c in filteredCountries"
-            :key="c.code"
-            class="db-country-item"
-            :class="{ 'db-country-selected': selectedCountry === c.code }"
-            @click="selectedCountry = c.code"
-          >
-            <span class="db-country-flag">{{ c.flag }}</span>
-            <span class="db-country-name">{{ c.name }}</span>
-            <span v-if="selectedCountry === c.code" class="db-country-check">✓</span>
-          </button>
-          <p v-if="filteredCountries.length === 0" class="db-country-empty">Aucun pays trouvé</p>
-        </div>
-
-        <button
-          class="db-btn db-btn-confirm"
-          :disabled="!selectedCountry || stripeConnectLoading"
-          @click="confirmCountryAndConnect"
-          style="margin-top:16px"
-        >
-          <span v-if="stripeConnectLoading">⏳ Connexion à Stripe...</span>
-          <span v-else-if="!selectedCountry">Sélectionnez un pays pour continuer</span>
-          <span v-else>Continuer avec {{ COUNTRIES.find(c => c.code === selectedCountry)?.name }} →</span>
-        </button>
-
-        <p class="db-plan-note">Vous serez redirigé vers Stripe pour finaliser la connexion.</p>
-
-      </div>
-    </div>
-  </Transition>
-
 </template>
 
 <script setup>
@@ -563,8 +512,7 @@ import { auth, db } from "../firebase"
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
-const BACKEND      = "https://backendfinal-production-afd2.up.railway.app"  // paiements clients des stores
-const BACKEND_SAAS = "https://backendsaas-production.up.railway.app"              // abonnements propriétaires → MrOnlineStores
+const BACKEND     = "https://backendfinal-production-afd2.up.railway.app"
 
 const router      = useRouter()
 const user        = ref(null)
@@ -575,81 +523,6 @@ const loading     = ref(true)
 const showPlanModal  = ref(false)
 const planChoix      = ref("pro")    // plan sélectionné dans le modal
 const planLoading    = ref(false)
-
-// ── Modal sélection du pays (Stripe Connect) ──────────────────
-const showCountryModal    = ref(false)
-const selectedCountry     = ref("")
-const countrySearch       = ref("")
-const stripeConnectLoading = ref(false)
-
-const COUNTRIES = [
-  // Francophones en premier
-  { code: "FR", flag: "🇫🇷", name: "France" },
-  { code: "BE", flag: "🇧🇪", name: "Belgique" },
-  { code: "CH", flag: "🇨🇭", name: "Suisse" },
-  { code: "LU", flag: "🇱🇺", name: "Luxembourg" },
-  { code: "CA", flag: "🇨🇦", name: "Canada" },
-  { code: "MA", flag: "🇲🇦", name: "Maroc" },
-  { code: "SN", flag: "🇸🇳", name: "Sénégal" },
-  { code: "CI", flag: "🇨🇮", name: "Côte d'Ivoire" },
-  // Europe
-  { code: "DE", flag: "🇩🇪", name: "Allemagne" },
-  { code: "AT", flag: "🇦🇹", name: "Autriche" },
-  { code: "BG", flag: "🇧🇬", name: "Bulgarie" },
-  { code: "CY", flag: "🇨🇾", name: "Chypre" },
-  { code: "HR", flag: "🇭🇷", name: "Croatie" },
-  { code: "DK", flag: "🇩🇰", name: "Danemark" },
-  { code: "EE", flag: "🇪🇪", name: "Estonie" },
-  { code: "FI", flag: "🇫🇮", name: "Finlande" },
-  { code: "GR", flag: "🇬🇷", name: "Grèce" },
-  { code: "HU", flag: "🇭🇺", name: "Hongrie" },
-  { code: "IE", flag: "🇮🇪", name: "Irlande" },
-  { code: "IS", flag: "🇮🇸", name: "Islande" },
-  { code: "IT", flag: "🇮🇹", name: "Italie" },
-  { code: "LV", flag: "🇱🇻", name: "Lettonie" },
-  { code: "LI", flag: "🇱🇮", name: "Liechtenstein" },
-  { code: "LT", flag: "🇱🇹", name: "Lituanie" },
-  { code: "MT", flag: "🇲🇹", name: "Malte" },
-  { code: "NO", flag: "🇳🇴", name: "Norvège" },
-  { code: "NL", flag: "🇳🇱", name: "Pays-Bas" },
-  { code: "PL", flag: "🇵🇱", name: "Pologne" },
-  { code: "PT", flag: "🇵🇹", name: "Portugal" },
-  { code: "CZ", flag: "🇨🇿", name: "République tchèque" },
-  { code: "RO", flag: "🇷🇴", name: "Roumanie" },
-  { code: "GB", flag: "🇬🇧", name: "Royaume-Uni" },
-  { code: "SK", flag: "🇸🇰", name: "Slovaquie" },
-  { code: "SI", flag: "🇸🇮", name: "Slovénie" },
-  { code: "ES", flag: "🇪🇸", name: "Espagne" },
-  { code: "SE", flag: "🇸🇪", name: "Suède" },
-  // Amériques
-  { code: "US", flag: "🇺🇸", name: "États-Unis" },
-  { code: "MX", flag: "🇲🇽", name: "Mexique" },
-  { code: "BR", flag: "🇧🇷", name: "Brésil" },
-  // Asie-Pacifique
-  { code: "AU", flag: "🇦🇺", name: "Australie" },
-  { code: "NZ", flag: "🇳🇿", name: "Nouvelle-Zélande" },
-  { code: "JP", flag: "🇯🇵", name: "Japon" },
-  { code: "SG", flag: "🇸🇬", name: "Singapour" },
-  { code: "HK", flag: "🇭🇰", name: "Hong Kong" },
-  { code: "MY", flag: "🇲🇾", name: "Malaisie" },
-  { code: "TH", flag: "🇹🇭", name: "Thaïlande" },
-  { code: "IN", flag: "🇮🇳", name: "Inde" },
-  // Moyen-Orient & Afrique
-  { code: "AE", flag: "🇦🇪", name: "Émirats arabes unis" },
-  { code: "IL", flag: "🇮🇱", name: "Israël" },
-  { code: "ZA", flag: "🇿🇦", name: "Afrique du Sud" },
-  { code: "KE", flag: "🇰🇪", name: "Kenya" },
-  { code: "GH", flag: "🇬🇭", name: "Ghana" },
-  { code: "TN", flag: "🇹🇳", name: "Tunisie" },
-]
-
-const filteredCountries = computed(() => {
-  const q = countrySearch.value.trim().toLowerCase()
-  if (!q) return COUNTRIES
-  return COUNTRIES.filter(c =>
-    c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
-  )
-})
 
 // ── Commandes ──────────────────────────────────────────────────
 const orders        = ref([])
@@ -858,7 +731,7 @@ const goToPlans = () => { showPlanModal.value = true }
 const payToReactivate = async () => {
   planLoading.value = true
   try {
-    const res  = await fetch(`${BACKEND_SAAS}/create-billing-session`, {
+    const res  = await fetch(`${BACKEND}/create-billing-session`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -887,7 +760,7 @@ const confirmPlan = async () => {
   if (isProActive.value && planChoix.value === 'pro') return
   planLoading.value = true
   try {
-    const res  = await fetch(`${BACKEND_SAAS}/create-billing-session`, {
+    const res  = await fetch(`${BACKEND}/create-billing-session`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -919,7 +792,7 @@ const renewPlan = () => {
 // ── Upgrade vers Pro — logique originale ─────────────────────
 const upgradeToPro = async () => {
   try {
-    const res  = await fetch(`${BACKEND_SAAS}/create-billing-session`, {
+    const res  = await fetch(`${BACKEND}/create-billing-session`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -937,17 +810,8 @@ const upgradeToPro = async () => {
   }
 }
 
-// ── Stripe Connect — ouvre la modale de sélection du pays ────
-const connectStripe = () => {
-  selectedCountry.value  = ""
-  countrySearch.value    = ""
-  showCountryModal.value = true
-}
-
-// Appelée après la sélection du pays dans la modale
-const confirmCountryAndConnect = async () => {
-  if (!selectedCountry.value) return
-  stripeConnectLoading.value = true
+// ── Stripe Connect — logique originale ───────────────────────
+const connectStripe = async () => {
   try {
     const res  = await fetch(`${BACKEND}/create-connect-account`, {
       method:  "POST",
@@ -955,7 +819,6 @@ const confirmCountryAndConnect = async () => {
       body: JSON.stringify({
         ownerUid: user.value.uid,
         email:    user.value.email,
-        country:  selectedCountry.value,
       }),
     })
     const data = await res.json()
@@ -964,8 +827,6 @@ const confirmCountryAndConnect = async () => {
   } catch(err) {
     console.error(err)
     alert("Erreur connexion Stripe")
-  } finally {
-    stripeConnectLoading.value = false
   }
 }
 
@@ -1515,50 +1376,4 @@ const exportOrdersCSV = () => {
 }
 .db-plan-pro-badge  { background: rgba(108,99,255,.2); color: #a78bfa; }
 .db-plan-free-badge { background: rgba(156,163,175,.15); color: #9ca3af; }
-
-/* ── Modal sélection pays (Stripe Connect) ─────────────────── */
-.db-country-modal-box {
-  max-height: 88vh; display: flex; flex-direction: column;
-}
-.db-country-search {
-  width: 100%; box-sizing: border-box;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 10px; padding: 11px 14px;
-  color: #f0f0f0; font-size: 14px; font-family: 'DM Sans', sans-serif;
-  margin-bottom: 12px; outline: none; transition: border-color .2s;
-}
-.db-country-search:focus { border-color: rgba(108,99,255,.6); }
-.db-country-search::placeholder { color: #5a5a6a; }
-.db-country-list {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column;
-  gap: 4px; max-height: 340px; padding-right: 4px;
-  scrollbar-width: thin; scrollbar-color: rgba(108,99,255,.3) transparent;
-}
-.db-country-list::-webkit-scrollbar { width: 4px; }
-.db-country-list::-webkit-scrollbar-thumb { background: rgba(108,99,255,.3); border-radius: 4px; }
-.db-country-item {
-  display: flex; align-items: center; gap: 12px;
-  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
-  border-radius: 10px; padding: 10px 14px; cursor: pointer;
-  transition: all .15s; text-align: left; font-family: 'DM Sans', sans-serif;
-  color: #c0c0d0;
-}
-.db-country-item:hover {
-  background: rgba(108,99,255,.1); border-color: rgba(108,99,255,.3);
-  color: #f0f0f0;
-}
-.db-country-selected {
-  background: rgba(108,99,255,.18) !important;
-  border-color: #6c63ff !important; color: #f0f0f0 !important;
-}
-.db-country-flag { font-size: 22px; flex-shrink: 0; line-height: 1; }
-.db-country-name { flex: 1; font-size: 14px; font-weight: 500; }
-.db-country-check {
-  font-size: 14px; font-weight: 700; color: #a78bfa;
-  flex-shrink: 0;
-}
-.db-country-empty {
-  text-align: center; color: #5a5a6a; font-size: 13px; padding: 24px 0;
-}
 </style>
