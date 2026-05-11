@@ -88,6 +88,9 @@
           <option value="premium">Premium</option>
         </select>
         <button class="adm-btn-refresh" @click="loadOwners">🔄 Actualiser</button>
+        <button class="adm-btn-stripe-check" @click="loadStripeAccounts" :disabled="stripeLoading">
+          {{ stripeLoading ? '⏳...' : '💳 Stripe (' + stripeAccounts.pending.length + ' en attente)' }}
+        </button>
         <button
           class="adm-btn-check-expiry"
           @click="runCheckExpiry"
@@ -98,6 +101,43 @@
           <span v-else>⏰ Vérifier expirés</span>
         </button>
         <button class="adm-btn-export" @click="exportCSV" title="Exporter en CSV">📥 Export CSV</button>
+      </div>
+
+      <!-- ── Stripe Connect : en attente de vérification ── -->
+      <div v-if="stripeAccounts.pending.length" class="adm-stripe-pending-section">
+        <h3 class="adm-stripe-title">
+          💳 Stripe Connect — En attente de vérification
+          <span class="adm-stripe-count">{{ stripeAccounts.pending.length }}</span>
+        </h3>
+        <div class="adm-stripe-list">
+          <div v-for="acc in stripeAccounts.pending" :key="acc.uid" class="adm-stripe-item">
+            <div class="adm-stripe-info">
+              <span class="adm-stripe-email">{{ acc.email }}</span>
+              <span class="adm-stripe-plan">{{ acc.plan }}</span>
+              <span class="adm-stripe-account">{{ acc.stripeAccountId }}</span>
+              <span class="adm-stripe-date" v-if="acc.stripeSubmittedAt">
+                Soumis le {{ new Date(acc.stripeSubmittedAt).toLocaleDateString('fr-FR') }}
+              </span>
+            </div>
+            <div class="adm-stripe-actions">
+              <a
+                :href="`https://dashboard.stripe.com/connect/accounts/${acc.stripeAccountId}`"
+                target="_blank"
+                class="adm-btn adm-btn-outline adm-btn-sm"
+              >🔗 Voir dans Stripe</a>
+              <button
+                class="adm-btn adm-btn-success adm-btn-sm"
+                @click="verifyStripe(acc.uid, true)"
+                :disabled="stripeActionUid === acc.uid"
+              >✅ Activer</button>
+              <button
+                class="adm-btn adm-btn-danger adm-btn-sm"
+                @click="verifyStripe(acc.uid, false)"
+                :disabled="stripeActionUid === acc.uid"
+              >🚫 Rejeter</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- TABLE DES PROPRIÉTAIRES -->
@@ -491,6 +531,48 @@ const suspendNow = async (owner) => {
   }
 }
 
+// ── Stripe Connect : comptes en attente de vérification ─────────
+const stripeAccounts   = ref({ pending: [], active: [], total: 0 })
+const stripeLoading    = ref(false)
+const stripeActionUid  = ref(null)
+
+const BACKEND_FINAL = "https://backendfinal-production-afd2.up.railway.app"
+
+const loadStripeAccounts = async () => {
+  stripeLoading.value = true
+  try {
+    const idToken = await auth.currentUser?.getIdToken()
+    const res     = await fetch(`${BACKEND_FINAL}/api/admin/stripe-accounts?idToken=${encodeURIComponent(idToken)}`)
+    const data    = await res.json()
+    if (data.error) throw new Error(data.error)
+    stripeAccounts.value = data
+  } catch(e) {
+    showToast("Erreur Stripe: " + e.message, "error")
+  } finally { stripeLoading.value = false }
+}
+
+const verifyStripe = async (ownerUid, approve) => {
+  stripeActionUid.value = ownerUid
+  try {
+    const idToken = await auth.currentUser?.getIdToken()
+    const res     = await fetch(`${BACKEND_FINAL}/api/admin/verify-stripe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken, ownerUid, approve }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    showToast(approve
+      ? `✅ Stripe activé — ${data.chargesEnabled ? "charges OK" : "⚠ charges non activées"}`
+      : "🚫 Stripe rejeté"
+    )
+    await loadStripeAccounts()
+    await loadOwners()
+  } catch(e) {
+    showToast("Erreur: " + e.message, "error")
+  } finally { stripeActionUid.value = null }
+}
+
 const runCheckExpiry = async () => {
   checkExpiryLoading.value = true
   try {
@@ -685,4 +767,42 @@ td{padding:12px 16px;vertical-align:middle}
 }
 .adm-btn-suspend-now:hover:not(:disabled) { background: rgba(239,68,68,.22); }
 .adm-btn-suspend-now:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Stripe pending section ───────────────────────────────────── */
+.adm-btn-stripe-check {
+  background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.25);
+  color: #818cf8; border-radius: 10px; padding: 10px 14px;
+  font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  font-family: 'DM Sans', sans-serif; transition: .15s;
+}
+.adm-btn-stripe-check:hover { background: rgba(99,102,241,.2); }
+.adm-stripe-pending-section {
+  background: rgba(245,158,11,.05); border: 1px solid rgba(245,158,11,.2);
+  border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;
+}
+.adm-stripe-title {
+  font-size: 14px; font-weight: 700; color: #fbbf24;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.adm-stripe-count {
+  background: rgba(245,158,11,.2); color: #fbbf24;
+  font-size: 11px; padding: 2px 8px; border-radius: 100px;
+}
+.adm-stripe-list { display: flex; flex-direction: column; gap: 10px; }
+.adm-stripe-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+  border-radius: 10px; padding: 12px 16px; gap: 12px; flex-wrap: wrap;
+}
+.adm-stripe-info { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.adm-stripe-email { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+.adm-stripe-plan  { font-size: 11px; color: #6c63ff; }
+.adm-stripe-account { font-size: 10px; color: #6b7280; font-family: monospace; }
+.adm-stripe-date  { font-size: 11px; color: #9ca3af; }
+.adm-stripe-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.adm-btn-success {
+  background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.3);
+  color: #34d399;
+}
+.adm-btn-success:hover:not(:disabled) { background: rgba(16,185,129,.22); }
 </style>
