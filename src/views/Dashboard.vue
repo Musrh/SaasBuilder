@@ -102,18 +102,37 @@
             :class="userData?.plan !== 'free' ? 'db-stat-card-clickable' : ''"
             @click="userData?.plan !== 'free' ? connectStripe() : upgradeToPro()"
             style="cursor:pointer"
-            :title="userData?.plan === 'free' ? 'Passer à Pro pour activer Stripe' : (hasPaymentConfig ? 'Reconfigurer Stripe' : 'Cliquez pour connecter Stripe')"
           >
-            <div class="db-stat-icon" :class="hasPaymentConfig ? 'db-icon-green' : (userData?.plan === 'free' ? 'db-icon-gray' : 'db-icon-yellow')">
-              {{ hasPaymentConfig ? '💳' : (userData?.plan === 'free' ? '🔒' : '⚙️') }}
+            <!-- Icône selon statut -->
+            <div class="db-stat-icon"
+              :class="{
+                'db-icon-green':  stripeStatus === 'active',
+                'db-icon-yellow': stripeStatus === 'pending',
+                'db-icon-gray':   stripeStatus === 'none' && userData?.plan === 'free',
+                'db-icon-orange': stripeStatus === 'none' && userData?.plan !== 'free',
+              }">
+              {{ stripeStatus === 'active' ? '💳' : stripeStatus === 'pending' ? '⏳' : (userData?.plan === 'free' ? '🔒' : '⚙️') }}
             </div>
             <div class="db-stat-body">
               <p class="db-stat-label">Store Stripe</p>
-              <p class="db-stat-val" :class="hasPaymentConfig ? 'db-val-green' : (userData?.plan === 'free' ? 'db-val-gray' : 'db-val-yellow')">
-                {{ hasPaymentConfig ? 'Configuré' : (userData?.plan === 'free' ? 'Plan Pro requis' : 'À configurer ▶') }}
+              <!-- Statut textuel -->
+              <p class="db-stat-val"
+                :class="{
+                  'db-val-green':  stripeStatus === 'active',
+                  'db-val-yellow': stripeStatus === 'pending',
+                  'db-val-gray':   userData?.plan === 'free',
+                  'db-val-orange': stripeStatus === 'none' && userData?.plan !== 'free',
+                }">
+                {{ stripeStatus === 'active'  ? '✓ Actif'
+                 : stripeStatus === 'pending' ? '⏳ En vérification'
+                 : userData?.plan === 'free'  ? 'Plan Pro requis'
+                 : 'À configurer ▶' }}
               </p>
               <p class="db-stat-sub">
-                {{ userData?.plan === 'free' ? 'Passez à Pro' : (hasPaymentConfig ? 'Cliquer pour reconfigurer' : 'Cliquez pour connecter') }}
+                {{ stripeStatus === 'active'  ? 'Paiements activés'
+                 : stripeStatus === 'pending' ? 'En attente de validation admin'
+                 : userData?.plan === 'free'  ? 'Passez à Pro'
+                 : 'Cliquez pour connecter' }}
               </p>
             </div>
           </div>
@@ -320,23 +339,33 @@
             <div class="db-payment-block">
               <p class="db-stat-label" style="font-size:11px;color:#5a5a6a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Paiements clients (Stripe)</p>
               <p class="db-payment-desc" style="margin-bottom:10px">
+                <!-- Plan Free -->
                 <span v-if="userData?.plan === 'free'" style="color:#5a5a6a">
                   🔒 Disponible avec le plan Pro.
                 </span>
-                <span v-else-if="hasPaymentConfig" class="db-stripe-ok">
-                  ✓ Stripe connecté — vos clients peuvent payer.
+                <!-- Stripe actif et vérifié -->
+                <span v-else-if="stripeStatus === 'active'" class="db-stripe-ok">
+                  ✅ Stripe actif — vos clients peuvent payer directement sur votre compte.
                 </span>
+                <!-- Configuré mais en attente de vérification -->
+                <span v-else-if="stripeStatus === 'pending'" class="db-stripe-pending">
+                  ⏳ Configuration soumise — en attente de vérification par notre équipe.
+                  Vous serez notifié une fois validé (généralement sous 24h).
+                </span>
+                <!-- Non configuré -->
                 <span v-else>
-                  ⚠ Non configuré — connectez Stripe pour recevoir des paiements.
+                  ⚠ Non configuré — connectez Stripe pour recevoir des paiements clients.
                 </span>
               </p>
               <button
                 @click="connectStripe"
                 :disabled="userData?.plan === 'free'"
                 class="db-btn db-btn-stripe"
-                :title="userData?.plan === 'free' ? 'Nécessite le plan Pro' : ''"
+                :class="{'db-btn-stripe-pending': stripeStatus === 'pending'}"
               >
-                💳 {{ hasPaymentConfig ? 'Reconfigurer Stripe' : 'Connecter Stripe' }}
+                {{ stripeStatus === 'active'  ? '💳 Reconfigurer Stripe'
+                 : stripeStatus === 'pending' ? '🔄 Reconfigurer la connexion'
+                 : '💳 Connecter Stripe' }}
               </button>
             </div>
 
@@ -580,9 +609,22 @@ const planTextColor  = computed(() => ({
   "db-val-purple":  userData.value?.plan === "premium",
 }))
 
+// Config Stripe saisie (clé présente) mais pas forcément vérifiée
 const hasPaymentConfig = computed(() => {
   const cfg = userData.value?.storePaymentConfig?.stripe
-  return cfg && cfg.publishableKey && cfg.publishableKey.length > 5
+  return !!(cfg && cfg.publishableKey && cfg.publishableKey.length > 5)
+})
+
+// Stripe vérifié ET activé par l'admin SaaS → peut recevoir les paiements
+const stripeVerified = computed(() =>
+  userData.value?.stripeVerified === true
+)
+
+// Statut Stripe : "none" | "pending" | "active"
+const stripeStatus = computed(() => {
+  if (!hasPaymentConfig.value) return "none"
+  if (stripeVerified.value)    return "active"
+  return "pending"   // configuré mais pas encore vérifié par l'admin
 })
 
 // Plan Pro actuellement actif (payé + non expiré)
@@ -1376,4 +1418,18 @@ const exportOrdersCSV = () => {
 }
 .db-plan-pro-badge  { background: rgba(108,99,255,.2); color: #a78bfa; }
 .db-plan-free-badge { background: rgba(156,163,175,.15); color: #9ca3af; }
+
+/* ── Stripe statuts ───────────────────────────────────────────── */
+.db-stripe-pending {
+  color: #f59e0b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.db-val-orange { color: #f97316; }
+.db-icon-orange { background: rgba(249,115,22,.12); color: #f97316; }
+.db-btn-stripe-pending {
+  background: rgba(245,158,11,.1) !important;
+  border-color: rgba(245,158,11,.3) !important;
+  color: #f59e0b !important;
+}
 </style>
