@@ -71,7 +71,7 @@
           <div class="af-plan af-plan-pro">
             <div class="af-plan-badge">Recommandé</div>
             <div class="af-plan-name">Pro</div>
-            <div class="af-plan-price">5€<span>/mois</span></div>
+            <div class="af-plan-price">10€<span>/mois</span></div>
             <div class="af-plan-tag">Tout ce qu'il vous faut pour vendre</div>
             <ul class="af-plan-list">
               <li class="ok">✓ Pages illimitées</li>
@@ -224,7 +224,7 @@ import {
 } from "firebase/auth"
 
 // Logo depuis dossier public (pas assets)
-const logo = "/logo.png"
+const logo = "../assets/logo.png"
 
 const route  = useRoute()
 const router = useRouter()
