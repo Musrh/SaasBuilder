@@ -63,9 +63,13 @@
             <div class="af-plan-tag">Pour commencer sans risque</div>
             <ul class="af-plan-list">
               <li class="ok">✓ Builder visuel</li>
-              <li class="no">✗ Paiements clients</li>
-              <li class="no">✗ Multi-pages</li>
-              <li class="no">✗ Catalogue produits</li>
+              
+              <li class="ok">✓Multi-pages</li>
+              <li class="ok">✓Catalogue produits</li>
+              <li class="ok">✓Formulaires</li>
+              <li class="ok">✓Insertion videos</li>
+              <li class="ok">✓ Gestion commandes</li>
+              <li class="ok"> ✓Paiements clients(en mode test)</li>
             </ul>
           </div>
           <div class="af-plan af-plan-pro">
@@ -74,10 +78,14 @@
             <div class="af-plan-price">10€<span>/mois</span></div>
             <div class="af-plan-tag">Tout ce qu'il vous faut pour vendre</div>
             <ul class="af-plan-list">
-              <li class="ok">✓ Pages illimitées</li>
+              
               <li class="ok">✓ Builder complet</li>
-              <li class="ok">✓ Paiements Stripe</li>
+              <li class="ok">✓ Pages illimitées</li>
+              <li class="ok">✓ Paiements Stripe (en mode production)</li>
               <li class="ok">✓ Catalogue produits</li>
+              <li class="ok">✓ Formulaires</li>
+              <li class="ok">✓ Insertion Videos</li>
+              <li class="ok">✓ Gestion Commandes</li>
               <li class="ok">✓ Support prioritaire</li>
             </ul>
           </div>
