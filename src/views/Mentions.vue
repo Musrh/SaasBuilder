@@ -27,7 +27,7 @@
           Le site est hébergé par :
         </p>
         <p>
-          0 / 1
+          0 / 1
         </p>
       </section>
 
@@ -42,7 +42,7 @@
       <section>
         <h2>4. Responsabilité</h2>
         <p>
-          L’éditeur ne peut être tenu responsable des contenus publiés par les utilisateurs.
+          L'éditeur ne peut être tenu responsable des contenus publiés par les utilisateurs.
         </p>
       </section>
 
@@ -56,7 +56,7 @@
       <section>
         <h2>6. Paiement</h2>
         <p>
-          Les paiements sont sécurisés via 2.
+          Les paiements sont sécurisés via 2.
         </p>
       </section>
 
@@ -70,9 +70,47 @@ const today = new Date().toLocaleDateString("fr-FR")
 </script>
 
 <style scoped>
-.legal-page { min-height:100vh;background:#f9fafb;font-family:'DM Sans' }
-.legal-header { text-align:center;padding:60px;background:linear-gradient(135deg,#6c63ff,#a78bfa);color:white }
-.legal-container { max-width:800px;margin:30px auto;background:white;padding:40px;border-radius:16px }
-section { margin-bottom:24px }
-h2 { color:#6c63ff }
+.legal-page {
+  min-height: 100vh;
+  background: #f9fafb;
+  font-family: 'DM Sans', sans-serif;
+  padding-bottom: 60px;
+}
+
+.legal-header {
+  text-align: center;
+  padding: 60px 20px 30px;
+  background: linear-gradient(135deg, #6c63ff, #a78bfa);
+  color: white;
+}
+
+.legal-header h1 {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.legal-container {
+  max-width: 800px;
+  margin: 30px auto;
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+section {
+  margin-bottom: 28px;
+}
+
+h2 {
+  font-size: 20px;
+  color: #6c63ff;
+  margin-bottom: 10px;
+}
+
+p {
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
 </style>
