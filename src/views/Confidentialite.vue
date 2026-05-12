@@ -32,7 +32,7 @@
       <section>
         <h2>3. Paiement sécurisé</h2>
         <p>
-          Les paiements sont traités via 0.
+          Les paiements sont traités via Stripe.
           Nous ne stockons aucune information bancaire.
         </p>
       </section>
