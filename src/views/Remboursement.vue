@@ -4,6 +4,7 @@
 
     <div class="legal-header">
       <h1>Politique de remboursement</h1>
+      <p>Dernière mise à jour : {{ today }}</p>
     </div>
 
     <div class="legal-container">
@@ -21,7 +22,7 @@
         <ul>
           <li>Erreur de facturation</li>
           <li>Paiement en double</li>
-          <li>Problème technique empêchant l’utilisation du service</li>
+          <li>Problème technique empêchant l'utilisation du service</li>
         </ul>
       </section>
 
@@ -43,3 +44,64 @@
 
   </div>
 </template>
+
+<script setup>
+const today = new Date().toLocaleDateString("fr-FR")
+</script>
+
+<style scoped>
+.legal-page {
+  min-height: 100vh;
+  background: #f9fafb;
+  font-family: 'DM Sans', sans-serif;
+  padding-bottom: 60px;
+}
+
+.legal-header {
+  text-align: center;
+  padding: 60px 20px 30px;
+  background: linear-gradient(135deg, #6c63ff, #a78bfa);
+  color: white;
+}
+
+.legal-header h1 {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.legal-container {
+  max-width: 800px;
+  margin: 30px auto;
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+section {
+  margin-bottom: 28px;
+}
+
+h2 {
+  font-size: 20px;
+  color: #6c63ff;
+  margin-bottom: 10px;
+}
+
+p {
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+ul {
+  color: #374151;
+  line-height: 1.6;
+  margin-left: 20px;
+  margin-bottom: 8px;
+}
+
+li {
+  margin-bottom: 4px;
+}
+</style>
