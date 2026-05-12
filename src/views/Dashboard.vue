@@ -471,10 +471,15 @@
             <div class="db-plan-name">🆓 Gratuit</div>
             <div class="db-plan-price">0€<span>/mois</span></div>
             <ul class="db-plan-features">
-              <li>✓ 1 page</li>
+              
               <li>✓ Builder visuel</li>
-              <li>✗ Paiements clients</li>
-              <li>✗ Multi-pages</li>
+              <li> ✓Multi-pages</li>
+              <li>✓ Catalogue produits</li>
+              <li>✓ Formulaires</li>
+              <li>✓ Insertion Videos</li>
+              <li>✓ Gestion commandes</li>
+              <li>✗ Paiements clients(en mode test)</li>
+              
             </ul>
           </div>
 
@@ -489,10 +494,15 @@
             <div class="db-plan-name">⚡ Pro</div>
             <div class="db-plan-price">10€<span>/mois</span></div>
             <ul class="db-plan-features">
-              <li>✓ Multi-pages illimité</li>
               <li>✓ Builder complet</li>
-              <li>✓ Paiements Stripe</li>
+              <li>✓ Multi-pages illimité</li>
+              
+              
               <li>✓ Catalogue produits</li>
+              <li>✓ Formulaires</li>
+              <li>✓ Insertion Videos</li>
+              <li>✓ Gestion commandes</li>
+              <li>✓ Paiements Stripe(en mode production)</li>
               <li>✓ Support prioritaire</li>
             </ul>
           </div>
