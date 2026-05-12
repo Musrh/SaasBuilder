@@ -15,8 +15,8 @@
           Le présent site est édité par :
         </p>
         <p>
-          Nom : Votre entreprise<br>
-          Email : contact@votresite.com<br>
+          Nom : mronlinestores<br>
+          Email : contact@mronlinestores.com<br>
           Pays : Maroc
         </p>
       </section>
@@ -27,7 +27,7 @@
           Le site est hébergé par :
         </p>
         <p>
-          0 / 1
+          Github et Cloudflare 
         </p>
       </section>
 
@@ -56,7 +56,7 @@
       <section>
         <h2>6. Paiement</h2>
         <p>
-          Les paiements sont sécurisés via 2.
+          Les paiements sont sécurisés via Stripe.
         </p>
       </section>
 
