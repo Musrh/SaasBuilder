@@ -13,7 +13,7 @@
         <h2>1. Données collectées</h2>
         <p>
           Nous collectons les informations nécessaires à la création et à la gestion
-          de votre compte : nom, email et données liées à l’utilisation du service.
+          de votre compte : nom, email et données liées à l'utilisation du service.
         </p>
       </section>
 
@@ -32,7 +32,7 @@
       <section>
         <h2>3. Paiement sécurisé</h2>
         <p>
-          Les paiements sont traités via 0.
+          Les paiements sont traités via 0.
           Nous ne stockons aucune information bancaire.
         </p>
       </section>
@@ -54,7 +54,7 @@
       <section>
         <h2>6. Vos droits</h2>
         <p>
-          Vous pouvez demander l’accès, la modification ou la suppression de vos données à tout moment.
+          Vous pouvez demander l'accès, la modification ou la suppression de vos données à tout moment.
         </p>
       </section>
 
@@ -75,10 +75,58 @@ const today = new Date().toLocaleDateString("fr-FR")
 </script>
 
 <style scoped>
-/* même style que Conditions.vue */
-.legal-page { min-height:100vh;background:#f9fafb;font-family:'DM Sans',sans-serif }
-.legal-header { text-align:center;padding:60px 20px;background:linear-gradient(135deg,#6c63ff,#a78bfa);color:white }
-.legal-container { max-width:800px;margin:30px auto;background:white;padding:40px;border-radius:16px }
-section { margin-bottom:24px }
-h2 { color:#6c63ff }
+.legal-page {
+  min-height: 100vh;
+  background: #f9fafb;
+  font-family: 'DM Sans', sans-serif;
+  padding-bottom: 60px;
+}
+
+.legal-header {
+  text-align: center;
+  padding: 60px 20px 30px;
+  background: linear-gradient(135deg, #6c63ff, #a78bfa);
+  color: white;
+}
+
+.legal-header h1 {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.legal-container {
+  max-width: 800px;
+  margin: 30px auto;
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+section {
+  margin-bottom: 28px;
+}
+
+h2 {
+  font-size: 20px;
+  color: #6c63ff;
+  margin-bottom: 10px;
+}
+
+p {
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+ul {
+  color: #374151;
+  line-height: 1.6;
+  margin-left: 20px;
+  margin-bottom: 8px;
+}
+
+li {
+  margin-bottom: 4px;
+}
 </style>
