@@ -3,40 +3,62 @@
   <div class="legal-page">
 
     <div class="legal-header">
-      <h1>Politique de remboursement</h1>
+      <h1>Conditions de Vente & Politique de Confidentialité</h1>
       <p>Dernière mise à jour : {{ today }}</p>
     </div>
 
     <div class="legal-container">
 
       <section>
-        <h2>1. Conditions générales</h2>
-        <p>
-          Les paiements effectués sur la plateforme sont en principe non remboursables.
+        <h2>Garanties et Retours</h2>
+        <p><strong>Garantie légale :</strong><br>
+          1 ans en Europe, 1 an aux États-Unis et au Royaume-Uni pour défauts matériels.
+        </p>
+        <p><strong>Droit de rétractation :</strong><br>
+          Retour possible sous 14 jours pour tous les pays.
+        </p>
+        <p><strong>Produits défectueux :</strong><br>
+          Remboursement ou remplacement gratuit partout dans le monde.
         </p>
       </section>
 
       <section>
-        <h2>2. Cas de remboursement</h2>
-        <p>Un remboursement peut être accordé uniquement dans les cas suivants :</p>
+        <h2>Paiement et Sécurité</h2>
+        <p>Paiements sécurisés via Stripe et PayPal.</p>
+        <p>Aucune information bancaire n'est stockée sur nos serveurs.</p>
+        <p>Monnaie : paiement en € ou $ selon pays.</p>
+      </section>
+
+      <section>
+        <h2>Livraison</h2>
+        <p>Expédition internationale sous 7 à 30 jours.</p>
+        <p>Numéro de suivi envoyé par email.</p>
+        <p>Taxes et douanes à la charge du client.</p>
+      </section>
+
+      <section>
+        <h2>Protection des données</h2>
+        <p>Les données sont utilisées uniquement pour :</p>
         <ul>
-          <li>Erreur de facturation</li>
-          <li>Paiement en double</li>
-          <li>Problème technique empêchant l'utilisation du service</li>
+          <li>Gestion des commandes</li>
+          <li>Support client</li>
+          <li>Marketing</li>
         </ul>
+        <p>Conformité RGPD, CCPA et lois locales.</p>
+        <p>Vous pouvez :</p>
+        <ul>
+          <li>Accéder à vos données</li>
+          <li>Les modifier</li>
+          <li>Les supprimer</li>
+        </ul>
+        <p>Utilisation de cookies pour améliorer l'expérience utilisateur.</p>
       </section>
 
       <section>
-        <h2>3. Demande</h2>
+        <h2>Responsabilité</h2>
         <p>
-          Toute demande doit être effectuée dans un délai de 7 jours après le paiement.
-        </p>
-      </section>
-
-      <section>
-        <h2>4. Traitement</h2>
-        <p>
-          Les remboursements sont effectués via le même moyen de paiement (Stripe).
+          Nous ne sommes pas responsables d'une mauvaise utilisation des produits.
+          Le client doit vérifier la conformité avec la législation de son pays.
         </p>
       </section>
 
