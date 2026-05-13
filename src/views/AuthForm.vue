@@ -232,7 +232,7 @@ import {
 } from "firebase/auth"
 
 // Logo depuis dossier public (pas assets)
-const logo = "../assets/logo.png"
+const logo = "/logo.png"
 
 const route  = useRoute()
 const router = useRouter()
