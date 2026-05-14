@@ -96,14 +96,12 @@
             </div>
           </div>
 
-          <!-- Carte Stripe cliquable selon le plan -->
           <div
             class="db-stat-card"
             :class="userData?.plan !== 'free' ? 'db-stat-card-clickable' : ''"
             @click="userData?.plan !== 'free' ? connectStripe() : upgradeToPro()"
             style="cursor:pointer"
           >
-            <!-- Icône selon statut -->
             <div class="db-stat-icon"
               :class="{
                 'db-icon-green':  stripeStatus === 'active',
@@ -115,7 +113,6 @@
             </div>
             <div class="db-stat-body">
               <p class="db-stat-label">Store Stripe</p>
-              <!-- Statut textuel -->
               <p class="db-stat-val"
                 :class="{
                   'db-val-green':  stripeStatus === 'active',
@@ -163,9 +160,7 @@
               <div>
                 <h2 class="db-orders-title">📦 Commandes clients</h2>
                 <div class="db-orders-source-tabs">
-                  <button
-                    class="db-source-tab active"
-                  >
+                  <button class="db-source-tab active">
                     {{ (userData?.plan || 'free') !== 'free' ? '⚡ Pro' : '🆓 Free' }}
                     <span class="db-source-count">{{ ordersStats.total }}</span>
                   </button>
@@ -194,25 +189,21 @@
               </div>
             </div>
 
-            <!-- Chargement commandes -->
             <div v-if="ordersLoading" class="db-orders-loading">
               <div class="db-spinner db-spinner-sm"></div>
               <p>Chargement des commandes...</p>
             </div>
 
-            <!-- Erreur Firestore -->
             <div v-if="!ordersLoading && ordersError" class="db-orders-error">
               <span>⚠️</span>
               <p>{{ ordersError }}</p>
             </div>
 
-            <!-- Aucune commande -->
             <div v-else-if="filteredOrders.length === 0" class="db-orders-empty">
               <span>📭</span>
               <p>{{ orders.length === 0 ? 'Aucune commande reçue pour le moment.' : 'Aucune commande ne correspond à votre recherche.' }}</p>
             </div>
 
-            <!-- Tableau commandes -->
             <div v-else class="db-orders-list">
               <div
                 v-for="order in filteredOrders"
@@ -220,7 +211,6 @@
                 class="db-order-card"
                 :class="{ 'db-order-paid': order.status === 'paid' }"
               >
-                <!-- Ligne principale -->
                 <div class="db-order-main">
                   <div class="db-order-info">
                     <div class="db-order-email">
@@ -258,19 +248,11 @@
                   </div>
                 </div>
 
-                <!-- Détail articles -->
                 <Transition name="db-slide">
                   <div v-if="openOrderId === order.id" class="db-order-detail">
                     <div class="db-order-items-title">Articles commandés</div>
-                    <div
-                      v-if="order.items?.length"
-                      class="db-order-items"
-                    >
-                      <div
-                        v-for="(item, i) in order.items"
-                        :key="i"
-                        class="db-order-item"
-                      >
+                    <div v-if="order.items?.length" class="db-order-items">
+                      <div v-for="(item, i) in order.items" :key="i" class="db-order-item">
                         <div class="db-item-img">
                           <img v-if="item.image" :src="item.image" :alt="item.name"/>
                           <span v-else>🛍️</span>
@@ -296,7 +278,6 @@
               </div>
             </div>
 
-            <!-- Pagination simple -->
             <div v-if="filteredOrders.length > 0" class="db-orders-footer">
               <p class="db-orders-count">
                 {{ filteredOrders.length }} commande{{ filteredOrders.length > 1 ? 's' : '' }}
@@ -314,7 +295,6 @@
           <h2 class="db-payments-title">💳 Paiements & Abonnement</h2>
           <div class="db-payments-row">
 
-            <!-- Toujours visible : statut plan + upgrade si free -->
             <div class="db-payment-block">
               <p class="db-stat-label" style="font-size:11px;color:#5a5a6a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Abonnement SaasBuilder</p>
               <p class="db-payment-desc" style="margin-bottom:10px">
@@ -335,24 +315,18 @@
               </button>
             </div>
 
-            <!-- Stripe Connect : visible selon plan -->
             <div class="db-payment-block">
               <p class="db-stat-label" style="font-size:11px;color:#5a5a6a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Paiements clients (Stripe)</p>
               <p class="db-payment-desc" style="margin-bottom:10px">
-                <!-- Plan Free -->
                 <span v-if="userData?.plan === 'free'" style="color:#5a5a6a">
                   🔒 Disponible avec le plan Pro.
                 </span>
-                <!-- Stripe actif et vérifié -->
                 <span v-else-if="stripeStatus === 'active'" class="db-stripe-ok">
                   ✅ Stripe actif — vos clients peuvent payer directement sur votre compte.
                 </span>
-                <!-- Configuré mais en attente de vérification -->
                 <span v-else-if="stripeStatus === 'pending'" class="db-stripe-pending">
                   ⏳ Configuration soumise — en attente de vérification par notre équipe.
-                  Vous serez notifié une fois validé (généralement sous 24h).
                 </span>
-                <!-- Non configuré -->
                 <span v-else>
                   ⚠ Non configuré — connectez Stripe pour recevoir des paiements clients.
                 </span>
@@ -440,11 +414,155 @@
             </div>
           </button>
 
+          <!-- Bouton raccourci Restore -->
+          <button @click="showRestorePanel = !showRestorePanel" class="db-action-card db-action-card-restore">
+            <span class="db-action-icon">🗄️</span>
+            <div>
+              <p class="db-action-title">Restaurer mes données</p>
+              <p class="db-action-desc">{{ showRestorePanel ? 'Masquer le panneau ▲' : 'Accéder aux backups ▼' }}</p>
+            </div>
+          </button>
+
         </div>
+
+        <!-- ══════════════════════════════════════════════════════
+             PANNEAU RESTAURATION — PROPRIÉTAIRE
+        ══════════════════════════════════════════════════════ -->
+        <Transition name="db-slide">
+          <div v-if="showRestorePanel" class="db-restore-panel">
+
+            <!-- En-tête -->
+            <div class="db-restore-header">
+              <div>
+                <h2 class="db-restore-title">🗄️ Restaurer mes données</h2>
+                <p class="db-restore-subtitle">
+                  Restaurez uniquement vos données (profil, commandes, slugs, produits)
+                  à partir d'un backup existant. Vos données sont isolées de celles des autres utilisateurs.
+                </p>
+              </div>
+              <button
+                class="db-restore-refresh-btn"
+                @click="loadUserBackups"
+                :disabled="restoreListLoading"
+              >
+                <span v-if="restoreListLoading" class="db-spinner-sm"></span>
+                <span v-else>↻ Rafraîchir</span>
+              </button>
+            </div>
+
+            <!-- Chargement -->
+            <div v-if="restoreListLoading && userBackups.length === 0" class="db-restore-loading">
+              <div class="db-spinner"></div>
+              <p>Chargement des backups disponibles...</p>
+            </div>
+
+            <!-- Erreur -->
+            <div v-else-if="restoreListError" class="db-restore-error">
+              <span>⚠️</span>
+              <p>{{ restoreListError }}</p>
+              <button class="db-btn db-btn-outline" @click="loadUserBackups" style="font-size:12px;padding:6px 12px">Réessayer</button>
+            </div>
+
+            <!-- Aucun backup -->
+            <div v-else-if="!restoreListLoading && userBackups.length === 0" class="db-restore-empty">
+              <span class="db-restore-empty-icon">📭</span>
+              <p>Aucun backup disponible pour le moment.</p>
+              <p class="db-restore-empty-hint">Les backups sont créés automatiquement chaque nuit à 2h00.</p>
+            </div>
+
+            <!-- Liste backups -->
+            <div v-else class="db-restore-list">
+              <div
+                v-for="backup in userBackups"
+                :key="backup.filename"
+                class="db-restore-item"
+                :class="{ 'db-restore-item-latest': backup === userBackups[0] }"
+              >
+                <div class="db-restore-info">
+                  <div class="db-restore-filename-row">
+                    <span class="db-restore-file-icon">📦</span>
+                    <span class="db-restore-filename">{{ backup.filename }}</span>
+                    <span v-if="backup === userBackups[0]" class="db-restore-badge-latest">Dernier</span>
+                  </div>
+                  <div class="db-restore-meta">
+                    <span>📅 {{ formatBackupDate(backup.createdAt) }}</span>
+                    <span>💾 {{ formatSize(backup.size) }}</span>
+                  </div>
+                </div>
+
+                <div class="db-restore-btns">
+                  <!-- Simulation -->
+                  <button
+                    class="db-btn-restore-dry"
+                    @click="runUserRestore(backup.filename, true)"
+                    :disabled="userRestoreLoading === backup.filename"
+                    title="Vérifier ce qui sera restauré, sans modifier vos données"
+                  >
+                    <span v-if="userRestoreLoading === backup.filename" class="db-spinner-sm"></span>
+                    <span v-else>🔍 Simuler</span>
+                  </button>
+
+                  <!-- Restore réel -->
+                  <button
+                    class="db-btn-restore-real"
+                    @click="askUserRestoreConfirm(backup.filename)"
+                    :disabled="userRestoreLoading === backup.filename"
+                    title="Restaurer vos données depuis ce backup"
+                  >
+                    🔄 Restaurer
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Résultat simulation -->
+            <Transition name="db-slide">
+              <div v-if="userDryRunResult" class="db-restore-dryrun">
+                <div class="db-restore-dryrun-header">
+                  <span>🔍</span>
+                  <strong>Simulation — {{ userDryRunResult.filename }}</strong>
+                  <button class="db-restore-dryrun-close" @click="userDryRunResult = null">✕</button>
+                </div>
+                <div class="db-restore-dryrun-detail">
+                  <div class="db-restore-dryrun-row">
+                    <span class="db-restore-dryrun-label">Profil (users)</span>
+                    <span class="db-restore-dryrun-val">{{ userDryRunResult.detail?.userData || 0 }} doc</span>
+                  </div>
+                  <div class="db-restore-dryrun-row">
+                    <span class="db-restore-dryrun-label">Commandes Pro (orders)</span>
+                    <span class="db-restore-dryrun-val">{{ userDryRunResult.detail?.orders || 0 }} docs</span>
+                  </div>
+                  <div class="db-restore-dryrun-row">
+                    <span class="db-restore-dryrun-label">Commandes Free (forders)</span>
+                    <span class="db-restore-dryrun-val">{{ userDryRunResult.detail?.forders || 0 }} docs</span>
+                  </div>
+                  <div class="db-restore-dryrun-row">
+                    <span class="db-restore-dryrun-label">Slugs publiés</span>
+                    <span class="db-restore-dryrun-val">{{ userDryRunResult.detail?.slugs || 0 }} docs</span>
+                  </div>
+                  <div class="db-restore-dryrun-row">
+                    <span class="db-restore-dryrun-label">Infos produits</span>
+                    <span class="db-restore-dryrun-val">{{ userDryRunResult.detail?.prodinfos || 0 }} docs</span>
+                  </div>
+                  <div class="db-restore-dryrun-row db-restore-dryrun-total">
+                    <span class="db-restore-dryrun-label">Total à restaurer</span>
+                    <span class="db-restore-dryrun-val db-restore-val-accent">{{ userDryRunResult.restored }} éléments</span>
+                  </div>
+                </div>
+                <p class="db-restore-dryrun-note">
+                  ✅ Simulation uniquement — aucune donnée modifiée. Cliquez sur "Restaurer" pour appliquer.
+                </p>
+              </div>
+            </Transition>
+
+          </div>
+        </Transition>
+        <!-- FIN PANNEAU RESTAURATION -->
 
       </template>
     </main>
   </div>
+
   <!-- ── MODAL CHOIX DE PLAN ────────────────────────────────── -->
   <Transition name="db-slide">
     <div v-if="showPlanModal" class="db-modal-overlay" @click.self="showPlanModal=false">
@@ -458,10 +576,8 @@
           <p class="db-modal-sub">Sélectionnez le plan adapté à votre activité</p>
         </div>
 
-        <!-- Cartes plans -->
         <div class="db-plan-grid">
 
-          <!-- Plan FREE -->
           <div
             class="db-plan-card"
             :class="{ 'db-plan-selected': planChoix === 'free', 'db-plan-current': userData?.plan === 'free' && !isProActive }"
@@ -471,19 +587,16 @@
             <div class="db-plan-name">🆓 Gratuit</div>
             <div class="db-plan-price">0€<span>/mois</span></div>
             <ul class="db-plan-features">
-              
               <li>✓ Builder visuel</li>
-              <li> ✓Multi-pages</li>
+              <li>✓ Multi-pages</li>
               <li>✓ Catalogue produits</li>
               <li>✓ Formulaires</li>
               <li>✓ Insertion Videos</li>
               <li>✓ Gestion commandes</li>
-              <li>✗ Paiements clients(en mode test)</li>
-              
+              <li>✗ Paiements clients (en mode test)</li>
             </ul>
           </div>
 
-          <!-- Plan PRO -->
           <div
             class="db-plan-card db-plan-pro"
             :class="{ 'db-plan-selected': planChoix === 'pro', 'db-plan-current': isProActive }"
@@ -496,20 +609,17 @@
             <ul class="db-plan-features">
               <li>✓ Builder complet</li>
               <li>✓ Multi-pages illimité</li>
-              
-              
               <li>✓ Catalogue produits</li>
               <li>✓ Formulaires</li>
               <li>✓ Insertion Videos</li>
               <li>✓ Gestion commandes</li>
-              <li>✓ Paiements Stripe(en mode production)</li>
+              <li>✓ Paiements Stripe (production)</li>
               <li>✓ Support prioritaire</li>
             </ul>
           </div>
 
         </div>
 
-        <!-- Résumé du choix -->
         <div class="db-plan-summary">
           <div class="db-plan-summary-row">
             <span>Plan sélectionné</span>
@@ -522,7 +632,6 @@
           </div>
         </div>
 
-        <!-- Bouton confirmation -->
         <button
           @click="confirmPlan"
           :disabled="planLoading || planChoix === 'free' || (isProActive && planChoix === 'pro')"
@@ -542,6 +651,41 @@
     </div>
   </Transition>
 
+  <!-- ══ MODAL CONFIRMATION RESTORE UTILISATEUR ══ -->
+  <Transition name="db-fade">
+    <div v-if="userRestoreConfirm" class="db-modal-overlay" @click.self="userRestoreConfirm = null">
+      <div class="db-modal-box" style="max-width:440px">
+        <button class="db-modal-close" @click="userRestoreConfirm = null">✕</button>
+        <div class="db-modal-header">
+          <span class="db-modal-icon">⚠️</span>
+          <h2 class="db-modal-title">Confirmer la restauration</h2>
+          <p class="db-modal-sub">Vos données seront remplacées par celles du backup.</p>
+        </div>
+        <div class="db-restore-confirm-info">
+          <p class="db-restore-confirm-file">📦 {{ userRestoreConfirm }}</p>
+          <p class="db-restore-confirm-warn">
+            Cette opération remplacera vos données actuelles (profil, commandes, slugs, produits)
+            par celles du backup sélectionné. Elle est irréversible.
+          </p>
+          <p class="db-restore-confirm-safe">
+            🔒 Seules <strong>vos</strong> données sont concernées. Les autres utilisateurs ne sont pas affectés.
+          </p>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <button class="db-restore-modal-cancel" @click="userRestoreConfirm = null">Annuler</button>
+          <button
+            class="db-restore-modal-confirm"
+            @click="runUserRestore(userRestoreConfirm, false)"
+            :disabled="userRestoreLoading === userRestoreConfirm"
+          >
+            <span v-if="userRestoreLoading === userRestoreConfirm" class="db-spinner-sm"></span>
+            <span v-else>🔄 Confirmer la restauration</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
 </template>
 
 <script setup>
@@ -551,17 +695,17 @@ import { auth, db } from "../firebase"
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
-const BACKEND     = "https://backendfinal-production-afd2.up.railway.app"
+const BACKEND = "https://backendfinal-production-afd2.up.railway.app"
 
-const router      = useRouter()
-const user        = ref(null)
-const userData    = ref(null)
-const loading     = ref(true)
+const router   = useRouter()
+const user     = ref(null)
+const userData = ref(null)
+const loading  = ref(true)
 
 // ── Modal choix de plan ───────────────────────────────────────
-const showPlanModal  = ref(false)
-const planChoix      = ref("pro")    // plan sélectionné dans le modal
-const planLoading    = ref(false)
+const showPlanModal = ref(false)
+const planChoix     = ref("pro")
+const planLoading   = ref(false)
 
 // ── Commandes ──────────────────────────────────────────────────
 const orders        = ref([])
@@ -573,16 +717,24 @@ const orderSearch   = ref("")
 const orderFilter   = ref("")
 const ordersStats   = ref({ total: 0, free: 0, pro: 0, revenue: 0 })
 
-// ── Compte suspendu (active === false dans Firestore) ──────────
+// ── Restore panel refs ────────────────────────────────────────
+const showRestorePanel    = ref(false)
+const userBackups         = ref([])
+const restoreListLoading  = ref(false)
+const restoreListError    = ref("")
+const userRestoreLoading  = ref("")      // filename en cours
+const userRestoreConfirm  = ref(null)    // filename à confirmer
+const userDryRunResult    = ref(null)    // résultat simulation
+
+// ── Compte suspendu ───────────────────────────────────────────
 const accountSuspended = computed(() =>
   userData.value !== null && userData.value?.active === false
 )
 
-// ── Computed plan ──────────────────────────────────────────────
+// ── Plan computed ─────────────────────────────────────────────
 const planExpired = computed(() => {
   if (!userData.value) return false
   if (userData.value.plan === "free") return false
-  // expiry null/0/absent = pas expiré (webhook Stripe peut ne pas l'écrire)
   const exp = userData.value.expiry
   if (!exp || exp === 0 || exp === null) return false
   return exp < Date.now()
@@ -591,7 +743,6 @@ const planExpired = computed(() => {
 const canAccessBuilder = computed(() => {
   if (!userData.value) return false
   if (userData.value.plan === "free") return true
-  // Pro payé : accès même si expiry absent (passage Free→Pro récent)
   return userData.value.paye === true && !planExpired.value
 })
 
@@ -607,37 +758,31 @@ const planEmoji = computed(() => {
   return p === "free" ? "🆓" : p === "pro" ? "⚡" : "💎"
 })
 
-const planBgColor    = computed(() => ({
+const planBgColor = computed(() => ({
   "db-icon-gray":   userData.value?.plan === "free",
   "db-icon-blue":   userData.value?.plan === "pro",
   "db-icon-purple": userData.value?.plan === "premium",
 }))
 
-const planTextColor  = computed(() => ({
+const planTextColor = computed(() => ({
   "db-val-gray":    userData.value?.plan === "free",
   "db-val-blue":    userData.value?.plan === "pro",
   "db-val-purple":  userData.value?.plan === "premium",
 }))
 
-// Config Stripe saisie (clé présente) mais pas forcément vérifiée
 const hasPaymentConfig = computed(() => {
   const cfg = userData.value?.storePaymentConfig?.stripe
   return !!(cfg && cfg.publishableKey && cfg.publishableKey.length > 5)
 })
 
-// Stripe vérifié ET activé par l'admin SaaS → peut recevoir les paiements
-const stripeVerified = computed(() =>
-  userData.value?.stripeVerified === true
-)
+const stripeVerified = computed(() => userData.value?.stripeVerified === true)
 
-// Statut Stripe : "none" | "pending" | "active"
 const stripeStatus = computed(() => {
   if (!hasPaymentConfig.value) return "none"
   if (stripeVerified.value)    return "active"
-  return "pending"   // configuré mais pas encore vérifié par l'admin
+  return "pending"
 })
 
-// Plan Pro actuellement actif (payé + non expiré)
 const isProActive = computed(() => {
   const d = userData.value
   if (!d) return false
@@ -649,14 +794,12 @@ const isProActive = computed(() => {
 // ── Commandes filtrées ─────────────────────────────────────────
 const filteredOrders = computed(() => {
   let list = [...orders.value]
-  if (orderFilter.value) {
-    list = list.filter(o => o.status === orderFilter.value)
-  }
+  if (orderFilter.value) list = list.filter(o => o.status === orderFilter.value)
   if (orderSearch.value.trim()) {
     const q = orderSearch.value.toLowerCase()
     list = list.filter(o =>
-      (o.customerEmail || o.email       || "").toLowerCase().includes(q) ||
-      (o.customerName  || o.clientName  || "").toLowerCase().includes(q) ||
+      (o.customerEmail || o.email      || "").toLowerCase().includes(q) ||
+      (o.customerName  || o.clientName || "").toLowerCase().includes(q) ||
       (o.siteSlug      || "").toLowerCase().includes(q) ||
       (o.items || []).some(i => (i.name || "").toLowerCase().includes(q))
     )
@@ -682,15 +825,11 @@ onMounted(() => {
       if (snap.exists()) userData.value = snap.data()
     } catch(e) { console.error(e) }
     loading.value = false
-    // Charger les commandes en passant le plan explicitement (évite le problème de timing)
     loadOrders(u.uid, userData.value?.plan ?? "free")
   })
 })
 
-// ── Charger les commandes du propriétaire ──────────────────────
-// Interroge les DEUX collections en parallèle et affiche tout ce qui est trouvé.
-// Le plan détermine la source principale, mais les deux sont essayées.
-
+// ── Commandes ─────────────────────────────────────────────────
 const toMs = (v) => {
   if (!v) return 0
   if (v?.toDate)  return v.toDate().getTime()
@@ -701,43 +840,23 @@ const toMs = (v) => {
 const loadOrders = async (uid, plan) => {
   ordersLoading.value = true
   ordersError.value   = ""
-
-  const currentPlan = plan ?? userData.value?.plan ?? "free"
-  const log = { errorForders: null, errorOrders: null }
-
+  const log     = { errorForders: null, errorOrders: null }
   const results = []
 
-  // ── forders (plan Free) ─────────────────────────────────────
   try {
-    const snap = await getDocs(
-      query(collection(db, "forders"), where("ownerUid", "==", uid))
-    )
+    const snap = await getDocs(query(collection(db, "forders"), where("ownerUid", "==", uid)))
     log.forders = snap.size
-    snap.docs.forEach(d =>
-      results.push({ id: d.id, _source: "forders", ...d.data() })
-    )
-  } catch(e) {
-    log.errorForders = `${e.code || e.message}`
-  }
+    snap.docs.forEach(d => results.push({ id: d.id, _source: "forders", ...d.data() }))
+  } catch(e) { log.errorForders = `${e.code || e.message}` }
 
-  // ── orders (plan Pro) ───────────────────────────────────────
   try {
-    const snap = await getDocs(
-      query(collection(db, "orders"), where("ownerUid", "==", uid))
-    )
+    const snap = await getDocs(query(collection(db, "orders"), where("ownerUid", "==", uid)))
     log.orders = snap.size
-    snap.docs.forEach(d =>
-      results.push({ id: d.id, _source: "orders", ...d.data() })
-    )
-  } catch(e) {
-    log.errorOrders = `${e.code || e.message}`
-  }
+    snap.docs.forEach(d => results.push({ id: d.id, _source: "orders", ...d.data() }))
+  } catch(e) { log.errorOrders = `${e.code || e.message}` }
 
-  // Dédupliquer par id Firestore
   const seen   = new Set()
   const unique = results.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true })
-
-  // Tri par date décroissante
   orders.value = unique.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
   if (orders.value.length === 0 && (log.errorForders || log.errorOrders)) {
@@ -753,86 +872,119 @@ const loadOrders = async (uid, plan) => {
     free:    orders.value.filter(o => o._source === "forders").length,
     revenue: orders.value.reduce((acc, o) => acc + parseFloat(o.total || 0), 0).toFixed(2)
   }
-
   ordersLoading.value = false
 }
 
+// ══════════════════════════════════════════════════════════════
+//  FONCTIONS RESTORE UTILISATEUR
+// ══════════════════════════════════════════════════════════════
+
+// Charger la liste des backups disponibles
+const loadUserBackups = async () => {
+  restoreListLoading.value = true
+  restoreListError.value   = ""
+  userDryRunResult.value   = null
+  try {
+    const idToken = await auth.currentUser?.getIdToken()
+    const res     = await fetch(
+      `${BACKEND}/api/store/backups?idToken=${encodeURIComponent(idToken)}`
+    )
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    userBackups.value = data.backups || []
+  } catch(e) {
+    restoreListError.value = e.message
+  } finally {
+    restoreListLoading.value = false
+  }
+}
+
+// Ouvrir la modal de confirmation
+const askUserRestoreConfirm = (filename) => {
+  userRestoreConfirm.value = filename
+  userDryRunResult.value   = null
+}
+
+// Lancer la restauration (simulation ou réelle)
+const runUserRestore = async (filename, dryRun) => {
+  userRestoreLoading.value = filename
+  userDryRunResult.value   = null
+  if (!dryRun) userRestoreConfirm.value = null
+
+  try {
+    const idToken = await auth.currentUser?.getIdToken()
+    const res     = await fetch(`${BACKEND}/api/store/restore`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken, filename, dryRun }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+
+    if (dryRun) {
+      userDryRunResult.value = {
+        filename,
+        restored: data.restored || 0,
+        skipped:  data.skipped  || 0,
+        detail:   data.detail   || {},
+      }
+    } else {
+      // Recharger les données utilisateur après restore réel
+      const snap = await getDoc(doc(db, "users", user.value.uid))
+      if (snap.exists()) userData.value = snap.data()
+      await loadOrders(user.value.uid, userData.value?.plan ?? "free")
+      alert(`✅ Restauration terminée : ${data.restored} éléments restaurés.`)
+    }
+  } catch(e) {
+    alert("Erreur : " + e.message)
+  } finally {
+    userRestoreLoading.value = ""
+  }
+}
+
+// Charger les backups quand le panneau s'ouvre
+const toggleRestorePanel = () => {
+  showRestorePanel.value = !showRestorePanel.value
+  if (showRestorePanel.value && userBackups.value.length === 0) {
+    loadUserBackups()
+  }
+}
+
 // ── Actions ────────────────────────────────────────────────────
-const toggleOrders = () => {
-  showOrders.value = !showOrders.value
-  window.scrollTo({ top: 200, behavior: "smooth" })
-}
+const toggleOrders      = () => { showOrders.value = !showOrders.value; window.scrollTo({ top: 200, behavior: "smooth" }) }
+const toggleOrderDetail = (id) => { openOrderId.value = openOrderId.value === id ? null : id }
+const openStore         = () => { window.open(`https://mronlinestores.com/#/${userData.value.publishedSlug}`, "_blank") }
+const goToBuilder       = () => { router.push("/saasgenerator") }
+const goToPlans         = () => { showPlanModal.value = true }
 
-const toggleOrderDetail = (id) => {
-  openOrderId.value = openOrderId.value === id ? null : id
-}
-
-const openStore = () => {
-  window.open(`https://mronlinestores.com/#/${userData.value.publishedSlug}`, "_blank")
-}
-
-const goToBuilder = () => {
-  router.push("/saasgenerator")
-}
-  
-  
-
-const goToPlans = () => { showPlanModal.value = true }
-
-// Paiement direct depuis la modale de suspension (toujours plan Pro)
 const payToReactivate = async () => {
   planLoading.value = true
   try {
     const res  = await fetch(`${BACKEND}/create-billing-session`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email:    user.value.email,
-        plan:     "pro",
-        ownerUid: user.value.uid,
-      }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.value.email, plan: "pro", ownerUid: user.value.uid }),
     })
     const data = await res.json()
-    if (!res.ok || !data.url) {
-      alert(data.error || "Erreur lors de la création de la session de paiement")
-      return
-    }
+    if (!res.ok || !data.url) { alert(data.error || "Erreur paiement"); return }
     window.location.href = data.url
-  } catch(err) {
-    console.error("payToReactivate:", err)
-    alert("Erreur réseau. Vérifiez votre connexion.")
-  } finally {
-    planLoading.value = false
-  }
+  } catch(err) { alert("Erreur réseau.") }
+  finally { planLoading.value = false }
 }
 
-// Confirme et lance le paiement Stripe pour le plan choisi
 const confirmPlan = async () => {
   if (planChoix.value === 'free') return
   if (isProActive.value && planChoix.value === 'pro') return
   planLoading.value = true
   try {
     const res  = await fetch(`${BACKEND}/create-billing-session`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email:    user.value.email,
-        plan:     planChoix.value,
-        ownerUid: user.value.uid,
-      }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.value.email, plan: planChoix.value, ownerUid: user.value.uid }),
     })
     const data = await res.json()
-    if (!res.ok || !data.url) {
-      alert(data.error || "Erreur lors de la création de la session de paiement")
-      return
-    }
+    if (!res.ok || !data.url) { alert(data.error || "Erreur paiement"); return }
     window.location.href = data.url
-  } catch(err) {
-    console.error("confirmPlan:", err)
-    alert("Erreur réseau. Vérifiez votre connexion.")
-  } finally {
-    planLoading.value = false
-  }
+  } catch(err) { alert("Erreur réseau.") }
+  finally { planLoading.value = false }
 }
 
 const renewPlan = () => {
@@ -841,45 +993,28 @@ const renewPlan = () => {
   router.push({ path: "/panier", query: { plan, price } })
 }
 
-// ── Upgrade vers Pro — logique originale ─────────────────────
 const upgradeToPro = async () => {
   try {
     const res  = await fetch(`${BACKEND}/create-billing-session`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email:    user.value.email,
-        plan:     "pro",
-        ownerUid: user.value.uid,
-      }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.value.email, plan: "pro", ownerUid: user.value.uid }),
     })
     const data = await res.json()
     if (!res.ok || !data.url) { alert(data.error || "Erreur paiement"); return }
     window.location.href = data.url
-  } catch(err) {
-    console.error(err)
-    alert("Erreur upgrade Pro")
-  }
+  } catch(err) { alert("Erreur upgrade Pro") }
 }
 
-// ── Stripe Connect — logique originale ───────────────────────
 const connectStripe = async () => {
   try {
     const res  = await fetch(`${BACKEND}/create-connect-account`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ownerUid: user.value.uid,
-        email:    user.value.email,
-      }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownerUid: user.value.uid, email: user.value.email }),
     })
     const data = await res.json()
     if (!res.ok || !data.url) { alert(data.error || "Erreur Stripe Connect"); return }
     window.location.href = data.url
-  } catch(err) {
-    console.error(err)
-    alert("Erreur connexion Stripe")
-  }
+  } catch(err) { alert("Erreur connexion Stripe") }
 }
 
 const logout = async () => {
@@ -908,7 +1043,21 @@ const formatTotal = (order) => {
   return "—"
 }
 
-// ── Export CSV des commandes ───────────────────────────────────
+const formatBackupDate = (isoStr) => {
+  if (!isoStr) return "—"
+  return new Date(isoStr).toLocaleString("fr-FR", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  })
+}
+
+const formatSize = (bytes) => {
+  if (!bytes) return "—"
+  const kb = parseInt(bytes) / 1024
+  if (kb < 1024) return kb.toFixed(0) + " KB"
+  return (kb / 1024).toFixed(1) + " MB"
+}
+
 const exportOrdersCSV = () => {
   const rows = [
     ["Date","Client","Email","Total","Statut","Produits","Adresse"],
@@ -935,151 +1084,66 @@ const exportOrdersCSV = () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-.db-root {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
-  font-family: 'DM Sans', sans-serif;
-  color: #f0f0f0;
-}
+.db-root { min-height: 100vh; background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%); font-family: 'DM Sans', sans-serif; color: #f0f0f0; }
 
-/* ── Header ────────────────────────────────────────────────── */
-.db-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px; height: 60px;
-  background: rgba(255,255,255,.04);
-  border-bottom: 1px solid rgba(255,255,255,.08);
-  position: sticky; top: 0; z-index: 100;
-  backdrop-filter: blur(12px);
-}
+/* Header */
+.db-header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 60px; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.08); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
 .db-brand { display: flex; align-items: center; gap: 10px; }
 .db-logo  { font-size: 22px; }
 .db-title { font-size: 16px; font-weight: 700; color: #fff; }
 .db-header-right { display: flex; align-items: center; gap: 12px; }
-.db-user-pill {
-  display: flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
-  border-radius: 100px; padding: 5px 12px;
-}
-.db-user-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #22c55e; flex-shrink: 0;
-}
+.db-user-pill { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 100px; padding: 5px 12px; }
+.db-user-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
 .db-user-email { font-size: 12px; color: #a0a0b0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.db-logout-btn {
-  font-size: 12px; color: #8a8a9a; background: transparent;
-  border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
-  padding: 6px 12px; cursor: pointer; transition: .15s;
-}
+.db-logout-btn { font-size: 12px; color: #8a8a9a; background: transparent; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 6px 12px; cursor: pointer; transition: .15s; }
 .db-logout-btn:hover { color: #fff; border-color: rgba(255,255,255,.3); }
 
-/* ── Main ──────────────────────────────────────────────────── */
-.db-main {
-  max-width: 900px; margin: 0 auto;
-  padding: 28px 20px 60px;
-  display: flex; flex-direction: column; gap: 20px;
-}
+/* Main */
+.db-main { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; display: flex; flex-direction: column; gap: 20px; }
 
-/* ── Loading ───────────────────────────────────────────────── */
-.db-loading {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 14px; padding: 80px 0; color: #8a8a9a;
-}
-.db-spinner {
-  width: 36px; height: 36px;
-  border: 3px solid rgba(108,99,255,.2);
-  border-top-color: #6c63ff;
-  border-radius: 50%; animation: db-spin .7s linear infinite;
-}
-.db-spinner-sm { width: 22px; height: 22px; border-width: 2px; }
+/* Loading */
+.db-loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 80px 0; color: #8a8a9a; }
+.db-spinner { width: 36px; height: 36px; border: 3px solid rgba(108,99,255,.2); border-top-color: #6c63ff; border-radius: 50%; animation: db-spin .7s linear infinite; }
+.db-spinner-sm { width: 16px; height: 16px; border-width: 2px; border-color: rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: db-spin .7s linear infinite; display: inline-block; }
 @keyframes db-spin { to { transform: rotate(360deg); } }
 
-/* ── Alert expiré ──────────────────────────────────────────── */
-/* ── Compte suspendu ─────────────────────────────────────────── */
-.db-suspended-overlay {
-  position: fixed; inset: 0; z-index: 9999;
-  background: rgba(10,10,20,.85);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
-}
-.db-suspended-card {
-  background: #1a1a2e; border: 1px solid rgba(239,68,68,.25);
-  border-radius: 20px; padding: 48px 40px; max-width: 460px; width: 100%;
-  text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.5);
-}
+/* Suspended */
+.db-suspended-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(10,10,20,.85); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.db-suspended-card { background: #1a1a2e; border: 1px solid rgba(239,68,68,.25); border-radius: 20px; padding: 48px 40px; max-width: 460px; width: 100%; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.5); }
 .db-suspended-icon { font-size: 52px; margin-bottom: 16px; }
-.db-suspended-title {
-  font-size: 22px; font-weight: 700; color: #f0f0f0; margin-bottom: 12px;
-}
-.db-suspended-msg {
-  font-size: 14px; color: #8a8a9a; line-height: 1.7; margin-bottom: 28px;
-}
-.db-suspended-pay-btn {
-  width: 100%; padding: 15px; margin-bottom: 10px;
-  background: linear-gradient(135deg, #6c63ff, #a78bfa);
-  color: white; border: none; border-radius: 12px;
-  font-size: 15px; font-weight: 700; cursor: pointer;
-  font-family: inherit; transition: all .2s;
-}
-.db-suspended-pay-btn:hover:not(:disabled) {
-  transform: translateY(-1px); box-shadow: 0 6px 20px rgba(108,99,255,.4);
-}
+.db-suspended-title { font-size: 22px; font-weight: 700; color: #f0f0f0; margin-bottom: 12px; }
+.db-suspended-msg { font-size: 14px; color: #8a8a9a; line-height: 1.7; margin-bottom: 28px; }
+.db-suspended-pay-btn { width: 100%; padding: 15px; margin-bottom: 10px; background: linear-gradient(135deg, #6c63ff, #a78bfa); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .2s; }
+.db-suspended-pay-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(108,99,255,.4); }
 .db-suspended-pay-btn:disabled { opacity: .6; cursor: not-allowed; }
 .db-suspended-note { font-size: 11px; color: #5a5a6a; margin-bottom: 20px; }
-.db-suspended-logout {
-  background: none; border: none; color: #5a5a6a;
-  font-size: 13px; cursor: pointer; font-family: inherit;
-  text-decoration: underline; transition: color .15s;
-}
+.db-suspended-logout { background: none; border: none; color: #5a5a6a; font-size: 13px; cursor: pointer; font-family: inherit; text-decoration: underline; }
 .db-suspended-logout:hover { color: #9ca3af; }
 .db-fade-enter-active, .db-fade-leave-active { transition: opacity .25s ease; }
 .db-fade-enter-from, .db-fade-leave-to { opacity: 0; }
 
-.db-alert-expired {
-  display: flex; align-items: center; gap: 14px;
-  background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
-  border-radius: 14px; padding: 16px 20px;
-}
+/* Alert */
+.db-alert-expired { display: flex; align-items: center; gap: 14px; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 14px; padding: 16px 20px; }
 .db-alert-icon { font-size: 24px; flex-shrink: 0; }
 .db-alert-expired > div { flex: 1; }
 .db-alert-expired strong { font-size: 15px; color: #ef4444; }
 .db-alert-expired p { font-size: 13px; color: #9ca3af; margin-top: 2px; }
 
-/* ── Stats ─────────────────────────────────────────────────── */
-.db-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 14px;
-}
-.db-stat-card {
-  display: flex; align-items: center; gap: 14px;
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 16px; padding: 18px 16px;
-  transition: .2s;
-}
-.db-stat-card-orders {
-  cursor: pointer;
-  border-color: rgba(108,99,255,.3);
-  background: rgba(108,99,255,.06);
-}
-.db-stat-card-orders:hover {
-  background: rgba(108,99,255,.12);
-  transform: translateY(-2px);
-}
-.db-stat-icon {
-  width: 44px; height: 44px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px; font-weight: 700; flex-shrink: 0;
-}
+/* Stats */
+.db-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.db-stat-card { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 18px 16px; transition: .2s; }
+.db-stat-card-orders { cursor: pointer; border-color: rgba(108,99,255,.3); background: rgba(108,99,255,.06); }
+.db-stat-card-orders:hover { background: rgba(108,99,255,.12); transform: translateY(-2px); }
+.db-stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; }
 .db-icon-gray   { background: rgba(156,163,175,.15); color: #9ca3af; }
 .db-icon-blue   { background: rgba(59,130,246,.15);  color: #60a5fa; }
 .db-icon-purple { background: rgba(108,99,255,.2);   color: #a78bfa; }
 .db-icon-green  { background: rgba(34,197,94,.15);   color: #22c55e; }
 .db-icon-red    { background: rgba(239,68,68,.15);   color: #ef4444; }
 .db-icon-yellow { background: rgba(234,179,8,.15);   color: #fbbf24; }
+.db-icon-orange { background: rgba(249,115,22,.15);  color: #fb923c; }
 .db-stat-body   { min-width: 0; }
 .db-stat-label  { font-size: 11px; color: #5a5a6a; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
 .db-stat-val    { font-size: 20px; font-weight: 700; line-height: 1.2; }
@@ -1090,72 +1154,30 @@ const exportOrdersCSV = () => {
 .db-val-green   { color: #22c55e; }
 .db-val-red     { color: #ef4444; }
 .db-val-yellow  { color: #fbbf24; }
+.db-val-orange  { color: #fb923c; }
 
-/* ── Panneau commandes ─────────────────────────────────────── */
-.db-orders-panel {
-  background: rgba(255,255,255,.03);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 18px; overflow: hidden;
-}
-.db-orders-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,.06);
-  flex-wrap: wrap; gap: 10px;
-}
+/* Commandes */
+.db-orders-panel { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 18px; overflow: hidden; }
+.db-orders-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,.06); flex-wrap: wrap; gap: 10px; }
 .db-orders-title { font-size: 16px; font-weight: 700; color: #f0f0f0; }
 .db-orders-filters { display: flex; gap: 8px; flex-wrap: wrap; }
-.db-search-input {
-  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
-  color: #f0f0f0; font-size: 12px; padding: 7px 12px;
-  border-radius: 8px; outline: none; width: 200px;
-  font-family: 'DM Sans', sans-serif;
-}
+.db-search-input { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); color: #f0f0f0; font-size: 12px; padding: 7px 12px; border-radius: 8px; outline: none; width: 200px; font-family: 'DM Sans', sans-serif; }
 .db-search-input::placeholder { color: #5a5a6a; }
 .db-search-input:focus { border-color: rgba(108,99,255,.5); }
-.db-filter-select {
-  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
-  color: #f0f0f0; font-size: 12px; padding: 7px 10px;
-  border-radius: 8px; outline: none; cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-}
-.db-orders-loading {
-  display: flex; align-items: center; gap: 10px;
-  padding: 30px 20px; color: #5a5a6a; font-size: 13px;
-}
-.db-orders-empty {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 10px; padding: 40px 20px; color: #5a5a6a;
-}
+.db-filter-select { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); color: #f0f0f0; font-size: 12px; padding: 7px 10px; border-radius: 8px; outline: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.db-orders-loading { display: flex; align-items: center; gap: 10px; padding: 30px 20px; color: #5a5a6a; font-size: 13px; }
+.db-orders-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 20px; color: #5a5a6a; }
 .db-orders-empty span { font-size: 36px; opacity: .5; }
-.db-orders-error {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 16px 20px; margin: 12px 16px;
-  background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
-  border-radius: 10px; color: #fca5a5; font-size: 13px;
-}
+.db-orders-error { display: flex; align-items: flex-start; gap: 10px; padding: 16px 20px; margin: 12px 16px; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); border-radius: 10px; color: #fca5a5; font-size: 13px; }
 .db-orders-error span { font-size: 18px; flex-shrink: 0; }
-
-/* Cartes commandes */
 .db-orders-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
-.db-order-card {
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 12px; overflow: hidden; transition: .2s;
-}
+.db-order-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; overflow: hidden; transition: .2s; }
 .db-order-card:hover { border-color: rgba(255,255,255,.12); }
 .db-order-paid { border-left: 3px solid #22c55e; }
-.db-order-main {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; gap: 12px;
-}
+.db-order-main { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; gap: 12px; }
 .db-order-info  { display: flex; align-items: center; justify-content: space-between; flex: 1; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .db-order-email { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.db-order-avatar {
-  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-  background: rgba(108,99,255,.25); color: #a78bfa;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 700;
-}
+.db-order-avatar { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; background: rgba(108,99,255,.25); color: #a78bfa; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
 .db-order-name       { font-size: 13px; font-weight: 600; color: #f0f0f0; }
 .db-order-email-text { font-size: 11px; color: #5a5a6a; margin-top: 1px; }
 .db-order-meta  { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
@@ -1166,27 +1188,13 @@ const exportOrdersCSV = () => {
 .db-order-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .db-order-total    { font-size: 16px; font-weight: 700; color: #a78bfa; white-space: nowrap; }
 .db-order-provider { font-size: 10px; color: #5a5a6a; text-transform: uppercase; }
-.db-order-toggle {
-  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
-  color: #8a8a9a; width: 28px; height: 28px; border-radius: 7px;
-  cursor: pointer; font-size: 11px; transition: .15s;
-  display: flex; align-items: center; justify-content: center;
-}
+.db-order-toggle { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); color: #8a8a9a; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; font-size: 11px; transition: .15s; display: flex; align-items: center; justify-content: center; }
 .db-order-toggle:hover { background: rgba(255,255,255,.12); color: #fff; }
-
-/* Détail commande */
-.db-order-detail {
-  border-top: 1px solid rgba(255,255,255,.06);
-  padding: 14px 16px; background: rgba(0,0,0,.15);
-}
+.db-order-detail { border-top: 1px solid rgba(255,255,255,.06); padding: 14px 16px; background: rgba(0,0,0,.15); }
 .db-order-items-title { font-size: 10px; font-weight: 700; color: #5a5a6a; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
 .db-order-items { display: flex; flex-direction: column; gap: 8px; }
 .db-order-item  { display: flex; align-items: center; gap: 10px; }
-.db-item-img {
-  width: 38px; height: 38px; border-radius: 8px; overflow: hidden;
-  background: rgba(255,255,255,.06); display: flex; align-items: center;
-  justify-content: center; font-size: 16px; flex-shrink: 0;
-}
+.db-item-img { width: 38px; height: 38px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
 .db-item-img img { width: 100%; height: 100%; object-fit: cover; }
 .db-item-info { flex: 1; min-width: 0; }
 .db-item-name  { font-size: 13px; font-weight: 600; color: #f0f0f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1194,252 +1202,379 @@ const exportOrdersCSV = () => {
 .db-item-subtotal { font-size: 13px; font-weight: 700; color: #a78bfa; white-space: nowrap; }
 .db-no-items   { font-size: 12px; color: #5a5a6a; text-align: center; padding: 10px; }
 .db-order-addr { font-size: 11px; color: #5a5a6a; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.06); }
-
-.db-orders-footer {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.06);
-  flex-wrap: wrap; gap: 8px;
-}
+.db-orders-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.06); flex-wrap: wrap; gap: 8px; }
 .db-orders-count { font-size: 13px; color: #8a8a9a; }
 .db-orders-count strong { color: #a78bfa; }
 
-/* ── Builder card ──────────────────────────────────────────── */
-.db-builder-card {
-  display: flex; align-items: center; justify-content: space-between;
-  background: linear-gradient(135deg, rgba(108,99,255,.2), rgba(167,139,250,.1));
-  border: 1px solid rgba(108,99,255,.35);
-  border-radius: 18px; padding: 24px 28px; gap: 20px; flex-wrap: wrap;
-}
+/* Builder */
+.db-builder-card { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, rgba(108,99,255,.2), rgba(167,139,250,.1)); border: 1px solid rgba(108,99,255,.35); border-radius: 18px; padding: 24px 28px; gap: 20px; flex-wrap: wrap; }
 .db-builder-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
 .db-builder-desc  { font-size: 13px; color: #8a8a9a; }
-.db-published-info {
-  display: flex; align-items: center; gap: 7px;
-  margin-top: 8px; font-size: 12px; color: #8a8a9a;
-}
-.db-published-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #22c55e; flex-shrink: 0;
-}
+.db-published-info { display: flex; align-items: center; gap: 7px; margin-top: 8px; font-size: 12px; color: #8a8a9a; }
+.db-published-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
 .db-published-link { color: #a78bfa; text-decoration: none; }
 .db-published-link:hover { text-decoration: underline; }
 
-/* ── Actions grid ──────────────────────────────────────────── */
-.db-actions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-.db-action-card {
-  display: flex; align-items: center; gap: 14px;
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 14px; padding: 16px;
-  cursor: pointer; transition: .2s; text-align: left;
-  color: #f0f0f0;
-}
-.db-action-card:hover:not(:disabled) {
-  background: rgba(255,255,255,.08);
-  border-color: rgba(255,255,255,.15);
-  transform: translateY(-2px);
-}
+/* Actions */
+.db-actions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.db-action-card { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 16px; cursor: pointer; transition: .2s; text-align: left; color: #f0f0f0; }
+.db-action-card:hover:not(:disabled) { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.15); transform: translateY(-2px); }
 .db-action-card:disabled { opacity: .4; cursor: not-allowed; }
+.db-action-card-restore { border-color: rgba(108,99,255,.2); }
+.db-action-card-restore:hover:not(:disabled) { border-color: rgba(108,99,255,.4) !important; background: rgba(108,99,255,.08) !important; }
 .db-action-icon  { font-size: 24px; flex-shrink: 0; }
 .db-action-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
 .db-action-desc  { font-size: 12px; color: #5a5a6a; margin-top: 2px; }
 
-/* ── Boutons ───────────────────────────────────────────────── */
-.db-btn {
-  border: none; border-radius: 10px; font-weight: 600;
-  cursor: pointer; transition: .2s; font-family: 'DM Sans', sans-serif;
-  padding: 10px 18px; font-size: 13px;
-}
+/* Buttons */
+.db-btn { border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: .2s; font-family: 'DM Sans', sans-serif; padding: 10px 18px; font-size: 13px; }
 .db-btn:disabled { opacity: .4; cursor: not-allowed; }
 .db-btn-primary { background: linear-gradient(135deg, #6c63ff, #4f46e5); color: #fff; }
 .db-btn-primary:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
 .db-btn-lg { padding: 14px 28px; font-size: 15px; border-radius: 12px; }
 .db-btn-danger  { background: rgba(239,68,68,.2); color: #ef4444; border: 1px solid rgba(239,68,68,.3); }
 .db-btn-danger:hover { background: rgba(239,68,68,.3); }
-.db-btn-outline {
-  background: transparent; color: #a78bfa;
-  border: 1px solid rgba(108,99,255,.4); font-size: 12px; padding: 7px 14px;
-}
+.db-btn-outline { background: transparent; color: #a78bfa; border: 1px solid rgba(108,99,255,.4); font-size: 12px; padding: 7px 14px; }
 .db-btn-outline:hover { background: rgba(108,99,255,.1); }
+.db-badge { background: #6c63ff; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 100px; min-width: 18px; text-align: center; }
 
-/* ── Badge ─────────────────────────────────────────────────── */
-.db-badge {
-  background: #6c63ff; color: #fff;
-  font-size: 10px; font-weight: 700;
-  padding: 2px 7px; border-radius: 100px; min-width: 18px; text-align: center;
-}
-
-/* ── Animations ────────────────────────────────────────────── */
+/* Animations */
 .db-slide-enter-active, .db-slide-leave-active { transition: all .3s ease; }
 .db-slide-enter-from, .db-slide-leave-to { opacity: 0; transform: translateY(-8px); }
 
-/* ── Responsive ────────────────────────────────────────────── */
+/* Responsive */
 @media (max-width: 600px) {
   .db-header { padding: 0 14px; }
   .db-user-email { max-width: 100px; }
   .db-main { padding: 18px 14px 50px; }
   .db-stats { grid-template-columns: repeat(2, 1fr); }
   .db-builder-card { flex-direction: column; align-items: flex-start; }
-  .db-btn-lg { width: 100%; text-align: center; justify-content: center; }
+  .db-btn-lg { width: 100%; text-align: center; }
   .db-orders-header { flex-direction: column; align-items: flex-start; }
   .db-search-input { width: 100%; }
-  .db-order-main { flex-wrap: wrap; }
 }
 
-/* ── Section paiements ────────────────────────────────────── */
-.db-payments-card {
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 18px; padding: 22px 24px;
-}
+/* Paiements */
+.db-payments-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 18px; padding: 22px 24px; }
 .db-payments-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
 .db-payments-row   { display: flex; gap: 16px; flex-wrap: wrap; }
 .db-payment-block  { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 220px; }
 .db-payment-desc   { font-size: 13px; color: #8a8a9a; line-height: 1.5; }
 .db-stripe-ok      { color: #22c55e; font-weight: 600; }
-.db-btn-upgrade {
-  background: linear-gradient(135deg, #22c55e, #16a34a);
-  color: #fff; align-self: flex-start;
-}
+.db-btn-upgrade { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; align-self: flex-start; }
 .db-btn-upgrade:hover { opacity: .9; transform: translateY(-1px); }
-.db-btn-stripe {
-  background: linear-gradient(135deg, #635bff, #4f46e5);
-  color: #fff; align-self: flex-start;
-}
+.db-btn-stripe { background: linear-gradient(135deg, #635bff, #4f46e5); color: #fff; align-self: flex-start; }
 .db-btn-stripe:hover { opacity: .9; transform: translateY(-1px); }
+.db-stat-card-clickable:hover { border-color: rgba(108,99,255,.4) !important; background: rgba(108,99,255,.08) !important; transform: translateY(-2px); }
 
-.db-stat-card-clickable:hover {
-  border-color: rgba(108,99,255,.4) !important;
-  background: rgba(108,99,255,.08) !important;
-  transform: translateY(-2px);
-}
-
-/* ── Modal choix de plan ──────────────────────────────────── */
-.db-modal-overlay {
-  position: fixed; inset: 0; z-index: 500;
-  background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
-}
-.db-modal-box {
-  background: #16162a; border: 1px solid rgba(255,255,255,.1);
-  border-radius: 20px; padding: 32px 28px;
-  width: 100%; max-width: 480px;
-  max-height: 90vh; overflow-y: auto;
-  position: relative;
-}
-.db-modal-close {
-  position: absolute; top: 16px; right: 16px;
-  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1);
-  color: #8a8a9a; width: 30px; height: 30px; border-radius: 50%;
-  cursor: pointer; font-size: 13px; transition: .15s;
-  display: flex; align-items: center; justify-content: center;
-}
+/* Modal plan */
+.db-modal-overlay { position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,.7); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.db-modal-box { background: #16162a; border: 1px solid rgba(255,255,255,.1); border-radius: 20px; padding: 32px 28px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; position: relative; }
+.db-modal-close { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); color: #8a8a9a; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 13px; transition: .15s; display: flex; align-items: center; justify-content: center; }
 .db-modal-close:hover { background: rgba(255,255,255,.15); color: #fff; }
 .db-modal-header { text-align: center; margin-bottom: 24px; }
 .db-modal-icon   { font-size: 36px; display: block; margin-bottom: 10px; }
 .db-modal-title  { font-size: 20px; font-weight: 700; color: #f0f0f0; margin-bottom: 6px; }
 .db-modal-sub    { font-size: 13px; color: #8a8a9a; }
-
-/* Grille des plans */
 .db-plan-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-.db-plan-card    {
-  background: rgba(255,255,255,.04); border: 2px solid rgba(255,255,255,.08);
-  border-radius: 14px; padding: 18px 14px;
-  cursor: pointer; transition: .2s; position: relative;
-}
+.db-plan-card    { background: rgba(255,255,255,.04); border: 2px solid rgba(255,255,255,.08); border-radius: 14px; padding: 18px 14px; cursor: pointer; transition: .2s; position: relative; }
 .db-plan-card:hover { border-color: rgba(108,99,255,.4); background: rgba(108,99,255,.06); }
 .db-plan-selected { border-color: #6c63ff !important; background: rgba(108,99,255,.12) !important; }
 .db-plan-current  { border-color: #22c55e !important; }
 .db-plan-pro      { border-color: rgba(108,99,255,.25); }
-.db-plan-badge    {
-  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
-  background: rgba(255,255,255,.15); color: #8a8a9a;
-  font-size: 10px; font-weight: 700; padding: 2px 10px;
-  border-radius: 100px; white-space: nowrap;
-}
+.db-plan-badge    { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,.15); color: #8a8a9a; font-size: 10px; font-weight: 700; padding: 2px 10px; border-radius: 100px; white-space: nowrap; }
 .db-plan-badge-pro { background: linear-gradient(135deg,#6c63ff,#a78bfa); color: #fff; }
 .db-plan-name    { font-size: 16px; font-weight: 700; margin-bottom: 6px; margin-top: 8px; }
 .db-plan-price   { font-size: 26px; font-weight: 800; color: #f0f0f0; margin-bottom: 12px; }
 .db-plan-price span { font-size: 13px; font-weight: 400; color: #8a8a9a; }
 .db-plan-features { list-style: none; display: flex; flex-direction: column; gap: 5px; }
 .db-plan-features li { font-size: 12px; color: #8a8a9a; }
-.db-plan-features li:first-child,
-.db-plan-features li:nth-child(2),
-.db-plan-features li:nth-child(3) { color: #f0f0f0; }
-
-/* Résumé + confirmation */
-.db-plan-summary {
-  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
-  border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
-}
+.db-plan-summary { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
 .db-plan-summary-row { display: flex; justify-content: space-between; font-size: 14px; color: #8a8a9a; }
 .db-plan-already-active { font-size: 12px; color: #22c55e; margin-top: 8px; font-weight: 600; }
-.db-btn-confirm {
-  width: 100%; padding: 14px; font-size: 15px; font-weight: 700;
-  border-radius: 12px; border: none; cursor: pointer; transition: .2s;
-  background: linear-gradient(135deg, #6c63ff, #4f46e5); color: #fff;
-  font-family: 'DM Sans', sans-serif;
-}
+.db-btn-confirm { width: 100%; padding: 14px; font-size: 15px; font-weight: 700; border-radius: 12px; border: none; cursor: pointer; transition: .2s; background: linear-gradient(135deg, #6c63ff, #4f46e5); color: #fff; font-family: 'DM Sans', sans-serif; }
 .db-btn-confirm:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
 .db-btn-confirm:disabled { opacity: .45; cursor: not-allowed; }
 .db-plan-note { text-align: center; font-size: 11px; color: #5a5a6a; margin-top: 10px; }
 
-/* ── Onglets source commandes ──────────────────────────────── */
-.db-orders-source-tabs {
-  display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;
+/* ══════════════════════════════════════════════════════════════
+   PANNEAU RESTAURATION UTILISATEUR
+══════════════════════════════════════════════════════════════ */
+.db-restore-panel {
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(108,99,255,.2);
+  border-radius: 18px;
+  overflow: hidden;
 }
-.db-source-tab {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.08);
-  color: #8a8a9a; font-size: 12px; font-weight: 600;
-  padding: 4px 12px; border-radius: 100px;
-  cursor: pointer; transition: .15s;
+
+.db-restore-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  background: linear-gradient(135deg, rgba(108,99,255,.07), rgba(167,139,250,.03));
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  flex-wrap: wrap;
+}
+
+.db-restore-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #a78bfa;
+  margin-bottom: 5px;
+}
+
+.db-restore-subtitle {
+  font-size: 12px;
+  color: #5a5a6a;
+  line-height: 1.6;
+  max-width: 580px;
+}
+
+.db-restore-refresh-btn {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #8a8a9a;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'DM Sans', sans-serif;
+  flex-shrink: 0;
+}
+.db-restore-refresh-btn:hover:not(:disabled) { background: rgba(255,255,255,.1); color: #fff; }
+.db-restore-refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Loading / empty / error */
+.db-restore-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px; color: #5a5a6a; }
+.db-restore-error { display: flex; align-items: center; gap: 10px; padding: 18px 22px; color: #f87171; font-size: 13px; }
+.db-restore-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px; text-align: center; color: #475569; }
+.db-restore-empty-icon { font-size: 36px; margin-bottom: 6px; opacity: .6; }
+.db-restore-empty-hint { font-size: 12px; color: #374151; margin-top: 4px; }
+
+/* Liste backups */
+.db-restore-list { display: flex; flex-direction: column; }
+
+.db-restore-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  gap: 12px;
+  flex-wrap: wrap;
+  transition: background .15s;
+}
+.db-restore-item:last-child { border-bottom: none; }
+.db-restore-item:hover { background: rgba(255,255,255,.02); }
+.db-restore-item-latest { border-left: 3px solid #a78bfa; }
+
+.db-restore-info { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+
+.db-restore-filename-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.db-restore-file-icon { font-size: 15px; flex-shrink: 0; }
+
+.db-restore-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-restore-badge-latest {
+  background: rgba(167,139,250,.15);
+  color: #a78bfa;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 100px;
+  border: 1px solid rgba(167,139,250,.25);
+  flex-shrink: 0;
+}
+
+.db-restore-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: #5a5a6a;
+}
+
+/* Boutons restore */
+.db-restore-btns { display: flex; gap: 8px; flex-shrink: 0; }
+
+.db-btn-restore-dry {
+  background: rgba(56,189,248,.08);
+  border: 1px solid rgba(56,189,248,.2);
+  color: #38bdf8;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-family: 'DM Sans', sans-serif;
 }
-.db-source-tab:hover { border-color: rgba(255,255,255,.2); color: #f0f0f0; }
-.db-source-tab.active {
-  background: rgba(108,99,255,.15);
-  border-color: rgba(108,99,255,.5);
-  color: #a78bfa;
-}
-.db-source-count {
-  background: rgba(255,255,255,.1);
-  font-size: 10px; font-weight: 700;
-  padding: 1px 6px; border-radius: 100px; color: #8a8a9a;
-}
-.db-source-tab.active .db-source-count {
-  background: rgba(108,99,255,.3); color: #a78bfa;
-}
-.db-source-label {
-  font-size: 10px; color: #5a5a6a;
-  align-self: center; font-style: italic;
-  padding-left: 4px;
-}
-/* ── Badge plan Free/Pro ───────────────────────────────────── */
-.db-order-plan-badge {
-  font-size: 9px; font-weight: 800;
-  padding: 2px 6px; border-radius: 4px;
-  letter-spacing: .5px; text-transform: uppercase;
-}
-.db-plan-pro-badge  { background: rgba(108,99,255,.2); color: #a78bfa; }
-.db-plan-free-badge { background: rgba(156,163,175,.15); color: #9ca3af; }
+.db-btn-restore-dry:hover:not(:disabled) { background: rgba(56,189,248,.15); }
+.db-btn-restore-dry:disabled { opacity: .5; cursor: not-allowed; }
 
-/* ── Stripe statuts ───────────────────────────────────────────── */
-.db-stripe-pending {
-  color: #f59e0b;
+.db-btn-restore-real {
+  background: rgba(108,99,255,.1);
+  border: 1px solid rgba(108,99,255,.25);
+  color: #a78bfa;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+.db-btn-restore-real:hover:not(:disabled) { background: rgba(108,99,255,.2); }
+.db-btn-restore-real:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Résultat simulation */
+.db-restore-dryrun {
+  margin: 12px 22px 16px;
+  background: rgba(56,189,248,.04);
+  border: 1px solid rgba(56,189,248,.15);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.db-restore-dryrun-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(56,189,248,.06);
+  border-bottom: 1px solid rgba(56,189,248,.1);
   font-size: 13px;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+.db-restore-dryrun-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #5a5a6a;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.db-restore-dryrun-close:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+.db-restore-dryrun-detail { padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+
+.db-restore-dryrun-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.db-restore-dryrun-row:last-child { border-bottom: none; }
+.db-restore-dryrun-total { margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08) !important; }
+.db-restore-dryrun-label { color: #5a5a6a; }
+.db-restore-dryrun-val   { color: #e2e8f0; font-weight: 600; }
+.db-restore-val-accent   { color: #a78bfa; }
+
+.db-restore-dryrun-note {
+  font-size: 11px;
+  color: #5a5a6a;
+  text-align: center;
+  padding: 10px 16px 14px;
+}
+
+/* Modal confirm restore */
+.db-restore-confirm-info { text-align: left; }
+.db-restore-confirm-file {
+  font-family: monospace;
+  font-size: 12px;
+  color: #a78bfa;
+  background: rgba(108,99,255,.08);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+.db-restore-confirm-warn {
+  font-size: 12px;
+  color: #f87171;
+  background: rgba(239,68,68,.06);
+  border: 1px solid rgba(239,68,68,.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
   line-height: 1.5;
 }
-.db-val-orange { color: #f97316; }
-.db-icon-orange { background: rgba(249,115,22,.12); color: #f97316; }
-.db-btn-stripe-pending {
-  background: rgba(245,158,11,.1) !important;
-  border-color: rgba(245,158,11,.3) !important;
-  color: #f59e0b !important;
+.db-restore-confirm-safe {
+  font-size: 12px;
+  color: #4ade80;
+  background: rgba(34,197,94,.06);
+  border: 1px solid rgba(34,197,94,.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  line-height: 1.5;
 }
+.db-restore-confirm-safe strong { font-weight: 700; }
+
+.db-restore-modal-cancel {
+  flex: 1;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #8a8a9a;
+  border-radius: 10px;
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.db-restore-modal-cancel:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+.db-restore-modal-confirm {
+  flex: 2;
+  background: linear-gradient(135deg, #6c63ff, #4f46e5);
+  border: none;
+  color: #fff;
+  border-radius: 10px;
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'DM Sans', sans-serif;
+}
+.db-restore-modal-confirm:hover:not(:disabled) { opacity: .85; }
+.db-restore-modal-confirm:disabled { opacity: .5; cursor: not-allowed; }
 </style>
