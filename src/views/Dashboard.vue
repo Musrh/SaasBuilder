@@ -887,7 +887,8 @@ const loadUserBackups = async () => {
   try {
     const idToken = await auth.currentUser?.getIdToken()
     const res     = await fetch(
-      `${BACKEND}/api/store/backups?idToken=${encodeURIComponent(idToken)}`
+      `${BACKEND}/api/store/backups`,
+      { headers: { Authorization: `Bearer ${idToken}` } }
     )
     const data = await res.json()
     if (data.error) throw new Error(data.error)
@@ -915,8 +916,11 @@ const runUserRestore = async (filename, dryRun) => {
     const idToken = await auth.currentUser?.getIdToken()
     const res     = await fetch(`${BACKEND}/api/store/restore`, {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ idToken, filename, dryRun }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization:  `Bearer ${idToken}`,
+      },
+      body:    JSON.stringify({ filename, dryRun }),
     })
     const data = await res.json()
     if (data.error) throw new Error(data.error)
