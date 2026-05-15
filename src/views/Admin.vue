@@ -101,7 +101,117 @@
           <span v-else>⏰ Vérifier expirés</span>
         </button>
         <button class="adm-btn-export" @click="exportCSV" title="Exporter en CSV">📥 Export CSV</button>
+        <button class="adm-btn-backup-toggle" @click="toggleBackupPanel">
+          🗄️ Backup &amp; Restore <span>{{ showBackupPanel ? '▲' : '▼' }}</span>
+        </button>
       </div>
+
+      <!-- ══════════════════════════════════════════════════════
+           PANNEAU BACKUP & RESTORE (admin)
+      ══════════════════════════════════════════════════════ -->
+      <Transition name="adm-slide">
+        <div v-if="showBackupPanel" class="adm-backup-panel">
+
+          <div class="adm-backup-header">
+            <div>
+              <h3 class="adm-backup-title">🗄️ Backup &amp; Restore Firestore</h3>
+              <p class="adm-backup-sub">Sauvegardes automatiques quotidiennes à 2h00 UTC — bucket <code>saasbuilder-backups</code></p>
+            </div>
+            <div class="adm-backup-header-btns">
+              <button class="adm-btn-do-backup" @click="triggerBackup" :disabled="backupLoading">
+                <span v-if="backupLoading" class="adm-spinner-sm"></span>
+                <span v-else>☁️ Backup maintenant</span>
+              </button>
+              <button class="adm-btn-refresh-backups" @click="loadBackupList" :disabled="backupListLoading">
+                <span v-if="backupListLoading" class="adm-spinner-sm"></span>
+                <span v-else>↻ Rafraîchir</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="backupListLoading && backupList.length === 0" class="adm-backup-loading">
+            <div class="adm-spinner"></div><p>Chargement des backups...</p>
+          </div>
+
+          <div v-else-if="backupListError" class="adm-backup-msg adm-backup-msg-error">
+            ⚠️ {{ backupListError }}
+            <button class="adm-btn adm-btn-sm adm-btn-outline" @click="loadBackupList" style="margin-left:10px">Réessayer</button>
+          </div>
+
+          <div v-else-if="!backupListLoading && backupList.length === 0" class="adm-backup-msg">
+            📭 Aucun backup disponible. Déclenchez un backup manuel ou attendez le cron de 2h00 UTC.
+          </div>
+
+          <div v-else class="adm-backup-list">
+            <div
+              v-for="(bk, idx) in backupList"
+              :key="bk.filename"
+              class="adm-backup-item"
+              :class="{ 'adm-backup-item-latest': idx === 0 }"
+            >
+              <div class="adm-backup-info">
+                <div class="adm-backup-filename-row">
+                  <span>📦</span>
+                  <span class="adm-backup-filename">{{ bk.filename }}</span>
+                  <span v-if="idx === 0" class="adm-backup-badge-latest">Dernier</span>
+                </div>
+                <div class="adm-backup-meta">
+                  <span>📅 {{ formatDate(bk.createdAt) }}</span>
+                  <span>💾 {{ formatSize(bk.size) }}</span>
+                </div>
+              </div>
+              <div class="adm-backup-btns">
+                <a
+                  :href="`${BACKEND}/api/admin/backup/${bk.filename}?idToken=${encodeURIComponent(adminToken)}`"
+                  class="adm-btn-dl"
+                  download
+                >📥 Télécharger</a>
+                <button
+                  class="adm-btn-restore-dry"
+                  @click="adminRestore(bk.filename, true)"
+                  :disabled="adminRestoreLoading === bk.filename"
+                >
+                  <span v-if="adminRestoreLoading === bk.filename" class="adm-spinner-sm"></span>
+                  <span v-else>🔍 Simuler</span>
+                </button>
+                <button
+                  class="adm-btn-restore-real"
+                  @click="askAdminRestoreConfirm(bk.filename)"
+                  :disabled="adminRestoreLoading === bk.filename"
+                >🔄 Restaurer tout</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Résultat simulation -->
+          <Transition name="adm-slide">
+            <div v-if="adminDryRunResult" class="adm-dryrun-result">
+              <div class="adm-dryrun-header">
+                <span>🔍</span>
+                <strong>Simulation — {{ adminDryRunResult.filename }}</strong>
+                <button class="adm-dryrun-close" @click="adminDryRunResult = null">✕</button>
+              </div>
+              <div class="adm-dryrun-rows">
+                <div class="adm-dryrun-row">
+                  <span class="adm-dryrun-label">Éléments à restaurer</span>
+                  <span class="adm-dryrun-val">{{ adminDryRunResult.restored }}</span>
+                </div>
+                <div class="adm-dryrun-row">
+                  <span class="adm-dryrun-label">Ignorés (déjà existants)</span>
+                  <span class="adm-dryrun-val">{{ adminDryRunResult.skipped }}</span>
+                </div>
+                <div v-if="adminDryRunResult.errors" class="adm-dryrun-row">
+                  <span class="adm-dryrun-label" style="color:#f87171">Erreurs</span>
+                  <span class="adm-dryrun-val" style="color:#f87171">{{ adminDryRunResult.errors }}</span>
+                </div>
+              </div>
+              <p class="adm-dryrun-note">✅ Simulation uniquement — aucune donnée modifiée.</p>
+            </div>
+          </Transition>
+
+        </div>
+      </Transition>
+      <!-- FIN PANNEAU BACKUP -->
 
       <!-- ── Stripe Connect : en attente de vérification ── -->
       <div v-if="stripeAccounts.pending.length" class="adm-stripe-pending-section">
@@ -260,6 +370,14 @@
                 >
                   🔒 Suspendre
                 </button>
+
+                <!-- Export JSON du store -->
+                <a
+                  :href="`${BACKEND}/api/admin/export-store/${owner.id}?idToken=${encodeURIComponent(adminToken)}`"
+                  class="adm-btn-export-store"
+                  download
+                  title="Exporter les données de ce store en JSON"
+                >📤 Export</a>
               </td>
             </tr>
           </tbody>
@@ -271,6 +389,34 @@
     <!-- TOAST notifications -->
     <Transition name="toast">
       <div v-if="toast" class="adm-toast" :class="toastType">{{ toast }}</div>
+    </Transition>
+
+    <!-- ══ MODAL CONFIRMATION RESTORE ADMIN ══ -->
+    <Transition name="toast">
+      <div v-if="adminRestoreConfirm" class="adm-modal-overlay" @click.self="adminRestoreConfirm = null">
+        <div class="adm-modal-box">
+          <button class="adm-modal-close" @click="adminRestoreConfirm = null">✕</button>
+          <div class="adm-modal-icon">⚠️</div>
+          <h2 class="adm-modal-title">Confirmer la restauration globale</h2>
+          <p class="adm-modal-sub">Cette opération restaurera <strong>toutes les collections</strong> Firestore depuis le backup.</p>
+          <div class="adm-modal-file">📦 {{ adminRestoreConfirm }}</div>
+          <p class="adm-modal-warn">
+            ⛔ Action irréversible — toutes les données actuelles seront écrasées par celles du backup.
+            Assurez-vous d'avoir fait un backup récent avant de procéder.
+          </p>
+          <div class="adm-modal-actions">
+            <button class="adm-modal-cancel" @click="adminRestoreConfirm = null">Annuler</button>
+            <button
+              class="adm-modal-confirm"
+              @click="adminRestore(adminRestoreConfirm, false); adminRestoreConfirm = null"
+              :disabled="adminRestoreLoading === adminRestoreConfirm"
+            >
+              <span v-if="adminRestoreLoading === adminRestoreConfirm" class="adm-spinner-sm"></span>
+              <span v-else>🔄 Confirmer la restauration</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </Transition>
 
   </div>
@@ -303,6 +449,17 @@ const toastType   = ref("success")
 
 const BACKEND          = "https://backendfinal-production-afd2.up.railway.app"
 const checkExpiryLoading = ref(false)
+
+// ── Backup & Restore (admin) ──────────────────────────────────
+const showBackupPanel     = ref(false)
+const backupList          = ref([])
+const backupListLoading   = ref(false)
+const backupListError     = ref("")
+const backupLoading       = ref(false)
+const adminRestoreLoading = ref("")      // filename en cours
+const adminRestoreConfirm = ref(null)   // filename à confirmer
+const adminDryRunResult   = ref(null)
+const adminToken          = ref("")     // token mis à jour à chaque opération admin
 
 const isAdmin = computed(() =>
   ADMIN_EMAILS.includes(currentUser.value?.email?.toLowerCase())
@@ -598,6 +755,101 @@ const runCheckExpiry = async () => {
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+//  FONCTIONS BACKUP & RESTORE (admin)
+// ══════════════════════════════════════════════════════════════
+
+const getAdminToken = async () => {
+  const token = await auth.currentUser?.getIdToken()
+  adminToken.value = token || ""
+  return token
+}
+
+const toggleBackupPanel = () => {
+  showBackupPanel.value = !showBackupPanel.value
+  if (showBackupPanel.value && backupList.value.length === 0) {
+    loadBackupList()
+  }
+}
+
+const loadBackupList = async () => {
+  backupListLoading.value = true
+  backupListError.value   = ""
+  try {
+    const idToken = await getAdminToken()
+    const res     = await fetch(`${BACKEND}/api/admin/backups?idToken=${encodeURIComponent(idToken)}`)
+    const data    = await res.json()
+    if (data.error) throw new Error(data.error)
+    backupList.value = data.backups || []
+  } catch(e) {
+    backupListError.value = e.message
+  } finally {
+    backupListLoading.value = false
+  }
+}
+
+const triggerBackup = async () => {
+  backupLoading.value = true
+  try {
+    const idToken = await getAdminToken()
+    const res     = await fetch(`${BACKEND}/api/admin/backup`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    showToast(`✅ Backup créé : ${data.filename}`)
+    await loadBackupList()
+  } catch(e) {
+    showToast("Erreur backup : " + e.message, "error")
+  } finally {
+    backupLoading.value = false
+  }
+}
+
+const askAdminRestoreConfirm = (filename) => {
+  adminRestoreConfirm.value = filename
+  adminDryRunResult.value   = null
+}
+
+const adminRestore = async (filename, dryRun) => {
+  adminRestoreLoading.value = filename
+  adminDryRunResult.value   = null
+  try {
+    const idToken = await getAdminToken()
+    const res     = await fetch(`${BACKEND}/api/admin/restore`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken, filename, dryRun, overwrite: true }),
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+
+    if (dryRun) {
+      adminDryRunResult.value = {
+        filename,
+        restored: data.restored || 0,
+        skipped:  data.skipped  || 0,
+        errors:   data.errors   || 0,
+      }
+    } else {
+      showToast(`✅ Restore terminé — ${data.restored} docs restaurés, ${data.skipped} ignorés`)
+      await loadOwners()
+    }
+  } catch(e) {
+    showToast("Erreur restore : " + e.message, "error")
+  } finally {
+    adminRestoreLoading.value = ""
+  }
+}
+
+const formatSize = (bytes) => {
+  if (!bytes) return "—"
+  const kb = parseInt(bytes) / 1024
+  return kb < 1024 ? kb.toFixed(0) + " KB" : (kb / 1024).toFixed(1) + " MB"
+}
+
 const logout = async () => {
   await signOut(auth)
   router.push("/")
@@ -805,4 +1057,405 @@ td{padding:12px 16px;vertical-align:middle}
   color: #34d399;
 }
 .adm-btn-success:hover:not(:disabled) { background: rgba(16,185,129,.22); }
+
+/* ── Bouton Backup & Restore dans la toolbar ─────────────────── */
+.adm-btn-backup-toggle {
+  background: rgba(167,139,250,.1);
+  border: 1px solid rgba(167,139,250,.25);
+  color: #a78bfa;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+  transition: .15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.adm-btn-backup-toggle:hover { background: rgba(167,139,250,.2); }
+
+/* ── Panneau Backup ──────────────────────────────────────────── */
+.adm-backup-panel {
+  background: #12121f;
+  border: 1px solid rgba(167,139,250,.2);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.adm-backup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  background: rgba(167,139,250,.05);
+  border-bottom: 1px solid rgba(167,139,250,.1);
+  flex-wrap: wrap;
+}
+
+.adm-backup-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #a78bfa;
+  margin-bottom: 4px;
+}
+
+.adm-backup-sub {
+  font-size: 12px;
+  color: #475569;
+}
+
+.adm-backup-sub code {
+  background: rgba(255,255,255,.06);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: monospace;
+  color: #94a3b8;
+}
+
+.adm-backup-header-btns { display: flex; gap: 8px; flex-shrink: 0; }
+
+.adm-btn-do-backup {
+  background: linear-gradient(135deg, #6c63ff, #4f46e5);
+  border: none;
+  color: #fff;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+.adm-btn-do-backup:hover:not(:disabled) { opacity: .85; }
+.adm-btn-do-backup:disabled { opacity: .5; cursor: not-allowed; }
+
+.adm-btn-refresh-backups {
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #94a3b8;
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'DM Sans', sans-serif;
+}
+.adm-btn-refresh-backups:hover:not(:disabled) { background: rgba(255,255,255,.1); }
+.adm-btn-refresh-backups:disabled { opacity: .5; cursor: not-allowed; }
+
+.adm-backup-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 30px 22px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.adm-backup-msg {
+  padding: 20px 22px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.adm-backup-msg-error { color: #f87171; }
+
+.adm-backup-list { display: flex; flex-direction: column; }
+
+.adm-backup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  gap: 12px;
+  flex-wrap: wrap;
+  transition: background .15s;
+}
+.adm-backup-item:last-child { border-bottom: none; }
+.adm-backup-item:hover { background: rgba(255,255,255,.02); }
+.adm-backup-item-latest { border-left: 3px solid #a78bfa; }
+
+.adm-backup-info { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+
+.adm-backup-filename-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-backup-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adm-backup-badge-latest {
+  background: rgba(167,139,250,.15);
+  color: #a78bfa;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 100px;
+  border: 1px solid rgba(167,139,250,.25);
+  flex-shrink: 0;
+}
+
+.adm-backup-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: #475569;
+}
+
+.adm-backup-btns { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+
+.adm-btn-dl {
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #94a3b8;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: .15s;
+  white-space: nowrap;
+}
+.adm-btn-dl:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+.adm-btn-restore-dry {
+  background: rgba(56,189,248,.08);
+  border: 1px solid rgba(56,189,248,.2);
+  color: #38bdf8;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'DM Sans', sans-serif;
+}
+.adm-btn-restore-dry:hover:not(:disabled) { background: rgba(56,189,248,.15); }
+.adm-btn-restore-dry:disabled { opacity: .5; cursor: not-allowed; }
+
+.adm-btn-restore-real {
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.25);
+  color: #f87171;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+.adm-btn-restore-real:hover:not(:disabled) { background: rgba(239,68,68,.2); }
+.adm-btn-restore-real:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Résultat DryRun ─────────────────────────────────────────── */
+.adm-dryrun-result {
+  margin: 12px 22px 16px;
+  background: rgba(56,189,248,.04);
+  border: 1px solid rgba(56,189,248,.15);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.adm-dryrun-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(56,189,248,.06);
+  border-bottom: 1px solid rgba(56,189,248,.1);
+  font-size: 13px;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+.adm-dryrun-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.adm-dryrun-close:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+.adm-dryrun-rows { padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; }
+
+.adm-dryrun-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.adm-dryrun-row:last-child { border-bottom: none; }
+.adm-dryrun-label { color: #475569; }
+.adm-dryrun-val   { color: #e2e8f0; font-weight: 600; }
+
+.adm-dryrun-note {
+  font-size: 11px;
+  color: #475569;
+  text-align: center;
+  padding: 8px 16px 12px;
+}
+
+/* ── Modal confirmation restore admin ────────────────────────── */
+.adm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 20px;
+}
+
+.adm-modal-box {
+  background: #1a1a2e;
+  border: 1px solid rgba(239,68,68,.3);
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 460px;
+  width: 100%;
+  position: relative;
+}
+
+.adm-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: .15s;
+}
+.adm-modal-close:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+.adm-modal-icon  { font-size: 36px; text-align: center; margin-bottom: 12px; }
+.adm-modal-title { font-size: 17px; font-weight: 700; color: #f87171; text-align: center; margin-bottom: 6px; }
+.adm-modal-sub   { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 16px; }
+
+.adm-modal-file {
+  font-family: monospace;
+  font-size: 12px;
+  color: #a78bfa;
+  background: rgba(108,99,255,.08);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+
+.adm-modal-warn {
+  font-size: 12px;
+  color: #f87171;
+  background: rgba(239,68,68,.06);
+  border: 1px solid rgba(239,68,68,.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.adm-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.adm-modal-cancel {
+  flex: 1;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #94a3b8;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.adm-modal-cancel:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+.adm-modal-confirm {
+  flex: 2;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  border: none;
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'DM Sans', sans-serif;
+}
+.adm-modal-confirm:hover:not(:disabled) { opacity: .85; }
+.adm-modal-confirm:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Bouton Export store (par ligne) ─────────────────────────── */
+.adm-btn-export-store {
+  background: rgba(16,185,129,.08);
+  border: 1px solid rgba(16,185,129,.2);
+  color: #34d399;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: .15s;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+.adm-btn-export-store:hover { background: rgba(16,185,129,.18); }
+
+/* ── Transition panneau backup ───────────────────────────────── */
+.adm-slide-enter-active,
+.adm-slide-leave-active { transition: all .25s ease; }
+.adm-slide-enter-from,
+.adm-slide-leave-to { opacity: 0; transform: translateY(-8px); }
 </style>
