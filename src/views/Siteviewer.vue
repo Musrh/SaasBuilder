@@ -27,6 +27,7 @@ import VoiceAssistantClient from "../components/VoiceAssistantClient.vue"
 import { db } from "../firebase.js"
 import { doc, getDoc, setDoc, collection, addDoc, query, where, getDocs } from "firebase/firestore"
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth"
+import { translations, svLangs, getT } from "../langues.js"
 const clientAuth      = getAuth()
 const svCurrentUser   = ref(null)
 const svShowAuth      = ref(false)
@@ -55,23 +56,11 @@ const site              = ref(null)
 const accountSuspended  = ref(false)
 
 const svLang  = ref("fr")
-const svLangs = [
-  { code:"fr", flag:"🇫🇷", full:"Français" },
-  { code:"en", flag:"🇬🇧", full:"English"  },
-  { code:"ar", flag:"🇲🇦", full:"العربية"  },
-  { code:"es", flag:"🇪🇸", full:"Español"  },
-]
+// svLangs importé depuis langues.js
 const svIsRtl = computed(() => svLang.value === "ar")
 
-const svT = computed(() => {
-  const all = {
-    fr:{ buy:"🛒 Acheter", login:"🔑 Se connecter", logout:"Déconnexion", cart:"Mon panier", delivery:"Livraison & Paiement", checkout:"Finaliser la commande", back:"← Retour", payCard:"💳 Payer par carte", name:"Nom complet *", email:"Email *", password:"Mot de passe * (min.6)", confirm:"Confirmer *", createAccount:"✨ Créer mon compte", register:"Inscription", send:"Envoyer", noOrders:"Aucune commande pour le moment.", discover:"Découvrir les produits →", orders:"MES COMMANDES", totalSpent:"TOTAL DÉPENSÉ", forgotPwd:"Mot de passe oublié ?", resetSent:"Email envoyé !", address:"Adresse", zip:"Code postal", city:"Ville", country:"Pays" },
-    en:{ buy:"🛒 Buy", login:"🔑 Sign in", logout:"Sign out", cart:"My cart", delivery:"Delivery & Payment", checkout:"Place order", back:"← Back", payCard:"💳 Pay by card", name:"Full name *", email:"Email *", password:"Password * (min.6)", confirm:"Confirm *", createAccount:"✨ Create account", register:"Register", send:"Send", noOrders:"No orders yet.", discover:"Discover products →", orders:"MY ORDERS", totalSpent:"TOTAL SPENT", forgotPwd:"Forgot password?", resetSent:"Email sent!", address:"Address", zip:"Zip code", city:"City", country:"Country" },
-    ar:{ buy:"🛒 شراء", login:"🔑 دخول", logout:"خروج", cart:"سلتي", delivery:"التسليم والدفع", checkout:"إتمام الطلب", back:"→ رجوع", payCard:"💳 الدفع ببطاقة", name:"الاسم الكامل *", email:"البريد الإلكتروني *", password:"كلمة المرور * (6 أحرف)", confirm:"تأكيد *", createAccount:"✨ إنشاء حساب", register:"تسجيل", send:"إرسال", noOrders:"لا توجد طلبات حتى الآن.", discover:"اكتشف المنتجات ←", orders:"طلباتي", totalSpent:"الإجمالي المنفق", forgotPwd:"نسيت كلمة المرور؟", resetSent:"تم الإرسال!", address:"العنوان", zip:"الرمز البريدي", city:"المدينة", country:"البلد" },
-    es:{ buy:"🛒 Comprar", login:"🔑 Entrar", logout:"Salir", cart:"Mi carrito", delivery:"Entrega y Pago", checkout:"Finalizar pedido", back:"← Volver", payCard:"💳 Pagar con tarjeta", name:"Nombre completo *", email:"Email *", password:"Contraseña * (mín.6)", confirm:"Confirmar *", createAccount:"✨ Crear cuenta", register:"Registro", send:"Enviar", noOrders:"Sin pedidos por ahora.", discover:"Descubrir productos →", orders:"MIS PEDIDOS", totalSpent:"TOTAL GASTADO", forgotPwd:"¿Olvidaste tu contraseña?", resetSent:"¡Email enviado!", address:"Dirección", zip:"Código postal", city:"Ciudad", country:"País" },
-  }
-  return all[svLang.value] || all.fr
-})
+// svT utilise langues.js
+const svT = computed(() => getT(svLang.value))
 const loading      = ref(true)
 const error        = ref("")
 const resolvedUid  = ref("")
@@ -106,11 +95,11 @@ const contactError   = ref("")
 
 const sendContact = async () => {
   if (!contactName.value || !contactEmail.value || !contactMessage.value) {
-    contactError.value = "Veuillez remplir tous les champs."
+    contactError.value = svT.value.formErrRequired
     return
   }
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.value)
-  if (!emailOk) { contactError.value = "Email invalide."; return }
+  if (!emailOk) { contactError.value = svT.value.formErrEmail; return }
 
   contactSending.value = true
   contactError.value   = ""
@@ -133,7 +122,7 @@ const sendContact = async () => {
     contactMessage.value = ""
     setTimeout(() => { contactSent.value = false }, 5000)
   } catch(e) {
-    contactError.value = "Erreur d'envoi. Réessayez plus tard."
+    contactError.value = svT.value.formErrSend
     console.error("Contact error:", e)
   } finally {
     contactSending.value = false
@@ -536,7 +525,7 @@ const svRegister = async () => {
     sessionStorage.setItem("svClientSession", JSON.stringify(clientSession))
     svCurrentUser.value = clientSession
 
-    svAuthSuccess.value = "Compte créé avec succès ! Bienvenue 🎉"
+    svAuthSuccess.value = svT.value.formSuccess || "Compte créé avec succès ! Bienvenue 🎉"
     setTimeout(() => {
       svShowAuth.value  = false
       svEmail.value     = ""
@@ -1046,27 +1035,25 @@ const saveOrder = async (provider, transactionId) => {
           <div class="sv-payment-btns">
             <button class="sv-pay-btn sv-stripe"
               @click="cart=[{...s, id:'direct', qty:1, price:s.amount}]; payProvider='stripe'; showPayModal=true">
-              💳 Payer avec Stripe
+              {{ svT.payWithStripe }}
             </button>
             <button class="sv-pay-btn sv-paypal"
               @click="cart=[{...s, id:'direct', qty:1, price:s.amount}]; payProvider='paypal'; showPayModal=true">
-              🅿 Payer avec PayPal
+              {{ svT.payWithPaypal }}
             </button>
           </div>
         </div>
 
         <div v-else-if="s.type==='form'" class="sv-form" :style="s.style">
-          <h3>Contactez-nous</h3>
-          <input v-model="contactName" placeholder="Nom complet" class="sv-form-input"/>
-          <input v-model="contactEmail" placeholder="Email" type="email" class="sv-form-input"/>
-          <textarea v-model="contactMessage" rows="4" placeholder="Votre message..." class="sv-form-input sv-form-textarea"></textarea>
+          <h3>{{ svT.formTitle }}</h3>
+          <input v-model="contactName"    :placeholder="svT.formNamePh"  class="sv-form-input"/>
+          <input v-model="contactEmail"   :placeholder="svT.formEmailPh" type="email" class="sv-form-input"/>
+          <textarea v-model="contactMessage" rows="4" :placeholder="svT.formMsgPh" class="sv-form-input sv-form-textarea"></textarea>
           <p v-if="contactError" class="sv-form-error">⚠ {{ contactError }}</p>
-          <div v-if="contactSent" class="sv-form-success">
-            ✅ Message envoyé ! Nous vous répondrons bientôt.
-          </div>
+          <div v-if="contactSent" class="sv-form-success">{{ svT.formSuccess }}</div>
           <button type="button" class="sv-form-btn" @click="sendContact" :disabled="contactSending">
-            <span v-if="contactSending">Envoi en cours...</span>
-            <span v-else>Envoyer →</span>
+            <span v-if="contactSending">{{ svT.formSending }}</span>
+            <span v-else>{{ svT.formSend }}</span>
           </button>
         </div>
 
@@ -1111,7 +1098,7 @@ const saveOrder = async (provider, transactionId) => {
         <div class="sv-modal-box sv-cart-box">
 
           <div class="sv-cart-header">
-            <button v-if="svCartStep==='checkout'" class="sv-back-btn" @click="svCartStep='cart'">← Retour</button>
+            <button v-if="svCartStep==='checkout'" class="sv-back-btn" @click="svCartStep='cart'">{{ svT.back }}</button>
             <div class="sv-cart-header-title">
               <span>{{ svCartStep==='cart' ? '🛒' : '📋' }}</span>
               <h2>{{ svCartStep==='cart' ? svT.cart : svT.delivery }}</h2>
@@ -1124,7 +1111,7 @@ const saveOrder = async (provider, transactionId) => {
 
           <template v-if="svCartStep==='cart'">
             <div v-if="cart.length===0" class="sv-cart-empty">
-              <span>🛍️</span><p>Votre panier est vide</p>
+              <span>🛍️</span><p>{{ svT.cartEmpty }}</p>
             </div>
             <div v-else class="sv-cart-items">
               <div v-for="item in cart" :key="item.id" class="sv-cart-item">
@@ -1147,11 +1134,11 @@ const saveOrder = async (provider, transactionId) => {
             </div>
             <div v-if="cart.length>0" class="sv-cart-footer">
               <div class="sv-cart-total-row">
-                <span>Total</span>
+                <span>{{ svT.cartTotal }}</span>
                 <strong>{{ cartTotal }}{{ cartCurrency }}</strong>
               </div>
               <div class="sv-cart-footer-btns">
-                <button class="sv-btn-sec" @click="showCart=false">Continuer</button>
+                <button class="sv-btn-sec" @click="showCart=false">{{ svT.cartContinue }}</button>
                 <button class="sv-btn-primary sv-checkout-btn" @click="svCartStep='checkout'">
                   📋 {{ svT.delivery }} →
                 </button>
@@ -1170,41 +1157,41 @@ const saveOrder = async (provider, transactionId) => {
                 <span class="sv-summary-price">{{ (parseFloat(item.price)*item.qty).toFixed(2) }}{{ item.currency }}</span>
               </div>
               <div class="sv-summary-total">
-                <span>Total</span>
+                <span>{{ svT.cartTotal }}</span>
                 <strong>{{ cartTotal }}{{ cartCurrency }}</strong>
               </div>
             </div>
 
             <div class="sv-checkout-fields">
-              <div class="sv-checkout-section">👤 Informations client</div>
+              <div class="sv-checkout-section">{{ svT.checkoutClient }}</div>
               <div class="sv-checkout-row">
                 <div class="sv-checkout-field">
-                  <label>Nom complet *</label>
+                  <label>{{ svT.name }}</label>
                   <input v-model="customerName" placeholder="Jean Dupont" class="sv-checkout-input"/>
                 </div>
                 <div class="sv-checkout-field">
-                  <label>Email *</label>
+                  <label>{{ svT.email }}</label>
                   <input v-model="customerEmail" placeholder="jean@email.com" type="email" class="sv-checkout-input"/>
                 </div>
               </div>
 
-              <div class="sv-checkout-section" style="margin-top:12px">📦 Adresse de livraison</div>
+              <div class="sv-checkout-section" style="margin-top:12px">{{ svT.checkoutDelivery }}</div>
               <div class="sv-checkout-field">
-                <label>Adresse *</label>
+                <label>{{ svT.address }}</label>
                 <input v-model="svAddress" placeholder="123 rue de la Paix" class="sv-checkout-input"/>
               </div>
               <div class="sv-checkout-row">
                 <div class="sv-checkout-field">
-                  <label>Code postal</label>
+                  <label>{{ svT.zip }}</label>
                   <input v-model="svZip" placeholder="75001" class="sv-checkout-input"/>
                 </div>
                 <div class="sv-checkout-field">
-                  <label>Ville</label>
+                  <label>{{ svT.city }}</label>
                   <input v-model="svCity" placeholder="Paris" class="sv-checkout-input"/>
                 </div>
               </div>
               <div class="sv-checkout-field">
-                <label>Pays</label>
+                <label>{{ svT.country }}</label>
                 <select v-model="svCountry" class="sv-checkout-input sv-checkout-select">
                   <option>France</option><option>Maroc</option><option>Belgique</option>
                   <option>Suisse</option><option>Canada</option><option>Algérie</option>
@@ -1218,9 +1205,9 @@ const saveOrder = async (provider, transactionId) => {
             <button class="sv-pay-final-btn" @click="payWithStripe" :disabled="payProcessing">
               <span v-if="payProcessing" class="sv-spinner"></span>
               <span v-else>💳</span>
-              {{ payProcessing ? 'Redirection Stripe...' : `Payer ${cartTotal}${cartCurrency}` }}
+              {{ payProcessing ? svT.checkoutPaying : `${svT.payCard} ${cartTotal}${cartCurrency}` }}
             </button>
-            <p class="sv-secure-note">🔒 Paiement sécurisé via Stripe</p>
+            <p class="sv-secure-note">{{ svT.checkoutSecure }}</p>
           </template>
 
         </div>
@@ -1245,10 +1232,10 @@ const saveOrder = async (provider, transactionId) => {
           <div class="svp-info">
             <div class="svp-name">{{ svCurrentUser.displayName || "Client" }}</div>
             <div class="svp-email">{{ svCurrentUser.email }}</div>
-            <span class="svp-badge">🛍 Client du store</span>
+            <span class="svp-badge">{{ svT.storeClient }}</span>
           </div>
         </div>
-        <button class="svp-signout-btn" @click="svSignOut">⏻ Se déconnecter</button>
+        <button class="svp-signout-btn" @click="svSignOut">{{ svT.signOut }}</button>
       </div>
     </div>
   </Transition>
@@ -1268,42 +1255,42 @@ const saveOrder = async (provider, transactionId) => {
         </div>
 
         <div class="sv-auth-tabs">
-          <button :class="['sv-auth-tab',{active:svAuthMode==='login'}]"    @click="svAuthMode='login';svAuthError='';svAuthSuccess=''">Connexion</button>
-          <button :class="['sv-auth-tab',{active:svAuthMode==='register'}]" @click="svAuthMode='register';svAuthError='';svAuthSuccess=''">Inscription</button>
+          <button :class="['sv-auth-tab',{active:svAuthMode==='login'}]"    @click="svAuthMode='login';svAuthError='';svAuthSuccess=''">{{ svT.loginTab }}</button>
+          <button :class="['sv-auth-tab',{active:svAuthMode==='register'}]" @click="svAuthMode='register';svAuthError='';svAuthSuccess=''">{{ svT.registerTab }}</button>
         </div>
 
         <p v-if="svAuthError"   class="sv-auth-error">⚠ {{ svAuthError }}</p>
         <p v-if="svAuthSuccess" class="sv-auth-success">✓ {{ svAuthSuccess }}</p>
 
         <div v-if="svAuthMode==='login'" class="sv-auth-form">
-          <input v-model="svEmail"    type="email"    placeholder="Email *"         class="sv-auth-input" @keydown.enter="svLogin"/>
-          <input v-model="svPassword" type="password" placeholder="Mot de passe *"  class="sv-auth-input" @keydown.enter="svLogin"/>
-          <button class="sv-auth-forgot-link" @click="svAuthMode='forgot';svAuthError='';svAuthSuccess=''">Mot de passe oublié ?</button>
+          <input v-model="svEmail"    type="email"    :placeholder="svT.email"      class="sv-auth-input" @keydown.enter="svLogin"/>
+          <input v-model="svPassword" type="password" :placeholder="svT.password"   class="sv-auth-input" @keydown.enter="svLogin"/>
+          <button class="sv-auth-forgot-link" @click="svAuthMode='forgot';svAuthError='';svAuthSuccess=''">{{ svT.forgotPwd }}</button>
           <button class="sv-auth-submit" @click="svLogin" :disabled="svAuthLoading">
             <span v-if="svAuthLoading" class="sv-auth-spin"></span>
-            <span v-else>🔑 Se connecter</span>
+            <span v-else>{{ svT.loginBtn }}</span>
           </button>
         </div>
 
         <div v-else-if="svAuthMode==='register'" class="sv-auth-form">
-          <input v-model="svName"     type="text"     placeholder="Nom complet *"          class="sv-auth-input"/>
-          <input v-model="svEmail"    type="email"    placeholder="Email *"                class="sv-auth-input"/>
-          <input v-model="svPassword" type="password" placeholder="Mot de passe * (min.6)" class="sv-auth-input"/>
-          <input v-model="svConfirm"  type="password" placeholder="Confirmer *"            class="sv-auth-input" @keydown.enter="svRegister"/>
+          <input v-model="svName"     type="text"     :placeholder="svT.name"              class="sv-auth-input"/>
+          <input v-model="svEmail"    type="email"    :placeholder="svT.email"             class="sv-auth-input"/>
+          <input v-model="svPassword" type="password" :placeholder="svT.password"          class="sv-auth-input"/>
+          <input v-model="svConfirm"  type="password" :placeholder="svT.confirm"           class="sv-auth-input" @keydown.enter="svRegister"/>
           <button class="sv-auth-submit" @click="svRegister" :disabled="svAuthLoading">
             <span v-if="svAuthLoading" class="sv-auth-spin"></span>
-            <span v-else>✨ Créer mon compte</span>
+            <span v-else>{{ svT.createAccount }}</span>
           </button>
         </div>
 
         <div v-else-if="svAuthMode==='forgot'" class="sv-auth-form">
-          <p class="sv-auth-forgot-desc">Entrez votre email pour recevoir un lien.</p>
-          <input v-model="svEmail" type="email" placeholder="Email" class="sv-auth-input" @keydown.enter="svForgot"/>
+          <p class="sv-auth-forgot-desc">{{ svT.forgotDesc }}</p>
+          <input v-model="svEmail" type="email" :placeholder="svT.email" class="sv-auth-input" @keydown.enter="svForgot"/>
           <button class="sv-auth-submit" @click="svForgot" :disabled="svAuthLoading">
             <span v-if="svAuthLoading" class="sv-auth-spin"></span>
-            <span v-else>📧 Envoyer le lien</span>
+            <span v-else>{{ svT.forgotSendBtn }}</span>
           </button>
-          <button class="sv-auth-back-link" @click="svAuthMode='login';svAuthError='';svAuthSuccess=''">← Retour</button>
+          <button class="sv-auth-back-link" @click="svAuthMode='login';svAuthError='';svAuthSuccess=''">{{ svT.back }}</button>
         </div>
       </div>
     </div>
