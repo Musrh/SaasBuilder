@@ -151,7 +151,116 @@
             </div>
           </div>
 
+          <!-- Stat card Messages -->
+          <div class="db-stat-card db-stat-card-clickable" @click="toggleContacts" style="cursor:pointer">
+            <div class="db-stat-icon db-icon-teal">✉️</div>
+            <div class="db-stat-body">
+              <p class="db-stat-label">Messages</p>
+              <p class="db-stat-val db-val-teal">
+                {{ contactsLoading ? '...' : contacts.length }}
+              </p>
+              <p class="db-stat-sub">
+                <span v-if="contactsUnread > 0" class="db-contacts-unread-badge">{{ contactsUnread }} non lu{{ contactsUnread > 1 ? "s" : "" }}</span>
+                <span v-else>{{ showContacts ? "Masquer ▲" : "Voir ▼" }}</span>
+              </p>
+            </div>
+          </div>
+
         </div>
+
+        <!-- ── MESSAGES DE CONTACT ──────────────────────────── -->
+        <Transition name="db-slide">
+          <div v-if="showContacts" class="db-contacts-panel">
+
+            <div class="db-contacts-header">
+              <div>
+                <h2 class="db-contacts-title">✉️ Messages de contact</h2>
+                <p class="db-contacts-sub">Messages reçus via le formulaire de votre site</p>
+              </div>
+              <div class="db-contacts-filters">
+                <input
+                  v-model="contactSearch"
+                  placeholder="Nom, email, message..."
+                  class="db-search-input"
+                />
+                <span v-if="contactsUnread > 0" class="db-contacts-badge">
+                  {{ contactsUnread }} non lu{{ contactsUnread > 1 ? "s" : "" }}
+                </span>
+              </div>
+            </div>
+
+            <div v-if="contactsLoading" class="db-orders-loading">
+              <div class="db-spinner db-spinner-sm"></div>
+              <p>Chargement des messages...</p>
+            </div>
+
+            <div v-else-if="contactsError" class="db-orders-error">
+              <span>⚠️</span><p>{{ contactsError }}</p>
+            </div>
+
+            <div v-else-if="filteredContacts.length === 0" class="db-orders-empty">
+              <span>📭</span>
+              <p>{{ contacts.length === 0 ? "Aucun message reçu pour le moment." : "Aucun message ne correspond à votre recherche." }}</p>
+            </div>
+
+            <div v-else class="db-contacts-list">
+              <div
+                v-for="msg in filteredContacts"
+                :key="msg.id"
+                class="db-contact-card"
+                :class="{ 'db-contact-unread': msg.status === 'nouveau' }"
+                @click="toggleContactDetail(msg.id)"
+              >
+                <div class="db-contact-main">
+                  <div class="db-contact-avatar">
+                    {{ (msg.name || msg.email || "?")[0].toUpperCase() }}
+                  </div>
+                  <div class="db-contact-info">
+                    <div class="db-contact-top">
+                      <span class="db-contact-name">{{ msg.name || "Anonyme" }}</span>
+                      <span v-if="msg.status === 'nouveau'" class="db-contact-new-dot"></span>
+                      <span class="db-contact-date">{{ formatDate(msg.createdAt) }}</span>
+                    </div>
+                    <p class="db-contact-email">{{ msg.email }}</p>
+                    <p class="db-contact-preview">{{ (msg.message || "").slice(0, 80) }}{{ msg.message?.length > 80 ? "..." : "" }}</p>
+                  </div>
+                  <div class="db-contact-chevron">{{ openContactId === msg.id ? "▲" : "▼" }}</div>
+                </div>
+
+                <!-- Détail du message -->
+                <Transition name="db-slide">
+                  <div v-if="openContactId === msg.id" class="db-contact-detail">
+                    <div class="db-contact-detail-meta">
+                      <div class="db-contact-detail-row">
+                        <span class="db-contact-detail-label">De</span>
+                        <a :href="`mailto:${msg.email}`" class="db-contact-detail-email">{{ msg.email }}</a>
+                      </div>
+                      <div class="db-contact-detail-row">
+                        <span class="db-contact-detail-label">Date</span>
+                        <span>{{ formatDate(msg.createdAt) }}</span>
+                      </div>
+                    </div>
+                    <div class="db-contact-message-box">
+                      <p class="db-contact-message-label">Message</p>
+                      <p class="db-contact-message-text">{{ msg.message }}</p>
+                    </div>
+                    <div class="db-contact-detail-actions">
+                      <a
+                        :href="`mailto:${msg.email}?subject=Re: Message depuis votre site`"
+                        class="db-btn-reply"
+                      >
+                        ↩ Répondre par email
+                      </a>
+                    </div>
+                  </div>
+                </Transition>
+
+              </div>
+            </div>
+
+          </div>
+        </Transition>
+        <!-- FIN MESSAGES DE CONTACT -->
 
         <!-- ── LISTE DES COMMANDES ──────────────────────────── -->
         <Transition name="db-slide">
@@ -689,10 +798,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRouter } from "vue-router"
 import { auth, db } from "../firebase"
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs, query, where, onSnapshot, orderBy, updateDoc } from "firebase/firestore"
 import { signOut } from "firebase/auth"
 
 const BACKEND = "https://backendfinal-production-afd2.up.railway.app"
@@ -716,6 +825,16 @@ const openOrderId   = ref(null)
 const orderSearch   = ref("")
 const orderFilter   = ref("")
 const ordersStats   = ref({ total: 0, free: 0, pro: 0, revenue: 0 })
+
+// ── Messages de contact ──────────────────────────────────────
+const contacts        = ref([])
+const contactsLoading = ref(false)
+const contactsError   = ref("")
+const showContacts    = ref(false)
+const contactSearch   = ref("")
+const openContactId   = ref(null)
+const contactsUnread  = ref(0)
+let   contactsUnsub   = null
 
 // ── Restore panel refs ────────────────────────────────────────
 const showRestorePanel    = ref(false)
@@ -826,8 +945,11 @@ onMounted(() => {
     } catch(e) { console.error(e) }
     loading.value = false
     loadOrders(u.uid, userData.value?.plan ?? "free")
+    loadContacts(u.uid)
   })
 })
+
+onUnmounted(() => { if (contactsUnsub) contactsUnsub() })
 
 // ── Commandes ─────────────────────────────────────────────────
 const toMs = (v) => {
@@ -887,8 +1009,7 @@ const loadUserBackups = async () => {
   try {
     const idToken = await auth.currentUser?.getIdToken()
     const res     = await fetch(
-      `${BACKEND}/api/store/backups`,
-      { headers: { Authorization: `Bearer ${idToken}` } }
+      `${BACKEND}/api/store/backups?idToken=${encodeURIComponent(idToken)}`
     )
     const data = await res.json()
     if (data.error) throw new Error(data.error)
@@ -916,11 +1037,8 @@ const runUserRestore = async (filename, dryRun) => {
     const idToken = await auth.currentUser?.getIdToken()
     const res     = await fetch(`${BACKEND}/api/store/restore`, {
       method:  "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization:  `Bearer ${idToken}`,
-      },
-      body:    JSON.stringify({ filename, dryRun }),
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken, filename, dryRun }),
     })
     const data = await res.json()
     if (data.error) throw new Error(data.error)
@@ -952,6 +1070,69 @@ const toggleRestorePanel = () => {
   if (showRestorePanel.value && userBackups.value.length === 0) {
     loadUserBackups()
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MESSAGES DE CONTACT
+// ══════════════════════════════════════════════════════════════
+
+const loadContacts = (uid) => {
+  contactsLoading.value = true
+  contactsError.value   = ""
+  try {
+    const q = query(
+      collection(db, "users", uid, "contacts"),
+      orderBy("createdAt", "desc")
+    )
+    contactsUnsub = onSnapshot(q, (snap) => {
+      contacts.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      contactsUnread.value = contacts.value.filter(m => m.status === "nouveau").length
+      contactsLoading.value = false
+    }, (e) => {
+      contactsError.value   = e.message
+      contactsLoading.value = false
+    })
+  } catch(e) {
+    contactsError.value   = e.message
+    contactsLoading.value = false
+  }
+}
+
+const markContactRead = async (contactId) => {
+  try {
+    await updateDoc(
+      doc(db, "users", user.value.uid, "contacts", contactId),
+      { status: "lu" }
+    )
+  } catch(e) { console.error("markContactRead:", e.message) }
+}
+
+const toggleContactDetail = (id) => {
+  openContactId.value = openContactId.value === id ? null : id
+  // Marquer comme lu à l'ouverture
+  const contact = contacts.value.find(m => m.id === id)
+  if (contact && contact.status === "nouveau") markContactRead(id)
+}
+
+const toggleContacts = () => {
+  showContacts.value = !showContacts.value
+  if (showContacts.value) window.scrollTo({ top: 200, behavior: "smooth" })
+}
+
+const filteredContacts = computed(() => {
+  if (!contactSearch.value.trim()) return contacts.value
+  const q = contactSearch.value.toLowerCase()
+  return contacts.value.filter(m =>
+    (m.name    || "").toLowerCase().includes(q) ||
+    (m.email   || "").toLowerCase().includes(q) ||
+    (m.message || "").toLowerCase().includes(q)
+  )
+})
+
+const formatDate = (v) => {
+  if (!v) return "—"
+  const d = new Date(typeof v === "string" ? v : v?.seconds ? v.seconds * 1000 : v)
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
 }
 
 // ── Actions ────────────────────────────────────────────────────
@@ -1581,4 +1762,227 @@ const exportOrdersCSV = () => {
 }
 .db-restore-modal-confirm:hover:not(:disabled) { opacity: .85; }
 .db-restore-modal-confirm:disabled { opacity: .5; cursor: not-allowed; }
+/* ── Contacts stat card ──────────────────────────────────── */
+.db-icon-teal    { background: rgba(20,184,166,.15); color: #14b8a6; }
+.db-val-teal     { color: #14b8a6; }
+.db-contacts-unread-badge {
+  background: #14b8a6; color: white; font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 100px;
+}
+
+/* ── Panneau messages ────────────────────────────────────── */
+.db-contacts-panel {
+  background: #12121f;
+  border: 1px solid rgba(20,184,166,.2);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.db-contacts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  background: rgba(20,184,166,.04);
+  border-bottom: 1px solid rgba(20,184,166,.1);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.db-contacts-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #14b8a6;
+  margin-bottom: 2px;
+}
+
+.db-contacts-sub {
+  font-size: 12px;
+  color: #475569;
+  margin: 0;
+}
+
+.db-contacts-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.db-contacts-badge {
+  background: rgba(20,184,166,.12);
+  color: #14b8a6;
+  border: 1px solid rgba(20,184,166,.25);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+/* ── Liste messages ──────────────────────────────────────── */
+.db-contacts-list { display: flex; flex-direction: column; }
+
+.db-contact-card {
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  transition: background .15s;
+  cursor: pointer;
+}
+.db-contact-card:last-child { border-bottom: none; }
+.db-contact-card:hover { background: rgba(255,255,255,.02); }
+.db-contact-unread { border-left: 3px solid #14b8a6; }
+
+.db-contact-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 22px;
+}
+
+.db-contact-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(20,184,166,.15);
+  color: #14b8a6;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.db-contact-info { flex: 1; min-width: 0; }
+
+.db-contact-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.db-contact-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.db-contact-new-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #14b8a6;
+  flex-shrink: 0;
+}
+
+.db-contact-date {
+  font-size: 11px;
+  color: #475569;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.db-contact-email {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 4px;
+}
+
+.db-contact-preview {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-contact-chevron {
+  font-size: 11px;
+  color: #475569;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+/* ── Détail message ──────────────────────────────────────── */
+.db-contact-detail {
+  margin: 0 22px 16px 22px;
+  background: rgba(20,184,166,.04);
+  border: 1px solid rgba(20,184,166,.12);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.db-contact-detail-meta {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(20,184,166,.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-contact-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.db-contact-detail-label {
+  color: #475569;
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.db-contact-detail-email {
+  color: #14b8a6;
+  text-decoration: none;
+  font-weight: 500;
+}
+.db-contact-detail-email:hover { text-decoration: underline; }
+
+.db-contact-message-box {
+  padding: 14px 16px;
+}
+
+.db-contact-message-label {
+  font-size: 12px;
+  color: #475569;
+  margin: 0 0 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.db-contact-message-text {
+  font-size: 14px;
+  color: #e2e8f0;
+  line-height: 1.7;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.db-contact-detail-actions {
+  padding: 10px 16px 14px;
+  border-top: 1px solid rgba(20,184,166,.08);
+}
+
+.db-btn-reply {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(20,184,166,.1);
+  border: 1px solid rgba(20,184,166,.25);
+  color: #14b8a6;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: .15s;
+  font-family: "DM Sans", sans-serif;
+}
+.db-btn-reply:hover { background: rgba(20,184,166,.2); }
+
 </style>
