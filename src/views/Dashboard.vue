@@ -1129,12 +1129,6 @@ const filteredContacts = computed(() => {
   )
 })
 
-const formatDate = (v) => {
-  if (!v) return "—"
-  const d = new Date(typeof v === "string" ? v : v?.seconds ? v.seconds * 1000 : v)
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
-}
-
 // ── Actions ────────────────────────────────────────────────────
 const toggleOrders      = () => { showOrders.value = !showOrders.value; window.scrollTo({ top: 200, behavior: "smooth" }) }
 const toggleOrderDetail = (id) => { openOrderId.value = openOrderId.value === id ? null : id }
@@ -1211,7 +1205,9 @@ const logout = async () => {
 // ── Formatage ──────────────────────────────────────────────────
 const formatDate = (ts) => {
   if (!ts) return "—"
-  const d = ts?.toDate ? ts.toDate() : new Date(ts)
+  const d = ts?.toDate   ? ts.toDate()
+          : ts?.seconds  ? new Date(ts.seconds * 1000)
+          : new Date(ts)
   return isNaN(d) ? "—" : d.toLocaleDateString("fr-FR", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit"
