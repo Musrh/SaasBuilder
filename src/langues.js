@@ -134,6 +134,9 @@ export const translations = {
     storeClient: "🛍 Client du store", signOut: "⏻ Se déconnecter",
     // Payment section
     payWithStripe: "💳 Payer avec Stripe", payWithPaypal: "🅿 Payer avec PayPal",
+    prevContactTitle: "Contactez-nous", prevNamePh: "Nom complet", prevEmailPh: "Email",
+    prevMsgPh: "Message...", prevSendBtn: "Envoyer", prevPayStripe: "Payer avec Stripe", prevPayPaypal: "Payer avec PayPal",
+    prevImgEmpty: "Image non définie", prevGalleryEmpty: "Galerie vide", prevVideoEmpty: "URL vidéo non définie", prevBuyBtn: "Acheter",
   },
 
   en: {
@@ -234,6 +237,9 @@ export const translations = {
     forgotSendBtn: "📧 Send link",
     storeClient: "🛍 Store customer", signOut: "⏻ Sign out",
     payWithStripe: "💳 Pay with Stripe", payWithPaypal: "🅿 Pay with PayPal",
+    prevContactTitle: "Contact Us", prevNamePh: "Full name", prevEmailPh: "Email",
+    prevMsgPh: "Message...", prevSendBtn: "Send", prevPayStripe: "Pay with Stripe", prevPayPaypal: "Pay with PayPal",
+    prevImgEmpty: "Image not defined", prevGalleryEmpty: "Empty gallery", prevVideoEmpty: "Video URL not defined", prevBuyBtn: "Buy",
   },
 
   es: {
@@ -334,6 +340,9 @@ export const translations = {
     forgotSendBtn: "📧 Enviar enlace",
     storeClient: "🛍 Cliente de la tienda", signOut: "⏻ Cerrar sesión",
     payWithStripe: "💳 Pagar con Stripe", payWithPaypal: "🅿 Pagar con PayPal",
+    prevContactTitle: "Contactenos", prevNamePh: "Nombre completo", prevEmailPh: "Email",
+    prevMsgPh: "Mensaje...", prevSendBtn: "Enviar", prevPayStripe: "Pagar con Stripe", prevPayPaypal: "Pagar con PayPal",
+    prevImgEmpty: "Imagen no definida", prevGalleryEmpty: "Galeria vacia", prevVideoEmpty: "URL no definida", prevBuyBtn: "Comprar",
   },
 
   ar: {
@@ -434,6 +443,9 @@ export const translations = {
     forgotSendBtn: "📧 إرسال الرابط",
     storeClient: "🛍 عميل المتجر", signOut: "⏻ تسجيل الخروج",
     payWithStripe: "💳 الدفع عبر Stripe", payWithPaypal: "🅿 الدفع عبر PayPal",
+    prevContactTitle: "اتصل بنا", prevNamePh: "الاسم", prevEmailPh: "البريد",
+    prevMsgPh: "الرسالة...", prevSendBtn: "إرسال", prevPayStripe: "Stripe", prevPayPaypal: "PayPal",
+    prevImgEmpty: "صورة غير محددة", prevGalleryEmpty: "معرض فارغ", prevVideoEmpty: "رابط غير محدد", prevBuyBtn: "شراء",
   },
 }
 
