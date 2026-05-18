@@ -107,32 +107,19 @@ const sendContact = async () => {
     const ownerUid = resolvedUid.value
     if (!ownerUid) throw new Error("Store non trouvé")
 
-    const payload = {
-      name:     contactName.value.trim(),
-      email:    contactEmail.value.trim().toLowerCase(),
-      message:  contactMessage.value.trim(),
-      storeUid: ownerUid,
-      siteSlug: props.slug || props.uid || ownerUid,
-    }
-
-    // 1. Sauvegarder en Firestore
-    await addDoc(collection(db, "users", ownerUid, "contacts"), {
-      ...payload,
-      status:    "nouveau",
-      createdAt: new Date().toISOString(),
+    const res = await fetch(`${BACKEND_URL.value}/api/contact`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        name:     contactName.value.trim(),
+        email:    contactEmail.value.trim().toLowerCase(),
+        message:  contactMessage.value.trim(),
+        storeUid: ownerUid,
+        siteSlug: props.slug || props.uid || ownerUid,
+      }),
     })
-
-    // 2. Envoyer par email au propriétaire via le backend
-    try {
-      await fetch(`${BACKEND_URL.value}/api/contact`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(payload),
-      })
-    } catch(emailErr) {
-      // L'email n'est pas bloquant — le message est déjà sauvegardé
-      console.warn("Email send failed (non-blocking):", emailErr.message)
-    }
+    const data = await res.json()
+    if (!data.success) throw new Error(data.error || "Erreur serveur")
 
     contactSent.value    = true
     contactName.value    = ""
