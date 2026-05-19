@@ -1307,8 +1307,11 @@ const saveOrder = async (provider, transactionId) => {
     :store-uid="resolvedUid"
     :store-name="siteMeta.name || 'Notre boutique'"
     :store-email="storePayConfig?.stripe?.storeName || ''"
-    :lang="'fr'"
-    :backend-url="'https://backend-master-production-cf50.up.railway.app'"
+    :lang="svLang"
+    :backend-url="BACKEND_URL"
+    :client-uid="svCurrentUser?.uid || ''"
+    :client-email="svCurrentUser?.email || ''"
+    :client-name="svCurrentUser?.displayName || ''"
   />
 
 </div>
