@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue"
 import { db, auth } from "../firebase.js"
-import { doc, getDoc, setDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc, collection, writeBatch, deleteDoc, getDocs, query, where } from "firebase/firestore"
 import { onAuthStateChanged, signOut } from "firebase/auth" 
 import { stripeConfig, loadStripeSDK } from "./stripe.js"
 import { translations, langs } from "../langues.js"
@@ -847,17 +847,87 @@ const saveSite = async () => {
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
   isSaving.value = true
   try {
-    const docRef = doc(db, "users", currentUser.value.uid)
-    // toRaw : convertir le Proxy Vue en plain object pour Firestore
+    const uid     = currentUser.value.uid
+    const docRef  = doc(db, "users", uid)
     const rawSite = JSON.parse(JSON.stringify(site.value))
-    await setDoc(docRef, { siteData: rawSite, siteName: siteName.value, siteLogo: siteLogo.value, siteTheme: (rawSite.theme || null) }, { merge: true })
+
+    // 1. Sauvegarder siteData dans users/{uid}
+    await setDoc(docRef, {
+      siteData:  rawSite,
+      siteName:  siteName.value,
+      siteLogo:  siteLogo.value,
+      siteTheme: rawSite.theme || null,
+    }, { merge: true })
     localStorage.setItem("siteDataPro", JSON.stringify(rawSite))
+
+    // 2. Synchroniser prodinfos — extraire tous les produits du siteData
+    await syncProdinfos(uid, rawSite)
+
     isSaved.value = true
     notify(t.value.saved)
   } catch (e) {
     console.error("Erreur sauvegarde :", e)
     notify(t.value.saveError, "error")
   } finally { isSaving.value = false }
+}
+
+// Synchroniser la collection prodinfos depuis siteData
+const syncProdinfos = async (uid, rawSite) => {
+  try {
+    // Extraire tous les produits de toutes les pages/sections
+    const produits = []
+    ;(rawSite.pages || []).forEach(page => {
+      ;(page.sections || []).forEach(section => {
+        if (section.type === "products" && Array.isArray(section.items)) {
+          section.items.forEach(p => {
+            if (p.name || p.nom) produits.push(p)
+          })
+        }
+      })
+    })
+
+    // Lire les produits existants dans prodinfos pour ce store
+    const existingSnap = await getDocs(
+      query(collection(db, "prodinfos"), where("ownerUid", "==", uid))
+    )
+    const existingIds = new Set(existingSnap.docs.map(d => d.id))
+
+    // Batch write — max 500 ops par batch
+    const batch     = writeBatch(db)
+    const newIds    = new Set()
+
+    produits.forEach((p, idx) => {
+      // ID stable basé sur le nom du produit
+      const prodId = `${uid}_${(p.name || p.nom || idx).replace(/[^a-zA-Z0-9]/g, "_").slice(0, 40)}`
+      newIds.add(prodId)
+      const ref = doc(db, "prodinfos", prodId)
+      batch.set(ref, {
+        ownerUid:    uid,
+        storeName:   siteName.value || "",
+        name:        p.name        || p.nom         || "",
+        description: p.description || p.desc        || "",
+        price:       p.price       !== undefined ? p.price : (p.prix ?? 0),
+        currency:    p.currency    || p.devise       || "€",
+        badge:       p.badge       || "",
+        image:       p.image       || "",
+        stock:       p.stock       !== undefined ? p.stock : "disponible",
+        updatedAt:   new Date().toISOString(),
+      }, { merge: true })
+    })
+
+    // Supprimer les produits qui n'existent plus dans siteData
+    existingIds.forEach(id => {
+      if (!newIds.has(id)) {
+        batch.delete(doc(db, "prodinfos", id))
+      }
+    })
+
+    await batch.commit()
+    console.log(`✅ prodinfos synchronisé: ${produits.length} produits pour ${uid}`)
+  } catch(e) {
+    console.warn("syncProdinfos:", e.message)
+    // Non bloquant — siteData est déjà sauvegardé
+  }
 }
 
 const goToPage = (i) => { currentPageIndex.value = i; activeSectionIndex.value = null; showPageMenu.value = false }
