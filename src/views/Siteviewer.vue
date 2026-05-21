@@ -254,6 +254,10 @@ const loadSite = async () => {
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false }
+        // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
+        if (data.lang && !sessionStorage.getItem("sv_lang_override")) {
+          svLang.value = data.lang
+        }
         await loadPayConfig(uid)
         if (data.siteTheme) applySiteTheme(data.siteTheme)
         loading.value = false
@@ -295,6 +299,10 @@ const loadSite = async () => {
           siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
           resolvedUid.value    = realUid
           storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false }
+          // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
+          if (rd.lang && !sessionStorage.getItem("sv_lang_override")) {
+            svLang.value = rd.lang
+          }
           await loadPayConfig(realUid)
           if (rd.siteTheme) applySiteTheme(rd.siteTheme)
           loading.value = false
@@ -960,7 +968,7 @@ const saveOrder = async (provider, transactionId) => {
         <button
           v-for="l in svLangs" :key="l.code"
           :class="['sv-lang-flag', svLang===l.code && 'sv-lang-active']"
-          @click="svLang=l.code"
+          @click="svLang=l.code; sessionStorage.setItem('sv_lang_override', l.code)"
           :title="l.full"
         >{{ l.flag }}</button>
       </div>
