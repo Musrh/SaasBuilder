@@ -29,13 +29,17 @@
             </div>
           </div>
           <div class="vac-header-actions">
-            <!-- Sélecteur langue -->
-            <select v-model="lang" class="vac-lang-select">
-              <option value="fr">🇫🇷</option>
-              <option value="en">🇬🇧</option>
-              <option value="ar">🇲🇦</option>
-              <option value="es">🇪🇸</option>
-            </select>
+            <!-- Sélecteur langue visiteur -->
+            <div class="vac-langs">
+              <button
+                v-for="l in availableLangs"
+                :key="l.code"
+                class="vac-lang-btn"
+                :class="{ active: lang === l.code }"
+                @click="lang = l.code"
+                :title="l.label"
+              >{{ l.flag }}</button>
+            </div>
             <button class="vac-close-btn" @click="open = false">✕</button>
           </div>
         </div>
@@ -126,6 +130,13 @@ const props = defineProps({
 // ── State ─────────────────────────────────────────────────────
 const open        = ref(false)
 const lang        = ref(props.lang || "fr")
+
+// Sync lang when SiteViewer changes it (visitor picks a language in the store)
+watch(() => props.lang, (newLang) => {
+  if (newLang && newLang !== lang.value) {
+    lang.value = newLang
+  }
+})
 const messages    = ref([])
 const input       = ref("")
 const loading     = ref(false)
@@ -185,6 +196,14 @@ const t       = computed(() => translations[lang.value] || translations.fr)
 const isRtl   = computed(() => lang.value === "ar")
 const backend = computed(() => props.backendUrl || "https://backendfinal-production-afd2.up.railway.app")
 
+// Langues disponibles pour le visiteur
+const availableLangs = [
+  { code: "fr", flag: "🇫🇷", label: "Français"  },
+  { code: "en", flag: "🇬🇧", label: "English"   },
+  { code: "ar", flag: "🇲🇦", label: "العربية"   },
+  { code: "es", flag: "🇪🇸", label: "Español"   },
+]
+
 // ── Historique pour contexte Groq (max 8 échanges) ───────────
 const history = computed(() =>
   messages.value
@@ -226,9 +245,10 @@ onMounted(() => {
 })
 
 watch(lang, () => {
-  // Re-afficher le message de bienvenue dans la nouvelle langue si premier message
-  if (messages.value.length === 1) {
-    messages.value[0].content = t.value.welcome(props.storeName || t.value.assistant)
+  // Mettre à jour le message de bienvenue dans la nouvelle langue
+  const firstBot = messages.value.find(m => m.role === "assistant")
+  if (firstBot) {
+    firstBot.content = t.value.welcome(props.storeName || t.value.assistant)
   }
 })
 
@@ -370,12 +390,14 @@ const submitForm = async () => {
 .vac-header-status      { color: rgba(255,255,255,.8); font-size: 11px; margin: 2px 0 0; display: flex; align-items: center; gap: 5px; }
 .vac-dot                { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display: inline-block; }
 .vac-header-actions     { display: flex; align-items: center; gap: 8px; }
-.vac-lang-select {
-  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
-  color: #fff; border-radius: 6px; padding: 3px 6px; font-size: 13px;
-  cursor: pointer; outline: none;
+.vac-langs         { display: flex; gap: 4px; align-items: center; }
+.vac-lang-btn {
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  color: #fff; border-radius: 6px; padding: 3px 6px; font-size: 14px;
+  cursor: pointer; transition: .15s; line-height: 1;
 }
-.vac-lang-select option { background: #4f46e5; color: #fff; }
+.vac-lang-btn:hover  { background: rgba(255,255,255,.25); }
+.vac-lang-btn.active { background: rgba(255,255,255,.35); border-color: rgba(255,255,255,.6); }
 .vac-close-btn {
   background: rgba(255,255,255,.15); border: none; color: #fff;
   width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
