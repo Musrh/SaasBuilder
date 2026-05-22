@@ -57,7 +57,7 @@
         <div class="af-badges">
           
           
-     button @click="goToGuide" class="af-back">
+     <button @click="goToGuide" class="af-back">
           Comment utiliser se site
           </button>
         
