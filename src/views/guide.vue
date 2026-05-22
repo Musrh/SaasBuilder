@@ -1,239 +1,226 @@
 <template>
   <div class="guide-root">
 
-   // <!-- ── Bouton déclencheur ──────────────────────────────── -->
-   // <button class="guide-trigger" @click="open = true">
-     // <span class="guide-trigger-icon">🗺️</span>
-   //   <span class="guide-trigger-label">Guide de démarrage</span>
-     // <span class="guide-trigger-arrow">→</span>
-  //  </button>
+    <div class="guide-modal">
 
-  //  <!-- ── Modal ──────────────────────────────────────────── -->
-  //  <Transition name="guide-fade">
-     // <div v-if="open" class="guide-overlay" @click.self="open = false">
-       // <div class="guide-modal">
+      <!-- Header -->
+      <div class="guide-header">
+        <div class="guide-header-left">
+          <div class="guide-logo">🚀</div>
+          <div>
+            <h2 class="guide-title">Guide de démarrage</h2>
+            <p class="guide-subtitle">Lancez votre store en quelques minutes</p>
+          </div>
+        </div>
+      </div>
 
-          <!-- Header -->
-          <div class="guide-header">
-            <div class="guide-header-left">
-              <div class="guide-logo">🚀</div>
-              <div>
-                <h2 class="guide-title">Guide de démarrage</h2>
-                <p class="guide-subtitle">Lancez votre store en quelques minutes</p>
+      <!-- Tabs plan -->
+      <div class="guide-tabs">
+        <button
+          class="guide-tab"
+          :class="{ active: plan === 'free' }"
+          @click="plan = 'free'"
+        >
+          <span class="guide-tab-icon">🆓</span>
+          <span>Plan Gratuit</span>
+        </button>
+        <button
+          class="guide-tab"
+          :class="{ active: plan === 'pro' }"
+          @click="plan = 'pro'"
+        >
+          <span class="guide-tab-icon">⭐</span>
+          <span>Plan Pro</span>
+        </button>
+      </div>
+
+      <!-- ══ PLAN GRATUIT ══════════════════════════════ -->
+      <div v-if="plan === 'free'" class="guide-content">
+
+        <div class="guide-plan-badge free">🆓 Plan Gratuit — Commencez sans carte bancaire</div>
+
+        <!-- Étapes -->
+        <div class="guide-steps">
+
+          <div v-for="(step, i) in freeSteps" :key="i" class="guide-step">
+            <div class="guide-step-left">
+              <div class="guide-step-num" :style="{ background: step.color }">{{ i + 1 }}</div>
+              <div class="guide-step-line" v-if="i < freeSteps.length - 1"></div>
+            </div>
+            <div class="guide-step-body">
+              <div class="guide-step-header">
+                <span class="guide-step-icon">{{ step.icon }}</span>
+                <h3 class="guide-step-title">{{ step.title }}</h3>
+              </div>
+              <p class="guide-step-desc">{{ step.desc }}</p>
+              <!-- Carte Stripe test -->
+              <div v-if="step.stripeTest" class="guide-stripe-test">
+                <div class="guide-stripe-test-header">
+                  <span>💳</span>
+                  <strong>Carte de test Stripe</strong>
+                  <span class="guide-badge-test">Mode TEST</span>
+                </div>
+                <div class="guide-stripe-fields">
+                  <div class="guide-stripe-field">
+                    <span class="guide-stripe-label">Numéro</span>
+                    <div class="guide-stripe-val-row">
+                      <code class="guide-stripe-val">4242 4242 4242 4242</code>
+                      <button class="guide-copy-btn" @click="copy('4242424242424242', 'card')">
+                        {{ copied === 'card' ? '✓' : '📋' }}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="guide-stripe-field">
+                    <span class="guide-stripe-label">Expiry</span>
+                    <code class="guide-stripe-val">12/34</code>
+                  </div>
+                  <div class="guide-stripe-field">
+                    <span class="guide-stripe-label">CVC</span>
+                    <code class="guide-stripe-val">123</code>
+                  </div>
+                </div>
+                <p class="guide-stripe-note">⚠️ Ces données sont uniquement pour tester. Aucun vrai paiement ne sera débité.</p>
+              </div>
+              <!-- Aperçu lien -->
+              <div v-if="step.preview" class="guide-preview-hint">
+                <span>👁️</span> Votre store sera accessible à : <code>mronlinestores.com/#/votre-slug</code>
               </div>
             </div>
-            <button class="guide-close" @click="open = false">✕</button>
           </div>
 
-          <!-- Tabs plan -->
-          <div class="guide-tabs">
-            <button
-              class="guide-tab"
-              :class="{ active: plan === 'free' }"
-              @click="plan = 'free'"
-            >
-              <span class="guide-tab-icon">🆓</span>
-              <span>Plan Gratuit</span>
-            </button>
-            <button
-              class="guide-tab"
-              :class="{ active: plan === 'pro' }"
-              @click="plan = 'pro'"
-            >
-              <span class="guide-tab-icon">⭐</span>
-              <span>Plan Pro</span>
-            </button>
-          </div>
+        </div>
 
-          <!-- ══ PLAN GRATUIT ══════════════════════════════ -->
-          <div v-if="plan === 'free'" class="guide-content">
-
-            <div class="guide-plan-badge free">🆓 Plan Gratuit — Commencez sans carte bancaire</div>
-
-            <!-- Étapes -->
-            <div class="guide-steps">
-
-              <div v-for="(step, i) in freeSteps" :key="i" class="guide-step">
-                <div class="guide-step-left">
-                  <div class="guide-step-num" :style="{ background: step.color }">{{ i + 1 }}</div>
-                  <div class="guide-step-line" v-if="i < freeSteps.length - 1"></div>
-                </div>
-                <div class="guide-step-body">
-                  <div class="guide-step-header">
-                    <span class="guide-step-icon">{{ step.icon }}</span>
-                    <h3 class="guide-step-title">{{ step.title }}</h3>
-                  </div>
-                  <p class="guide-step-desc">{{ step.desc }}</p>
-                  <!-- Carte Stripe test -->
-                  <div v-if="step.stripeTest" class="guide-stripe-test">
-                    <div class="guide-stripe-test-header">
-                      <span>💳</span>
-                      <strong>Carte de test Stripe</strong>
-                      <span class="guide-badge-test">Mode TEST</span>
-                    </div>
-                    <div class="guide-stripe-fields">
-                      <div class="guide-stripe-field">
-                        <span class="guide-stripe-label">Numéro</span>
-                        <div class="guide-stripe-val-row">
-                          <code class="guide-stripe-val">4242 4242 4242 4242</code>
-                          <button class="guide-copy-btn" @click="copy('4242424242424242', 'card')">
-                            {{ copied === 'card' ? '✓' : '📋' }}
-                          </button>
-                        </div>
-                      </div>
-                      <div class="guide-stripe-field">
-                        <span class="guide-stripe-label">Expiry</span>
-                        <code class="guide-stripe-val">12/34</code>
-                      </div>
-                      <div class="guide-stripe-field">
-                        <span class="guide-stripe-label">CVC</span>
-                        <code class="guide-stripe-val">123</code>
-                      </div>
-                    </div>
-                    <p class="guide-stripe-note">⚠️ Ces données sont uniquement pour tester. Aucun vrai paiement ne sera débité.</p>
-                  </div>
-                  <!-- Aperçu lien -->
-                  <div v-if="step.preview" class="guide-preview-hint">
-                    <span>👁️</span> Votre store sera accessible à : <code>mronlinestores.com/#/votre-slug</code>
-                  </div>
-                </div>
-              </div>
-
+        <!-- Limites plan free -->
+        <div class="guide-limits">
+          <h4 class="guide-limits-title">📋 Limites du plan Gratuit</h4>
+          <div class="guide-limits-grid">
+            <div class="guide-limit-item">
+              <span class="guide-limit-icon limit-ok">✅</span>
+              <span>Store en ligne</span>
             </div>
+            <div class="guide-limit-item">
+              <span class="guide-limit-icon limit-ok">✅</span>
+              <span>Paiements test Stripe</span>
+            </div>
+            <div class="guide-limit-item">
+              <span class="guide-limit-icon limit-ok">✅</span>
+              <span>Assistant IA</span>
+            </div>
+            <div class="guide-limit-item">
+              <span class="guide-limit-icon limit-no">❌</span>
+              <span>Paiements réels</span>
+            </div>
+            <div class="guide-limit-item">
+              <span class="guide-limit-icon limit-no">❌</span>
+              <span>Domaine personnalisé</span>
+            </div>
+            <div class="guide-limit-item">
+              <span class="guide-limit-icon limit-no">❌</span>
+              <span>Stripe Connect sécurisé</span>
+            </div>
+          </div>
+          <div class="guide-upgrade-hint">
+            💡 Passez au <strong>Plan Pro</strong> pour accepter de vrais paiements et connecter votre domaine.
+          </div>
+        </div>
 
-            <!-- Limites plan free -->
-            <div class="guide-limits">
-              <h4 class="guide-limits-title">📋 Limites du plan Gratuit</h4>
-              <div class="guide-limits-grid">
-                <div class="guide-limit-item">
-                  <span class="guide-limit-icon limit-ok">✅</span>
-                  <span>Store en ligne</span>
+      </div>
+
+      <!-- ══ PLAN PRO ══════════════════════════════════ -->
+      <div v-if="plan === 'pro'" class="guide-content">
+
+        <div class="guide-plan-badge pro">⭐ Plan Pro — Paiements réels, domaine personnalisé</div>
+
+        <div class="guide-steps">
+          <div v-for="(step, i) in proSteps" :key="i" class="guide-step">
+            <div class="guide-step-left">
+              <div class="guide-step-num" :style="{ background: step.color }">{{ i + 1 }}</div>
+              <div class="guide-step-line" v-if="i < proSteps.length - 1"></div>
+            </div>
+            <div class="guide-step-body">
+              <div class="guide-step-header">
+                <span class="guide-step-icon">{{ step.icon }}</span>
+                <h3 class="guide-step-title">{{ step.title }}</h3>
+              </div>
+              <p class="guide-step-desc">{{ step.desc }}</p>
+
+              <!-- Stripe Connect block -->
+              <div v-if="step.stripeConnect" class="guide-stripe-connect">
+                <div class="guide-stripe-connect-header">
+                  <img src="https://cdn.brandfetch.io/stripe.com/w/512/h/512/logo" class="guide-stripe-logo" alt="Stripe"/>
+                  <strong>Stripe Connect — Paiements sécurisés</strong>
                 </div>
-                <div class="guide-limit-item">
-                  <span class="guide-limit-icon limit-ok">✅</span>
-                  <span>Paiements test Stripe</span>
+                <div class="guide-connect-steps">
+                  <div class="guide-connect-step">
+                    <span class="guide-connect-num">1</span>
+                    <p>Depuis votre <strong>Dashboard</strong>, cliquez sur <strong>"Connecter Stripe"</strong></p>
+                  </div>
+                  <div class="guide-connect-step">
+                    <span class="guide-connect-num">2</span>
+                    <p>Vous êtes redirigé vers <strong>Stripe.com</strong> — créez ou connectez votre compte Stripe</p>
+                  </div>
+                  <div class="guide-connect-step">
+                    <span class="guide-connect-num">3</span>
+                    <p>Renseignez vos informations bancaires <strong>directement chez Stripe</strong> (jamais sur notre plateforme)</p>
+                  </div>
+                  <div class="guide-connect-step">
+                    <span class="guide-connect-num">4</span>
+                    <p>Une fois validé, vos clients paient et <strong>les fonds arrivent directement</strong> sur votre compte bancaire</p>
+                  </div>
                 </div>
-                <div class="guide-limit-item">
-                  <span class="guide-limit-icon limit-ok">✅</span>
-                  <span>Assistant IA</span>
+                <div class="guide-security-badges">
+                  <span class="guide-security-badge">🔒 SSL/TLS</span>
+                  <span class="guide-security-badge">🛡️ PCI-DSS</span>
+                  <span class="guide-security-badge">🏦 Virement direct</span>
+                  <span class="guide-security-badge">✅ KYC Stripe</span>
                 </div>
-                <div class="guide-limit-item">
-                  <span class="guide-limit-icon limit-no">❌</span>
-                  <span>Paiements réels</span>
-                </div>
-                <div class="guide-limit-item">
-                  <span class="guide-limit-icon limit-no">❌</span>
-                  <span>Domaine personnalisé</span>
-                </div>
-                <div class="guide-limit-item">
-                  <span class="guide-limit-icon limit-no">❌</span>
-                  <span>Stripe Connect sécurisé</span>
+                <p class="guide-connect-warning">
+                  ⚠️ <strong>Important :</strong> Nous ne stockons jamais vos coordonnées bancaires. Tout est géré directement par Stripe dans un environnement sécurisé et certifié.
+                </p>
+              </div>
+
+              <!-- Domaine block -->
+              <div v-if="step.domain" class="guide-domain-hint">
+                <div class="guide-domain-row">
+                  <span>🌐</span>
+                  <div>
+                    <p class="guide-domain-title">Configuration DNS</p>
+                    <p class="guide-domain-desc">Ajoutez les serveurs NS fournis dans votre Dashboard chez votre registrar (GoDaddy, Namecheap, OVH...)</p>
+                    <p class="guide-domain-note">⏱️ La propagation DNS prend 24 à 48 heures.</p>
+                  </div>
                 </div>
               </div>
-              <div class="guide-upgrade-hint">
-                💡 Passez au <strong>Plan Pro</strong> pour accepter de vrais paiements et connecter votre domaine.
+
+              <!-- Aperçu lien -->
+              <div v-if="step.preview" class="guide-preview-hint">
+                <span>👁️</span> Votre store sera accessible à : <code>www.votre-domaine.com</code>
               </div>
             </div>
-
           </div>
+        </div>
 
-          <!-- ══ PLAN PRO ══════════════════════════════════ -->
-          <div v-if="plan === 'pro'" class="guide-content">
-
-            <div class="guide-plan-badge pro">⭐ Plan Pro — Paiements réels, domaine personnalisé</div>
-
-            <div class="guide-steps">
-              <div v-for="(step, i) in proSteps" :key="i" class="guide-step">
-                <div class="guide-step-left">
-                  <div class="guide-step-num" :style="{ background: step.color }">{{ i + 1 }}</div>
-                  <div class="guide-step-line" v-if="i < proSteps.length - 1"></div>
-                </div>
-                <div class="guide-step-body">
-                  <div class="guide-step-header">
-                    <span class="guide-step-icon">{{ step.icon }}</span>
-                    <h3 class="guide-step-title">{{ step.title }}</h3>
-                  </div>
-                  <p class="guide-step-desc">{{ step.desc }}</p>
-
-                  <!-- Stripe Connect block -->
-                  <div v-if="step.stripeConnect" class="guide-stripe-connect">
-                    <div class="guide-stripe-connect-header">
-                      <img src="https://cdn.brandfetch.io/stripe.com/w/512/h/512/logo" class="guide-stripe-logo" alt="Stripe"/>
-                      <strong>Stripe Connect — Paiements sécurisés</strong>
-                    </div>
-                    <div class="guide-connect-steps">
-                      <div class="guide-connect-step">
-                        <span class="guide-connect-num">1</span>
-                        <p>Depuis votre <strong>Dashboard</strong>, cliquez sur <strong>"Connecter Stripe"</strong></p>
-                      </div>
-                      <div class="guide-connect-step">
-                        <span class="guide-connect-num">2</span>
-                        <p>Vous êtes redirigé vers <strong>Stripe.com</strong> — créez ou connectez votre compte Stripe</p>
-                      </div>
-                      <div class="guide-connect-step">
-                        <span class="guide-connect-num">3</span>
-                        <p>Renseignez vos informations bancaires <strong>directement chez Stripe</strong> (jamais sur notre plateforme)</p>
-                      </div>
-                      <div class="guide-connect-step">
-                        <span class="guide-connect-num">4</span>
-                        <p>Une fois validé, vos clients paient et <strong>les fonds arrivent directement</strong> sur votre compte bancaire</p>
-                      </div>
-                    </div>
-                    <div class="guide-security-badges">
-                      <span class="guide-security-badge">🔒 SSL/TLS</span>
-                      <span class="guide-security-badge">🛡️ PCI-DSS</span>
-                      <span class="guide-security-badge">🏦 Virement direct</span>
-                      <span class="guide-security-badge">✅ KYC Stripe</span>
-                    </div>
-                    <p class="guide-connect-warning">
-                      ⚠️ <strong>Important :</strong> Nous ne stockons jamais vos coordonnées bancaires. Tout est géré directement par Stripe dans un environnement sécurisé et certifié.
-                    </p>
-                  </div>
-
-                  <!-- Domaine block -->
-                  <div v-if="step.domain" class="guide-domain-hint">
-                    <div class="guide-domain-row">
-                      <span>🌐</span>
-                      <div>
-                        <p class="guide-domain-title">Configuration DNS</p>
-                        <p class="guide-domain-desc">Ajoutez les serveurs NS fournis dans votre Dashboard chez votre registrar (GoDaddy, Namecheap, OVH...)</p>
-                        <p class="guide-domain-note">⏱️ La propagation DNS prend 24 à 48 heures.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Aperçu lien -->
-                  <div v-if="step.preview" class="guide-preview-hint">
-                    <span>👁️</span> Votre store sera accessible à : <code>www.votre-domaine.com</code>
-                  </div>
-                </div>
-              </div>
+        <!-- Avantages Pro -->
+        <div class="guide-limits">
+          <h4 class="guide-limits-title">⭐ Tout ce qu'inclut le Plan Pro</h4>
+          <div class="guide-limits-grid">
+            <div class="guide-limit-item" v-for="f in proFeatures" :key="f">
+              <span class="guide-limit-icon limit-ok">✅</span>
+              <span>{{ f }}</span>
             </div>
-
-            <!-- Avantages Pro -->
-            <div class="guide-limits">
-              <h4 class="guide-limits-title">⭐ Tout ce qu'inclut le Plan Pro</h4>
-              <div class="guide-limits-grid">
-                <div class="guide-limit-item" v-for="f in proFeatures" :key="f">
-                  <span class="guide-limit-icon limit-ok">✅</span>
-                  <span>{{ f }}</span>
-                </div>
-              </div>
-            </div>
-
           </div>
+        </div>
 
-          <!-- Footer -->
-          <div class="guide-footer">
-            <p class="guide-footer-text">Des questions ? Notre assistant IA est disponible sur chaque store pour vous aider.</p>
-            <button class="guide-footer-btn" @click="open = false">
-              Commencer maintenant →
-            </button>
-          </div>
+      </div>
 
-        //</div>
-     // </div>
-    </Transition>
+      <!-- Footer -->
+      <div class="guide-footer">
+        <p class="guide-footer-text">Des questions ? Notre assistant IA est disponible sur chaque store pour vous aider.</p>
+        <button class="guide-footer-btn">
+          Commencer maintenant →
+        </button>
+      </div>
+
+    </div>
 
   </div>
 </template>
@@ -241,7 +228,6 @@
 <script setup>
 import { ref } from "vue"
 
-const open   = ref(false)
 const plan   = ref("free")
 const copied = ref("")
 
@@ -347,34 +333,18 @@ const proFeatures = [
 </script>
 
 <style scoped>
-/* ── Trigger ─────────────────────────────────────────────── */
-.guide-trigger {
-  display: inline-flex; align-items: center; gap: 10px;
-  background: linear-gradient(135deg, rgba(108,99,255,.12), rgba(168,85,247,.12));
-  border: 1px solid rgba(108,99,255,.3);
-  color: #a78bfa; border-radius: 12px; padding: 12px 20px;
-  font-size: 14px; font-weight: 600; cursor: pointer;
+/* ── Root ────────────────────────────────────────────────── */
+.guide-root {
   font-family: 'DM Sans', sans-serif;
-  transition: all .2s; width: 100%;
-  justify-content: space-between;
-}
-.guide-trigger:hover { background: linear-gradient(135deg, rgba(108,99,255,.2), rgba(168,85,247,.2)); border-color: rgba(108,99,255,.5); }
-.guide-trigger-icon  { font-size: 18px; }
-.guide-trigger-arrow { font-size: 16px; opacity: .7; }
-
-/* ── Overlay ─────────────────────────────────────────────── */
-.guide-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.7);
-  z-index: 5000; display: flex; align-items: center; justify-content: center;
-  padding: 16px;
+  color: #f1f5f9;
 }
 
-/* ── Modal ───────────────────────────────────────────────── */
+/* ── Modal (now just a styled container) ─────────────────── */
 .guide-modal {
   background: #0f0f1a;
   border: 1px solid rgba(108,99,255,.25);
   border-radius: 20px; width: 100%; max-width: 620px;
-  max-height: 88vh; overflow: hidden;
+  overflow: hidden;
   display: flex; flex-direction: column;
   box-shadow: 0 24px 80px rgba(0,0,0,.6);
 }
@@ -391,13 +361,6 @@ const proFeatures = [
 .guide-logo        { font-size: 32px; }
 .guide-title       { font-size: 18px; font-weight: 800; color: #f1f5f9; margin: 0 0 2px; }
 .guide-subtitle    { font-size: 12px; color: #64748b; margin: 0; }
-.guide-close {
-  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
-  color: #94a3b8; width: 32px; height: 32px; border-radius: 50%;
-  cursor: pointer; font-size: 14px; transition: .15s;
-  display: flex; align-items: center; justify-content: center;
-}
-.guide-close:hover { background: rgba(255,255,255,.14); color: #fff; }
 
 /* ── Tabs ────────────────────────────────────────────────── */
 .guide-tabs {
@@ -606,11 +569,4 @@ const proFeatures = [
   transition: opacity .15s; white-space: nowrap;
 }
 .guide-footer-btn:hover { opacity: .85; }
-
-/* ── Transitions ─────────────────────────────────────────── */
-.guide-fade-enter-active, .guide-fade-leave-active { transition: all .25s ease; }
-.guide-fade-enter-from, .guide-fade-leave-to { opacity: 0; }
-.guide-fade-enter-from .guide-modal, .guide-fade-leave-to .guide-modal {
-  transform: scale(.95) translateY(10px);
-}
 </style>
