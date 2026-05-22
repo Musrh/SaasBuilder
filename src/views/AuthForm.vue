@@ -54,6 +54,16 @@
           <span class="af-badge">🛟 Support inclus</span>
         </div>
 
+        <div class="af-badges">
+          
+          
+     button @click="goToGuide" class="af-back">
+          Comment utiliser se site
+          </button>
+        
+        </div>
+        
+
         <!-- Offres -->
         <h2 class="af-offers-title">Nos offres</h2>
         <div class="af-plans">
@@ -463,6 +473,8 @@ const resendVerification = async () => {
 }
 
 const goToPlans = () => router.push("/")
+
+const goToGuide = () => router.push("/guide")
 </script>
 
 <style scoped>
