@@ -3,6 +3,7 @@ import { createRouter, createWebHashHistory } from "vue-router"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { getFirestore, doc, getDoc } from "firebase/firestore"
 
+import Guide from "./views/guide.vue"
 import SlugSetup      from "./views/Slugsetup.vue"
 import AuthForm       from "./views/AuthForm.vue"
 import Dashboard      from "./views/Dashboard.vue"
@@ -35,6 +36,9 @@ const routes = [
   // ======================
   { path: "/", name: "auth", component: AuthForm },
 
+  //Page Guide Saas
+  { path: "/guide", name: "guide", component: Guide },
+  
   // ======================
   // PAGES LÉGALES (publiques)
   // ======================
