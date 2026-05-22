@@ -59,9 +59,10 @@
          <span class="af-badge"> 
      <button @click="goToGuide" class="af-back">
           Comment utiliser se site
-       </span>
+      
         
      </button>
+           </span>
         
         </div>
         
