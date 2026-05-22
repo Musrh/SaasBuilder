@@ -1,17 +1,17 @@
 <template>
   <div class="guide-root">
 
-    <!-- ── Bouton déclencheur ──────────────────────────────── -->
-    <button class="guide-trigger" @click="open = true">
-      <span class="guide-trigger-icon">🗺️</span>
-      <span class="guide-trigger-label">Guide de démarrage</span>
-      <span class="guide-trigger-arrow">→</span>
-    </button>
+   // <!-- ── Bouton déclencheur ──────────────────────────────── -->
+   // <button class="guide-trigger" @click="open = true">
+     // <span class="guide-trigger-icon">🗺️</span>
+   //   <span class="guide-trigger-label">Guide de démarrage</span>
+     // <span class="guide-trigger-arrow">→</span>
+  //  </button>
 
-    <!-- ── Modal ──────────────────────────────────────────── -->
-    <Transition name="guide-fade">
-      <div v-if="open" class="guide-overlay" @click.self="open = false">
-        <div class="guide-modal">
+  //  <!-- ── Modal ──────────────────────────────────────────── -->
+  //  <Transition name="guide-fade">
+     // <div v-if="open" class="guide-overlay" @click.self="open = false">
+       // <div class="guide-modal">
 
           <!-- Header -->
           <div class="guide-header">
@@ -231,8 +231,8 @@
             </button>
           </div>
 
-        </div>
-      </div>
+        //</div>
+     // </div>
     </Transition>
 
   </div>
