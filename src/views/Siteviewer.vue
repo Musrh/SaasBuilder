@@ -172,6 +172,8 @@ const cartCurrency = computed(() => cart.value[0]?.currency || "€")
 const currentPage  = computed(() => site.value?.pages?.[currentPageIndex.value] || site.value?.pages?.[0])
 
 const addToCart = (product) => {
+  // Bloquer si Pro non vérifié
+  if (!paymentAllowed.value) return
   if (!svCurrentUser.value) {
     svShowAuth.value = true
     svAuthMode.value = "login"
@@ -682,6 +684,7 @@ const svOpenProfile = async () => {
 }
 
 const initPaypal = async () => {
+  if (!paymentAllowed.value) return
   const cfg = storePayConfig.value?.paypal
   if (!cfg?.clientId || cfg.clientId.length < 5) {
     payError.value = "Paiement PayPal non configuré pour ce store."
@@ -746,6 +749,7 @@ watch([showPayModal, payProvider], ([open, provider]) => {
 })
 
 const payWithStripe = async () => {
+  if (!paymentAllowed.value) return
   const cfg = storePayConfig.value?.stripe
 
   if (!svCurrentUser.value) {
@@ -1031,7 +1035,10 @@ const saveOrder = async (provider, transactionId) => {
                 <div class="sv-product-desc">{{ p.description }}</div>
                 <div class="sv-product-footer">
                   <span class="sv-product-price">{{ p.price }}{{ p.currency }}</span>
-                  <span class="sv-product-btn-wrap"><button class="sv-product-btn" @click.stop="addToCart(p)">🛒 {{ svT?.buy || 'Acheter' }}</button></span>
+                  <span class="sv-product-btn-wrap">
+                    <button v-if="paymentAllowed" class="sv-product-btn" @click.stop="addToCart(p)">🛒 {{ svT?.buy || 'Acheter' }}</button>
+                    <button v-else class="sv-product-btn sv-buy-suspended" disabled>🔒 Indisponible</button>
+                  </span>
                 </div>
               </div>
             </div>
