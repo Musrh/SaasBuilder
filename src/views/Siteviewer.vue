@@ -74,11 +74,18 @@ const currentPageIndex = ref(0)
 
 const storePayConfig = ref({ stripe: null, paypal: null })
 
-const storeOwner = ref({ plan: "free", paye: false })
+const storeOwner = ref({ plan: "free", paye: false, stripeVerified: false })
 
 const isPro = computed(() =>
   storeOwner.value.plan === "pro" || storeOwner.value.paye === true
 )
+
+// Plan Free  → paiement test toujours autorisé
+// Plan Pro   → autorisé seulement si stripeVerified === true (validé par admin SaaS)
+const paymentAllowed = computed(() => {
+  if (!isPro.value) return true
+  return storeOwner.value.stripeVerified === true
+})
 
 const BACKEND_URL = computed(() =>
   isPro.value
@@ -253,7 +260,7 @@ const loadSite = async () => {
         site.value           = data.siteData
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
-        storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false }
+        storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false, stripeVerified: data.stripeVerified === true }
         // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
         if (data.lang && !sessionStorage.getItem("sv_lang_override")) {
           svLang.value = data.lang
@@ -298,7 +305,7 @@ const loadSite = async () => {
           site.value           = rd.siteData
           siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
           resolvedUid.value    = realUid
-          storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false }
+          storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false, stripeVerified: rd.stripeVerified === true }
           // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
           if (rd.lang && !sessionStorage.getItem("sv_lang_override")) {
             svLang.value = rd.lang
@@ -1045,7 +1052,13 @@ const saveOrder = async (provider, transactionId) => {
           <h2 class="sv-payment-title">{{ s.title }}</h2>
           <p  class="sv-payment-desc">{{ s.description }}</p>
           <div class="sv-payment-amount">{{ s.amount }}{{ s.currency }}</div>
-          <div class="sv-payment-btns">
+          <!-- Plan Pro non vérifié : paiement suspendu -->
+          <div v-if="!paymentAllowed" class="sv-payment-suspended">
+            <div class="sv-payment-suspended-icon">🔒</div>
+            <p class="sv-payment-suspended-title">Paiement temporairement suspendu</p>
+            <p class="sv-payment-suspended-msg">Le propriétaire de ce store finalise la configuration des paiements. Revenez bientôt.</p>
+          </div>
+          <div v-else class="sv-payment-btns">
             <button class="sv-pay-btn sv-stripe"
               @click="cart=[{...s, id:'direct', qty:1, price:s.amount}]; payProvider='stripe'; showPayModal=true">
               {{ svT.payWithStripe }}
@@ -1580,5 +1593,25 @@ const saveOrder = async (provider, transactionId) => {
   .sv-cart-item{grid-template-columns:40px 1fr auto 24px}
   .sv-ci-subtotal{display:none}
   .sv-user-name{display:none}.sv-login-btn{padding:7px 10px;font-size:11px}
+}
+
+/* ── Paiement suspendu Pro non vérifié ──────────────────── */
+.sv-payment-suspended {
+  text-align: center; padding: 24px 20px; margin-top: 12px;
+  background: rgba(239,68,68,.06);
+  border: 1px dashed rgba(239,68,68,.3); border-radius: 14px;
+}
+.sv-payment-suspended-icon  { font-size: 28px; margin-bottom: 8px; }
+.sv-payment-suspended-title { font-size: 15px; font-weight: 700; color: #ef4444; margin: 0 0 6px; }
+.sv-payment-suspended-msg   { font-size: 13px; color: #6b7280; margin: 0; line-height: 1.6; }
+.sv-buy-suspended {
+  background: #e5e7eb !important; color: #9ca3af !important;
+  cursor: not-allowed !important; border-color: transparent !important;
+}
+.sv-cart-suspended {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 20px; border-radius: 10px; font-size: 13px;
+  font-weight: 600; color: #ef4444;
+  background: rgba(239,68,68,.06); border: 1px dashed rgba(239,68,68,.25);
 }
 </style>
