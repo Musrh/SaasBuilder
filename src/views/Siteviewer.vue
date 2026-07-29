@@ -836,6 +836,15 @@ const payWithStripe = async () => {
     if (data.url) {
       showCart.value     = false
       showPayModal.value = false
+
+      // ─────────────────────────────────────────────────────
+      // CORRECTION : poser le flag sessionStorage AVANT la
+      // redirection vers Stripe. PaymentSuccess.vue vérifiera
+      // ce flag pour s'assurer que l'utilisateur vient bien
+      // d'un vrai flux de paiement et non du bouton retour.
+      // ─────────────────────────────────────────────────────
+      sessionStorage.setItem("stripe_payment_initiated", Date.now().toString())
+
       window.location.href = data.url
       return
     }
