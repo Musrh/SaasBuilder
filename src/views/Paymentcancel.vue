@@ -1,7 +1,7 @@
 <!-- ============================================================
-  SaaasGenerator/src/views/PaymentCancel.vue
+  PaymentCancel.vue — SaasBuilder/src/views/PaymentCancel.vue
   Affiché si un client annule son paiement dans un store.
-  Permet de retourner au store pour réessayer.
+  Permet de retourner à la boutique pour réessayer.
 ============================================================ -->
 <template>
   <div class="pc-root">
@@ -13,7 +13,7 @@
 
       <div class="pc-actions">
         <button class="pc-btn-primary" @click="goBack">
-          🛒 Retourner au panier
+          🛒 Retourner à la boutique
         </button>
         <button class="pc-btn-sec" @click="goHome">
           Accueil
@@ -31,17 +31,45 @@ import { useRouter, useRoute } from "vue-router"
 const router = useRouter()
 const route  = useRoute()
 
-const goBack = () => {
-  // Essayer d'abord depuis localStorage (Stripe ignore les params après #)
-  const siteUid = localStorage.getItem("stripeSiteSlug")
-    || localStorage.getItem("stripeOwnerUid")
-    || route.query.uid
-  // Ne pas supprimer le localStorage ici (PaymentSuccess peut encore en avoir besoin)
-  if (siteUid) router.push(`/site/${siteUid}`)
-  else router.push("/")
+// ─────────────────────────────────────────────────────────────
+// CORRECTION : quand l'utilisateur appuie sur le bouton retour
+// depuis Stripe (ou clique "Annuler"), on le renvoie sur la
+// PAGE D'ACCUEIL de la boutique (le slug), pas vers /site/{uid}.
+//
+// On nettoie aussi pendingStripeOrder pour que PaymentSuccess
+// ne s'affiche plus si l'utilisateur navigue accidentellement.
+// ─────────────────────────────────────────────────────────────
+const cleanStorage = () => {
+  localStorage.removeItem("pendingStripeOrder")
+  localStorage.removeItem("stripeOwnerUid")
+  sessionStorage.removeItem("stripe_payment_initiated")
+  // On garde stripeSiteSlug un peu pour que goBack puisse l'utiliser
 }
 
-const goHome = () => router.push("/")
+const goBack = () => {
+  // Priorité au slug (URL conviviale) sur l'UID brut
+  const siteSlug =
+    localStorage.getItem("stripeSiteSlug") ||
+    route.query.slug ||
+    route.query.uid ||
+    localStorage.getItem("stripeOwnerUid") ||
+    ""
+
+  cleanStorage()
+  localStorage.removeItem("stripeSiteSlug")
+
+  if (siteSlug) {
+    router.push(`/${siteSlug}`)
+  } else {
+    router.push("/")
+  }
+}
+
+const goHome = () => {
+  cleanStorage()
+  localStorage.removeItem("stripeSiteSlug")
+  router.push("/")
+}
 </script>
 
 <style scoped>
