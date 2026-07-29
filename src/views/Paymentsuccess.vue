@@ -91,7 +91,7 @@
 
     </div>
   </div>
-</template> <!-- ✅ CORRECTION ICI -->
+</template>
 
 <script setup>
 import { ref, onMounted } from "vue"
@@ -106,11 +106,45 @@ const auth = getAuth()
 
 const orderData = ref(null)
 const storeSlug = ref("")
-const saving = ref(true)   // ✅ AJOUT
-const saved = ref(false)   // ✅ AJOUT
+const saving = ref(true)
+const saved = ref(false)
 
 onMounted(() => {
+  // ─────────────────────────────────────────────────────────────
+  // GARDE ANTI-RETOUR ARRIÈRE
+  //
+  // Quand l'utilisateur appuie sur le bouton retour depuis la page
+  // Stripe sans finaliser le paiement, le navigateur revient sur
+  // cette page. On vérifie deux conditions :
+  //
+  //   1. "stripe_payment_initiated" en sessionStorage : positionné
+  //      par SiteViewer juste avant la redirection vers Stripe.
+  //      Persiste pendant toute la session de l'onglet.
+  //
+  //   2. "pendingStripeOrder" en localStorage : positionné par
+  //      SiteViewer avec les données de la commande.
+  //
+  // Si aucune des deux n'est présente, l'utilisateur n'arrive PAS
+  // d'un vrai paiement → on le redirige vers la page d'accueil.
+  // ─────────────────────────────────────────────────────────────
+  const paymentFlag = sessionStorage.getItem("stripe_payment_initiated")
   const raw = localStorage.getItem("pendingStripeOrder")
+
+  if (!paymentFlag && !raw) {
+    // Pas de paiement initié — navigation directe ou bouton retour
+    // Récupérer le slug pour rediriger vers la bonne boutique
+    const fallbackSlug =
+      route.query.slug ||
+      localStorage.getItem("stripeSiteSlug") ||
+      ""
+    router.replace(fallbackSlug ? `/${fallbackSlug}` : "/")
+    return
+  }
+
+  // Supprimer le flag sessionStorage (usage unique)
+  sessionStorage.removeItem("stripe_payment_initiated")
+
+  // Charger les données de commande
   if (raw) {
     try {
       orderData.value = JSON.parse(raw)
@@ -122,6 +156,7 @@ onMounted(() => {
     localStorage.getItem("stripeSiteSlug") ||
     orderData.value?.slug ||
     orderData.value?.storeSlug ||
+    orderData.value?.siteSlug ||
     ""
 
   onAuthStateChanged(auth, async (user) => {
@@ -186,6 +221,6 @@ function goBack() {
 .ps-item-price{font-size:12px;font-weight:700;color:#10b981}
 
 .ps-actions{display:flex}
-.ps-btn-primary{flex:1;background:#10b981;color:white;border:none;border-radius:11px;padding:13px;cursor:pointer}
+.ps-btn-primary{flex:1;background:#10b981;color:white;border:none;border-radius:11px;padding:13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;transition:background .15s}
 .ps-btn-primary:hover{background:#059669}
 </style>
