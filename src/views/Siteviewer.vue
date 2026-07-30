@@ -795,11 +795,23 @@ const payWithStripe = async () => {
     localStorage.setItem("stripeOwnerUid",  resolvedUid.value)
     localStorage.setItem("stripeSiteSlug",  props.slug || props.uid || resolvedUid.value)
 
+    // ─────────────────────────────────────────────────────────────
+    // CORRECTION bouton retour Android : token aléatoire à usage unique.
+    // Ce token est stocké en sessionStorage ET ajouté à l'URL de succès
+    // Stripe (?ptoken=...). PaymentSuccess.vue vérifie que les deux
+    // correspondent. Un historique ancien aura un token différent →
+    // redirection immédiate vers la boutique au lieu d'afficher
+    // "Commande confirmée !" à tort.
+    // ─────────────────────────────────────────────────────────────
+    const payToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+    sessionStorage.setItem("stripe_pay_token", payToken)
+
     const origin     = "https://mronlinestores.com"
     const slug       = props.slug || props.uid || resolvedUid.value
     const ownerUid   = resolvedUid.value
-    const successUrl = cfg?.successUrl ||
-      `${origin}/?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
+    const successUrl = cfg?.successUrl
+      ? `${cfg.successUrl}${cfg.successUrl.includes('?') ? '&' : '?'}ptoken=${payToken}`
+      : `${origin}/?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&ptoken=${payToken}`
     const cancelUrl  = cfg?.cancelUrl  || `${origin}/${slug}`
 
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
