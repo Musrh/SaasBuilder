@@ -111,38 +111,53 @@ const saved = ref(false)
 
 onMounted(() => {
   // ─────────────────────────────────────────────────────────────
-  // GARDE ANTI-RETOUR ARRIÈRE
+  // GARDE ANTI-RETOUR ARRIÈRE — TOKEN À USAGE UNIQUE
   //
-  // Quand l'utilisateur appuie sur le bouton retour depuis la page
-  // Stripe sans finaliser le paiement, le navigateur revient sur
-  // cette page. On vérifie deux conditions :
+  // Problème : sessionStorage persiste quand l'utilisateur navigue
+  // vers Stripe (autre domaine) et revient par le bouton retour.
+  // Un simple flag "initié" reste donc présent, la garde passait.
   //
-  //   1. "stripe_payment_initiated" en sessionStorage : positionné
-  //      par SiteViewer juste avant la redirection vers Stripe.
-  //      Persiste pendant toute la session de l'onglet.
+  // Solution : SiteViewer génère un token aléatoire avant la
+  // redirection Stripe et le stocke dans sessionStorage ET dans
+  // l'URL de succès (?ptoken=...).
   //
-  //   2. "pendingStripeOrder" en localStorage : positionné par
-  //      SiteViewer avec les données de la commande.
+  //   URL de succès réel : /?stripe=ok&...&ptoken=abc123
+  //   Bouton retour      : URL sans ptoken (ou ptoken périmé)
+  //   Historique ancien  : ptoken différent du sessionStorage
   //
-  // Si aucune des deux n'est présente, l'utilisateur n'arrive PAS
-  // d'un vrai paiement → on le redirige vers la page d'accueil.
+  // On compare les deux. En cas de différence → redirection.
+  // Le token est détruit immédiatement après lecture (usage unique).
   // ─────────────────────────────────────────────────────────────
-  const paymentFlag = sessionStorage.getItem("stripe_payment_initiated")
+  const urlToken     = route.query.ptoken || ""
+  const sessionToken = sessionStorage.getItem("stripe_pay_token") || ""
+
+  // Consommer le token immédiatement (usage unique — évite réutilisation)
+  sessionStorage.removeItem("stripe_pay_token")
+  // Nettoyer aussi l'ancien flag hérité des versions précédentes
+  sessionStorage.removeItem("stripe_payment_initiated")
+
   const raw = localStorage.getItem("pendingStripeOrder")
 
-  if (!paymentFlag && !raw) {
-    // Pas de paiement initié — navigation directe ou bouton retour
-    // Récupérer le slug pour rediriger vers la bonne boutique
+  // ── Valider la session de paiement ───────────────────────────
+  // Cas 1 — token présent des deux côtés et identique : paiement réel ✓
+  // Cas 2 — URL sans ptoken mais sessionStorage a un token récent
+  //          (fallback pour les stores avec successUrl personnalisée)
+  // Cas 3 — tout le reste : bouton retour, navigation directe, historique
+  const tokenMatch   = urlToken && sessionToken && urlToken === sessionToken
+  const fallbackValid = !urlToken && sessionToken && raw   // successUrl custom sans ptoken
+
+  if (!tokenMatch && !fallbackValid) {
+    // Paiement non confirmé — nettoyer et rediriger vers la boutique
     const fallbackSlug =
       route.query.slug ||
       localStorage.getItem("stripeSiteSlug") ||
       ""
+    localStorage.removeItem("pendingStripeOrder")
+    localStorage.removeItem("stripeOwnerUid")
+    localStorage.removeItem("stripeSiteSlug")
     router.replace(fallbackSlug ? `/${fallbackSlug}` : "/")
     return
   }
-
-  // Supprimer le flag sessionStorage (usage unique)
-  sessionStorage.removeItem("stripe_payment_initiated")
 
   // Charger les données de commande
   if (raw) {
