@@ -1,7 +1,7 @@
 <!-- ============================================================
-  PaymentCancel.vue — SaasBuilder/src/views/PaymentCancel.vue
+  SaaasGenerator/src/views/PaymentCancel.vue
   Affiché si un client annule son paiement dans un store.
-  Permet de retourner à la boutique pour réessayer.
+  Permet de retourner au store pour réessayer.
 ============================================================ -->
 <template>
   <div class="pc-root">
@@ -13,7 +13,7 @@
 
       <div class="pc-actions">
         <button class="pc-btn-primary" @click="goBack">
-          🛒 Retourner à la boutique
+          🛒 Retourner au panier
         </button>
         <button class="pc-btn-sec" @click="goHome">
           Accueil
@@ -31,45 +31,27 @@ import { useRouter, useRoute } from "vue-router"
 const router = useRouter()
 const route  = useRoute()
 
-// ─────────────────────────────────────────────────────────────
-// CORRECTION : quand l'utilisateur appuie sur le bouton retour
-// depuis Stripe (ou clique "Annuler"), on le renvoie sur la
-// PAGE D'ACCUEIL de la boutique (le slug), pas vers /site/{uid}.
-//
-// On nettoie aussi pendingStripeOrder pour que PaymentSuccess
-// ne s'affiche plus si l'utilisateur navigue accidentellement.
-// ─────────────────────────────────────────────────────────────
-const cleanStorage = () => {
-  localStorage.removeItem("pendingStripeOrder")
-  localStorage.removeItem("stripeOwnerUid")
-  sessionStorage.removeItem("stripe_payment_initiated")
-  // On garde stripeSiteSlug un peu pour que goBack puisse l'utiliser
-}
-
 const goBack = () => {
-  // Priorité au slug (URL conviviale) sur l'UID brut
-  const siteSlug =
-    localStorage.getItem("stripeSiteSlug") ||
-    route.query.slug ||
-    route.query.uid ||
-    localStorage.getItem("stripeOwnerUid") ||
-    ""
+  // Priorité : localStorage (posé juste avant la redirection vers Stripe),
+  // puis les paramètres transmis par Stripe dans le cancel_url.
+  const slug     = localStorage.getItem("stripeSiteSlug") || route.query.slug || ""
+  const ownerUid = localStorage.getItem("stripeOwnerUid") || route.query.owner || route.query.uid || ""
 
-  cleanStorage()
-  localStorage.removeItem("stripeSiteSlug")
+  // Ne pas supprimer le localStorage ici (PaymentSuccess peut encore en avoir besoin
+  // si le client retente le paiement et réussit ensuite).
 
-  if (siteSlug) {
-    router.push(`/${siteSlug}`)
+  if (slug && slug !== ownerUid) {
+    // Slug convivial → route publique "/:slug"
+    router.push(`/${slug}`)
+  } else if (ownerUid) {
+    // Pas de slug distinct : on a un UID Firestore → route "/site/:uid"
+    router.push(`/site/${ownerUid}`)
   } else {
     router.push("/")
   }
 }
 
-const goHome = () => {
-  cleanStorage()
-  localStorage.removeItem("stripeSiteSlug")
-  router.push("/")
-}
+const goHome = () => router.push("/")
 </script>
 
 <style scoped>
@@ -88,4 +70,3 @@ const goHome = () => {
 .pc-btn-sec:hover{background:#e5e7eb}
 .pc-note{font-size:12px;color:#9ca3af}
 </style>
-
