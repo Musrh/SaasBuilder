@@ -21,7 +21,7 @@
 ============================================================ -->
 
 <script setup>
-import { ref, onMounted, computed, watch } from "vue"
+import { ref, onMounted, onUnmounted, computed, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import VoiceAssistantClient from "../components/VoiceAssistantClient.vue"
 import { db } from "../firebase.js"
@@ -153,6 +153,49 @@ const payProvider  = ref("stripe")
 const payProcessing = ref(false)
 const paySuccess   = ref(false)
 const payError     = ref("")
+
+// ── Annulation du panier / paiement ────────────────────────────
+// Permet d'annuler le paiement soit via un bouton dédié, soit en
+// utilisant le bouton "retour" (mobile) ou "précédent" (desktop),
+// sans faire quitter l'utilisateur de la boutique.
+let svCartHistoryPushed = false
+
+function svPushCartHistory() {
+  if (!svCartHistoryPushed) {
+    history.pushState({ svCartModal: true }, "", location.href)
+    svCartHistoryPushed = true
+  }
+}
+
+function cancelPayment() {
+  payError.value       = ""
+  payProcessing.value  = false
+  showPayModal.value   = false
+  showCart.value       = false
+  svCartStep.value      = "cart"
+
+  if (svCartHistoryPushed) {
+    svCartHistoryPushed = false
+    history.back()
+  }
+}
+
+function svHandlePopState() {
+  // Le bouton retour (mobile ou desktop) a été utilisé pendant que
+  // le panier/paiement était ouvert : on l'interprète comme une annulation.
+  if (showCart.value || showPayModal.value) {
+    svCartHistoryPushed = false
+    payError.value      = ""
+    payProcessing.value = false
+    showPayModal.value  = false
+    showCart.value      = false
+    svCartStep.value     = "cart"
+  }
+}
+
+watch(showCart, (isOpen) => {
+  if (isOpen) svPushCartHistory()
+})
 const customerName  = computed({
   get: () => _customerName.value || svCurrentUser.value?.displayName || "",
   set: (v) => { _customerName.value = v }
@@ -393,6 +436,8 @@ watch(
 onMounted(() => {
   loadSite()
 
+  window.addEventListener("popstate", svHandlePopState)
+
   const savedSession = sessionStorage.getItem("svClientSession")
   if (savedSession) {
     try {
@@ -410,6 +455,10 @@ onMounted(() => {
       }
     }
   })
+})
+
+onUnmounted(() => {
+  window.removeEventListener("popstate", svHandlePopState)
 })
 
 const svLogin = async () => {
@@ -795,23 +844,11 @@ const payWithStripe = async () => {
     localStorage.setItem("stripeOwnerUid",  resolvedUid.value)
     localStorage.setItem("stripeSiteSlug",  props.slug || props.uid || resolvedUid.value)
 
-    // ─────────────────────────────────────────────────────────────
-    // CORRECTION bouton retour Android : token aléatoire à usage unique.
-    // Ce token est stocké en sessionStorage ET ajouté à l'URL de succès
-    // Stripe (?ptoken=...). PaymentSuccess.vue vérifie que les deux
-    // correspondent. Un historique ancien aura un token différent →
-    // redirection immédiate vers la boutique au lieu d'afficher
-    // "Commande confirmée !" à tort.
-    // ─────────────────────────────────────────────────────────────
-    const payToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
-    sessionStorage.setItem("stripe_pay_token", payToken)
-
     const origin     = "https://mronlinestores.com"
     const slug       = props.slug || props.uid || resolvedUid.value
     const ownerUid   = resolvedUid.value
-    const successUrl = cfg?.successUrl
-      ? `${cfg.successUrl}${cfg.successUrl.includes('?') ? '&' : '?'}ptoken=${payToken}`
-      : `${origin}/?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&ptoken=${payToken}`
+    const successUrl = cfg?.successUrl ||
+      `${origin}/?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
     const cancelUrl  = cfg?.cancelUrl  || `${origin}/${slug}`
 
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
@@ -848,15 +885,6 @@ const payWithStripe = async () => {
     if (data.url) {
       showCart.value     = false
       showPayModal.value = false
-
-      // ─────────────────────────────────────────────────────
-      // CORRECTION : poser le flag sessionStorage AVANT la
-      // redirection vers Stripe. PaymentSuccess.vue vérifiera
-      // ce flag pour s'assurer que l'utilisateur vient bien
-      // d'un vrai flux de paiement et non du bouton retour.
-      // ─────────────────────────────────────────────────────
-      sessionStorage.setItem("stripe_payment_initiated", Date.now().toString())
-
       window.location.href = data.url
       return
     }
@@ -1148,7 +1176,7 @@ const saveOrder = async (provider, transactionId) => {
     <!-- MODAL PANIER -->
     <Transition name="sv-modal">
       <div v-if="showCart" class="sv-modal-overlay sv-cart-overlay"
-           @click.self="showCart=false; svCartStep='cart'">
+           @click.self="cancelPayment">
         <div class="sv-modal-box sv-cart-box">
 
           <div class="sv-cart-header">
@@ -1160,7 +1188,7 @@ const saveOrder = async (provider, transactionId) => {
                 {{ cartCount }} article{{ cartCount>1?'s':'' }}
               </span>
             </div>
-            <button class="sv-modal-close" @click="showCart=false; svCartStep='cart'">✕</button>
+            <button class="sv-modal-close" @click="cancelPayment">✕</button>
           </div>
 
           <template v-if="svCartStep==='cart'">
@@ -1192,7 +1220,7 @@ const saveOrder = async (provider, transactionId) => {
                 <strong>{{ cartTotal }}{{ cartCurrency }}</strong>
               </div>
               <div class="sv-cart-footer-btns">
-                <button class="sv-btn-sec" @click="showCart=false">{{ svT.cartContinue }}</button>
+                <button class="sv-btn-sec" @click="cancelPayment">{{ svT.cartContinue }}</button>
                 <button class="sv-btn-primary sv-checkout-btn" @click="svCartStep='checkout'">
                   📋 {{ svT.delivery }} →
                 </button>
@@ -1256,11 +1284,16 @@ const saveOrder = async (provider, transactionId) => {
 
             <div v-if="payError" class="sv-pay-error">⚠ {{ payError }}</div>
 
-            <button class="sv-pay-final-btn" @click="payWithStripe" :disabled="payProcessing">
-              <span v-if="payProcessing" class="sv-spinner"></span>
-              <span v-else>💳</span>
-              {{ payProcessing ? svT.checkoutPaying : `${svT.payCard} ${cartTotal}${cartCurrency}` }}
-            </button>
+            <div class="sv-checkout-actions">
+              <button class="sv-cancel-pay-btn" type="button" @click="cancelPayment" :disabled="payProcessing">
+                ✕ Annuler
+              </button>
+              <button class="sv-pay-final-btn" @click="payWithStripe" :disabled="payProcessing">
+                <span v-if="payProcessing" class="sv-spinner"></span>
+                <span v-else>💳</span>
+                {{ payProcessing ? svT.checkoutPaying : `${svT.payCard} ${cartTotal}${cartCurrency}` }}
+              </button>
+            </div>
             <p class="sv-secure-note">{{ svT.checkoutSecure }}</p>
           </template>
 
@@ -1555,6 +1588,12 @@ const saveOrder = async (provider, transactionId) => {
 .sv-checkout-input:focus{border-color:#6c63ff}
 .sv-checkout-select{cursor:pointer}
 .sv-pay-error{margin:0 16px;background:#fef2f2;border:1px solid #fecaca;color:#ef4444;padding:8px 12px;border-radius:8px;font-size:13px;flex-shrink:0}
+.sv-checkout-actions{display:flex;gap:8px;margin:10px 16px;flex-shrink:0}
+.sv-checkout-actions .sv-pay-final-btn{margin:0;width:auto;flex:1 1 auto}
+.sv-cancel-pay-btn{flex:0 0 auto;padding:14px 18px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.sv-cancel-pay-btn:hover:not(:disabled){background:#fee2e2;color:#dc2626;border-color:#fecaca}
+.sv-cancel-pay-btn:disabled{opacity:.5;cursor:not-allowed}
+
 .sv-pay-final-btn{margin:10px 16px;width:calc(100% - 32px);padding:14px;background:linear-gradient(135deg,#6c63ff,#a78bfa);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;flex-shrink:0}
 .sv-pay-final-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(108,99,255,.35)}
 .sv-pay-final-btn:disabled{opacity:.6;cursor:not-allowed}
