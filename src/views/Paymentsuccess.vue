@@ -91,7 +91,7 @@
 
     </div>
   </div>
-</template>
+</template> <!-- ✅ CORRECTION ICI -->
 
 <script setup>
 import { ref, onMounted } from "vue"
@@ -106,60 +106,11 @@ const auth = getAuth()
 
 const orderData = ref(null)
 const storeSlug = ref("")
-const saving = ref(true)
-const saved = ref(false)
+const saving = ref(true)   // ✅ AJOUT
+const saved = ref(false)   // ✅ AJOUT
 
 onMounted(() => {
-  // ─────────────────────────────────────────────────────────────
-  // GARDE ANTI-RETOUR ARRIÈRE — TOKEN À USAGE UNIQUE
-  //
-  // Problème : sessionStorage persiste quand l'utilisateur navigue
-  // vers Stripe (autre domaine) et revient par le bouton retour.
-  // Un simple flag "initié" reste donc présent, la garde passait.
-  //
-  // Solution : SiteViewer génère un token aléatoire avant la
-  // redirection Stripe et le stocke dans sessionStorage ET dans
-  // l'URL de succès (?ptoken=...).
-  //
-  //   URL de succès réel : /?stripe=ok&...&ptoken=abc123
-  //   Bouton retour      : URL sans ptoken (ou ptoken périmé)
-  //   Historique ancien  : ptoken différent du sessionStorage
-  //
-  // On compare les deux. En cas de différence → redirection.
-  // Le token est détruit immédiatement après lecture (usage unique).
-  // ─────────────────────────────────────────────────────────────
-  const urlToken     = route.query.ptoken || ""
-  const sessionToken = sessionStorage.getItem("stripe_pay_token") || ""
-
-  // Consommer le token immédiatement (usage unique — évite réutilisation)
-  sessionStorage.removeItem("stripe_pay_token")
-  // Nettoyer aussi l'ancien flag hérité des versions précédentes
-  sessionStorage.removeItem("stripe_payment_initiated")
-
   const raw = localStorage.getItem("pendingStripeOrder")
-
-  // ── Valider la session de paiement ───────────────────────────
-  // Cas 1 — token présent des deux côtés et identique : paiement réel ✓
-  // Cas 2 — URL sans ptoken mais sessionStorage a un token récent
-  //          (fallback pour les stores avec successUrl personnalisée)
-  // Cas 3 — tout le reste : bouton retour, navigation directe, historique
-  const tokenMatch   = urlToken && sessionToken && urlToken === sessionToken
-  const fallbackValid = !urlToken && sessionToken && raw   // successUrl custom sans ptoken
-
-  if (!tokenMatch && !fallbackValid) {
-    // Paiement non confirmé — nettoyer et rediriger vers la boutique
-    const fallbackSlug =
-      route.query.slug ||
-      localStorage.getItem("stripeSiteSlug") ||
-      ""
-    localStorage.removeItem("pendingStripeOrder")
-    localStorage.removeItem("stripeOwnerUid")
-    localStorage.removeItem("stripeSiteSlug")
-    router.replace(fallbackSlug ? `/${fallbackSlug}` : "/")
-    return
-  }
-
-  // Charger les données de commande
   if (raw) {
     try {
       orderData.value = JSON.parse(raw)
@@ -171,14 +122,14 @@ onMounted(() => {
     localStorage.getItem("stripeSiteSlug") ||
     orderData.value?.slug ||
     orderData.value?.storeSlug ||
-    orderData.value?.siteSlug ||
     ""
 
   onAuthStateChanged(auth, async (user) => {
     const ownerUid =
       user?.uid ||
       localStorage.getItem("stripeOwnerUid") ||
-      orderData.value?.ownerUid
+      orderData.value?.ownerUid ||
+      route.query.owner
 
     if (ownerUid) {
       try {
@@ -236,6 +187,6 @@ function goBack() {
 .ps-item-price{font-size:12px;font-weight:700;color:#10b981}
 
 .ps-actions{display:flex}
-.ps-btn-primary{flex:1;background:#10b981;color:white;border:none;border-radius:11px;padding:13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;transition:background .15s}
+.ps-btn-primary{flex:1;background:#10b981;color:white;border:none;border-radius:11px;padding:13px;cursor:pointer}
 .ps-btn-primary:hover{background:#059669}
 </style>
