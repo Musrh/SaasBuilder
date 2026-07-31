@@ -848,8 +848,9 @@ const payWithStripe = async () => {
     const slug       = props.slug || props.uid || resolvedUid.value
     const ownerUid   = resolvedUid.value
     const successUrl = cfg?.successUrl ||
-      `${origin}/?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
-    const cancelUrl  = cfg?.cancelUrl  || `${origin}/${slug}`
+      `${origin}/payment-success?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
+    const cancelUrl  = cfg?.cancelUrl  ||
+      `${origin}/payment-cancel?slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
 
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
 
