@@ -21,7 +21,7 @@
 ============================================================ -->
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from "vue"
+import { ref, onMounted, computed, watch } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import VoiceAssistantClient from "../components/VoiceAssistantClient.vue"
 import { db } from "../firebase.js"
@@ -153,63 +153,6 @@ const payProvider  = ref("stripe")
 const payProcessing = ref(false)
 const paySuccess   = ref(false)
 const payError     = ref("")
-
-// ── Annulation du panier / paiement ────────────────────────────
-// Le bouton retour (mobile/desktop) ne doit plus jamais servir à
-// annuler un paiement : trop imprévisible une fois sur la page Stripe
-// (peut sauter des étapes, atterrir sur une ancienne page, etc.).
-// Sur l'écran de paiement (svCartStep === "checkout"), on neutralise
-// le bouton retour en repoussant systématiquement le même état :
-// seul le bouton "✕ Annuler" explicite peut réellement annuler.
-let svCartHistoryPushed = false
-const svBackWarning = ref(false)
-let svBackWarningTimer = null
-
-function svPushCartHistory() {
-  if (!svCartHistoryPushed) {
-    history.pushState({ svCartModal: true }, "", location.href)
-    svCartHistoryPushed = true
-  }
-}
-
-function cancelPayment() {
-  payError.value       = ""
-  payProcessing.value  = false
-  showPayModal.value   = false
-  showCart.value       = false
-  svCartStep.value      = "cart"
-
-  if (svCartHistoryPushed) {
-    svCartHistoryPushed = false
-    history.back()
-  }
-}
-
-function svHandlePopState() {
-  if (svCartStep.value === "checkout") {
-    // Sur l'écran de paiement : on bloque le retour, on ne ferme rien.
-    // L'utilisateur doit cliquer sur "Annuler" pour vraiment sortir.
-    svPushCartHistory()
-    svBackWarning.value = true
-    clearTimeout(svBackWarningTimer)
-    svBackWarningTimer = setTimeout(() => { svBackWarning.value = false }, 3000)
-    return
-  }
-
-  // Simple panier (pas encore en paiement) : le retour peut le fermer.
-  if (showCart.value || showPayModal.value) {
-    svCartHistoryPushed = false
-    payError.value      = ""
-    payProcessing.value = false
-    showPayModal.value  = false
-    showCart.value      = false
-    svCartStep.value     = "cart"
-  }
-}
-
-watch(showCart, (isOpen) => {
-  if (isOpen) svPushCartHistory()
-})
 const customerName  = computed({
   get: () => _customerName.value || svCurrentUser.value?.displayName || "",
   set: (v) => { _customerName.value = v }
@@ -450,8 +393,6 @@ watch(
 onMounted(() => {
   loadSite()
 
-  window.addEventListener("popstate", svHandlePopState)
-
   const savedSession = sessionStorage.getItem("svClientSession")
   if (savedSession) {
     try {
@@ -469,10 +410,6 @@ onMounted(() => {
       }
     }
   })
-})
-
-onUnmounted(() => {
-  window.removeEventListener("popstate", svHandlePopState)
 })
 
 const svLogin = async () => {
@@ -861,18 +798,9 @@ const payWithStripe = async () => {
     const origin     = "https://mronlinestores.com"
     const slug       = props.slug || props.uid || resolvedUid.value
     const ownerUid   = resolvedUid.value
-
-    // Jeton unique par tentative de paiement : permet à PaymentSuccess.vue
-    // de refuser d'afficher "succès" si le navigateur atterrit sur une
-    // ANCIENNE page de succès (retour arrière qui saute une étape) au lieu
-    // de la tentative en cours. Tout se passe côté client, sans appel serveur.
-    const attemptId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
-    localStorage.setItem("stripePendingAttempt", attemptId)
-
-    const successUrl =
-      `${origin}/#/payment-success?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}`
-    const cancelUrl =
-      `${origin}/#/payment-cancel?slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}`
+    const successUrl = cfg?.successUrl ||
+      `${origin}/?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
+    const cancelUrl  = cfg?.cancelUrl  || `${origin}/${slug}`
 
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
 
@@ -1199,7 +1127,7 @@ const saveOrder = async (provider, transactionId) => {
     <!-- MODAL PANIER -->
     <Transition name="sv-modal">
       <div v-if="showCart" class="sv-modal-overlay sv-cart-overlay"
-           @click.self="cancelPayment">
+           @click.self="showCart=false; svCartStep='cart'">
         <div class="sv-modal-box sv-cart-box">
 
           <div class="sv-cart-header">
@@ -1211,7 +1139,7 @@ const saveOrder = async (provider, transactionId) => {
                 {{ cartCount }} article{{ cartCount>1?'s':'' }}
               </span>
             </div>
-            <button class="sv-modal-close" @click="cancelPayment">✕</button>
+            <button class="sv-modal-close" @click="showCart=false; svCartStep='cart'">✕</button>
           </div>
 
           <template v-if="svCartStep==='cart'">
@@ -1243,7 +1171,7 @@ const saveOrder = async (provider, transactionId) => {
                 <strong>{{ cartTotal }}{{ cartCurrency }}</strong>
               </div>
               <div class="sv-cart-footer-btns">
-                <button class="sv-btn-sec" @click="cancelPayment">{{ svT.cartContinue }}</button>
+                <button class="sv-btn-sec" @click="showCart=false">{{ svT.cartContinue }}</button>
                 <button class="sv-btn-primary sv-checkout-btn" @click="svCartStep='checkout'">
                   📋 {{ svT.delivery }} →
                 </button>
@@ -1305,21 +1233,13 @@ const saveOrder = async (provider, transactionId) => {
               </div>
             </div>
 
-            <div v-if="svBackWarning" class="sv-pay-error sv-back-warning">
-              ← Utilisez le bouton "Annuler" ci-dessous pour annuler le paiement
-            </div>
             <div v-if="payError" class="sv-pay-error">⚠ {{ payError }}</div>
 
-            <div class="sv-checkout-actions">
-              <button class="sv-cancel-pay-btn" type="button" @click="cancelPayment" :disabled="payProcessing">
-                ✕ Annuler
-              </button>
-              <button class="sv-pay-final-btn" @click="payWithStripe" :disabled="payProcessing">
-                <span v-if="payProcessing" class="sv-spinner"></span>
-                <span v-else>💳</span>
-                {{ payProcessing ? svT.checkoutPaying : `${svT.payCard} ${cartTotal}${cartCurrency}` }}
-              </button>
-            </div>
+            <button class="sv-pay-final-btn" @click="payWithStripe" :disabled="payProcessing">
+              <span v-if="payProcessing" class="sv-spinner"></span>
+              <span v-else>💳</span>
+              {{ payProcessing ? svT.checkoutPaying : `${svT.payCard} ${cartTotal}${cartCurrency}` }}
+            </button>
             <p class="sv-secure-note">{{ svT.checkoutSecure }}</p>
           </template>
 
@@ -1614,13 +1534,6 @@ const saveOrder = async (provider, transactionId) => {
 .sv-checkout-input:focus{border-color:#6c63ff}
 .sv-checkout-select{cursor:pointer}
 .sv-pay-error{margin:0 16px;background:#fef2f2;border:1px solid #fecaca;color:#ef4444;padding:8px 12px;border-radius:8px;font-size:13px;flex-shrink:0}
-.sv-back-warning{background:#fffbeb;border-color:#fde68a;color:#b45309}
-.sv-checkout-actions{display:flex;gap:8px;margin:10px 16px;flex-shrink:0}
-.sv-checkout-actions .sv-pay-final-btn{margin:0;width:auto;flex:1 1 auto}
-.sv-cancel-pay-btn{flex:0 0 auto;padding:14px 18px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
-.sv-cancel-pay-btn:hover:not(:disabled){background:#fee2e2;color:#dc2626;border-color:#fecaca}
-.sv-cancel-pay-btn:disabled{opacity:.5;cursor:not-allowed}
-
 .sv-pay-final-btn{margin:10px 16px;width:calc(100% - 32px);padding:14px;background:linear-gradient(135deg,#6c63ff,#a78bfa);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;flex-shrink:0}
 .sv-pay-final-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(108,99,255,.35)}
 .sv-pay-final-btn:disabled{opacity:.6;cursor:not-allowed}
