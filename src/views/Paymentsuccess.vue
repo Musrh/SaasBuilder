@@ -3,13 +3,14 @@
 ============================================================ -->
 
 <template>
-  <div class="ps-root">
+  <div class="ps-root" :class="{ 'ps-root--fail': verifyFailed }">
     <div class="ps-card">
 
       <!-- Icône animée -->
       <div class="ps-icon-wrap">
-        <div class="ps-circle">
-          <span class="ps-check">✓</span>
+        <div class="ps-circle" :class="{ 'ps-circle--fail': verifyFailed }">
+          <span v-if="verifyFailed" class="ps-check">⚠</span>
+          <span v-else class="ps-check">✓</span>
         </div>
       </div>
 
@@ -27,7 +28,7 @@
           Si vous avez été débité, contactez-nous ; sinon votre panier est conservé.
         </p>
         <div class="ps-actions">
-          <button class="ps-btn-primary" @click="goBack">← Retourner à la boutique</button>
+          <button class="ps-btn-primary ps-btn-fail" @click="goBack">← Retourner à la boutique</button>
         </div>
       </div>
 
@@ -246,6 +247,10 @@ function goBack() {
 *{box-sizing:border-box;margin:0;padding:0}
 
 .ps-root{min-height:100vh;background:linear-gradient(135deg,#f0fdf4,#dcfce7);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'DM Sans',sans-serif}
+.ps-root.ps-root--fail{background:linear-gradient(135deg,#fffbeb,#fef3c7)}
+.ps-circle.ps-circle--fail{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.ps-btn-fail{background:#f59e0b}
+.ps-btn-fail:hover{background:#d97706}
 .ps-card{background:white;border-radius:24px;padding:40px 32px;max-width:500px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(16,185,129,.12)}
 
 .ps-icon-wrap{display:flex;justify-content:center;margin-bottom:20px}
