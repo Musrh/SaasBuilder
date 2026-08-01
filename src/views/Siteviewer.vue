@@ -155,10 +155,15 @@ const paySuccess   = ref(false)
 const payError     = ref("")
 
 // ── Annulation du panier / paiement ────────────────────────────
-// Permet d'annuler le paiement soit via un bouton dédié, soit en
-// utilisant le bouton "retour" (mobile) ou "précédent" (desktop),
-// sans faire quitter l'utilisateur de la boutique.
+// Le bouton retour (mobile/desktop) ne doit plus jamais servir à
+// annuler un paiement : trop imprévisible une fois sur la page Stripe
+// (peut sauter des étapes, atterrir sur une ancienne page, etc.).
+// Sur l'écran de paiement (svCartStep === "checkout"), on neutralise
+// le bouton retour en repoussant systématiquement le même état :
+// seul le bouton "✕ Annuler" explicite peut réellement annuler.
 let svCartHistoryPushed = false
+const svBackWarning = ref(false)
+let svBackWarningTimer = null
 
 function svPushCartHistory() {
   if (!svCartHistoryPushed) {
@@ -181,8 +186,17 @@ function cancelPayment() {
 }
 
 function svHandlePopState() {
-  // Le bouton retour (mobile ou desktop) a été utilisé pendant que
-  // le panier/paiement était ouvert : on l'interprète comme une annulation.
+  if (svCartStep.value === "checkout") {
+    // Sur l'écran de paiement : on bloque le retour, on ne ferme rien.
+    // L'utilisateur doit cliquer sur "Annuler" pour vraiment sortir.
+    svPushCartHistory()
+    svBackWarning.value = true
+    clearTimeout(svBackWarningTimer)
+    svBackWarningTimer = setTimeout(() => { svBackWarning.value = false }, 3000)
+    return
+  }
+
+  // Simple panier (pas encore en paiement) : le retour peut le fermer.
   if (showCart.value || showPayModal.value) {
     svCartHistoryPushed = false
     payError.value      = ""
@@ -1291,6 +1305,9 @@ const saveOrder = async (provider, transactionId) => {
               </div>
             </div>
 
+            <div v-if="svBackWarning" class="sv-pay-error sv-back-warning">
+              ← Utilisez le bouton "Annuler" ci-dessous pour annuler le paiement
+            </div>
             <div v-if="payError" class="sv-pay-error">⚠ {{ payError }}</div>
 
             <div class="sv-checkout-actions">
@@ -1597,6 +1614,7 @@ const saveOrder = async (provider, transactionId) => {
 .sv-checkout-input:focus{border-color:#6c63ff}
 .sv-checkout-select{cursor:pointer}
 .sv-pay-error{margin:0 16px;background:#fef2f2;border:1px solid #fecaca;color:#ef4444;padding:8px 12px;border-radius:8px;font-size:13px;flex-shrink:0}
+.sv-back-warning{background:#fffbeb;border-color:#fde68a;color:#b45309}
 .sv-checkout-actions{display:flex;gap:8px;margin:10px 16px;flex-shrink:0}
 .sv-checkout-actions .sv-pay-final-btn{margin:0;width:auto;flex:1 1 auto}
 .sv-cancel-pay-btn{flex:0 0 auto;padding:14px 18px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
