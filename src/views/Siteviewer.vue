@@ -848,16 +848,17 @@ const payWithStripe = async () => {
     const slug       = props.slug || props.uid || resolvedUid.value
     const ownerUid   = resolvedUid.value
 
-    // On ne laisse plus jamais une éventuelle successUrl/cancelUrl déjà
-    // enregistrée dans la config Stripe de la boutique (cfg.successUrl /
-    // cfg.cancelUrl) écraser ces URLs : elles doivent toujours contenir
-    // slug/owner/backend/session_id pour que PaymentSuccess.vue puisse
-    // vérifier le paiement. Une ancienne valeur figée en base cassait
-    // silencieusement toute la vérification.
+    // Jeton unique par tentative de paiement : permet à PaymentSuccess.vue
+    // de refuser d'afficher "succès" si le navigateur atterrit sur une
+    // ANCIENNE page de succès (retour arrière qui saute une étape) au lieu
+    // de la tentative en cours. Tout se passe côté client, sans appel serveur.
+    const attemptId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
+    localStorage.setItem("stripePendingAttempt", attemptId)
+
     const successUrl =
-      `${origin}/#/payment-success?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&backend=${encodeURIComponent(BACKEND_URL.value)}&session_id={CHECKOUT_SESSION_ID}`
+      `${origin}/#/payment-success?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}`
     const cancelUrl =
-      `${origin}/#/payment-cancel?slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}`
+      `${origin}/#/payment-cancel?slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}`
 
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
 
@@ -891,9 +892,6 @@ const payWithStripe = async () => {
 
     const data = await res.json()
     if (data.url) {
-      if (data.sessionId) {
-        localStorage.setItem("stripeLastSessionId", data.sessionId)
-      }
       showCart.value     = false
       showPayModal.value = false
       window.location.href = data.url
