@@ -3,18 +3,31 @@
 ============================================================ -->
 
 <template>
-  <div class="ps-root">
+  <div class="ps-root" :class="{ 'ps-root--fail': verifyFailed }">
     <div class="ps-card">
 
       <!-- Icône animée -->
       <div class="ps-icon-wrap">
-        <div class="ps-circle">
-          <span class="ps-check">✓</span>
+        <div class="ps-circle" :class="{ 'ps-circle--fail': verifyFailed }">
+          <span v-if="verifyFailed" class="ps-check">⚠</span>
+          <span v-else class="ps-check">✓</span>
+        </div>
+      </div>
+
+      <!-- Paiement non confirmé (retour arrière sur une ancienne page) -->
+      <div v-if="verifyFailed" class="ps-fail">
+        <h1 class="ps-title">Paiement non confirmé</h1>
+        <p class="ps-subtitle">
+          Cette page de confirmation ne correspond pas à votre dernière tentative de paiement.
+          Si vous avez été débité, contactez-nous ; sinon votre panier est conservé.
+        </p>
+        <div class="ps-actions">
+          <button class="ps-btn-primary ps-btn-fail" @click="goBack">← Retourner à la boutique</button>
         </div>
       </div>
 
       <!-- Chargement -->
-      <div v-if="saving" class="ps-saving">
+      <div v-else-if="saving" class="ps-saving">
         <div class="ps-spinner"></div>
         <p>Enregistrement de votre commande...</p>
       </div>
@@ -106,10 +119,43 @@ const auth = getAuth()
 
 const orderData = ref(null)
 const storeSlug = ref("")
-const saving = ref(true)   // ✅ AJOUT
-const saved = ref(false)   // ✅ AJOUT
+const saving = ref(true)
+const saved = ref(false)
+const verifyFailed = ref(false)
+
+// Si cette page est restaurée depuis le bfcache (retour arrière mobile/desktop
+// ayant déjà affiché cette page), le JS ne se réexécute pas par défaut : on
+// force donc un rechargement pour que la vérification ci-dessous soit rejouée.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    location.reload()
+  }
+})
+
+function isCurrentAttempt() {
+  const attempt = route.query.attempt
+  const pending = localStorage.getItem("stripePendingAttempt")
+
+  // Pas de jeton stocké (navigation privée, storage vidé...) : on ne peut
+  // rien comparer, on laisse passer plutôt que de bloquer un vrai succès.
+  if (!pending) return true
+
+  return !!attempt && attempt === pending
+}
 
 onMounted(() => {
+  if (!isCurrentAttempt()) {
+    verifyFailed.value = true
+    saving.value = false
+    return   // n'efface pas le panier, n'affiche pas "succès"
+  }
+
+  // Cette tentative est confirmée. On NE supprime PAS le jeton : le
+  // prochain paiement l'écrasera de toute façon avec sa propre valeur
+  // avant sa redirection. Le supprimer ici désactiverait la protection
+  // pour toute visite suivante (une ancienne page de succès repasserait
+  // alors le contrôle, puisqu'il n'y aurait plus rien à comparer).
+
   const raw = localStorage.getItem("pendingStripeOrder")
   if (raw) {
     try {
@@ -128,7 +174,8 @@ onMounted(() => {
     const ownerUid =
       user?.uid ||
       localStorage.getItem("stripeOwnerUid") ||
-      orderData.value?.ownerUid
+      orderData.value?.ownerUid ||
+      route.query.owner
 
     if (ownerUid) {
       try {
@@ -149,8 +196,12 @@ onMounted(() => {
 })
 
 function goBack() {
+  const slug = storeSlug.value ||
+    route.query.slug ||
+    localStorage.getItem("stripeSiteSlug") ||
+    ""
   localStorage.removeItem("stripeSiteSlug")
-  router.push(storeSlug.value ? `/${storeSlug.value}` : "/")
+  router.push(slug ? `/${slug}` : "/")
 }
 </script>
 
@@ -159,6 +210,10 @@ function goBack() {
 *{box-sizing:border-box;margin:0;padding:0}
 
 .ps-root{min-height:100vh;background:linear-gradient(135deg,#f0fdf4,#dcfce7);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'DM Sans',sans-serif}
+.ps-root.ps-root--fail{background:linear-gradient(135deg,#fffbeb,#fef3c7)}
+.ps-circle.ps-circle--fail{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.ps-btn-fail{background:#f59e0b}
+.ps-btn-fail:hover{background:#d97706}
 .ps-card{background:white;border-radius:24px;padding:40px 32px;max-width:500px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(16,185,129,.12)}
 
 .ps-icon-wrap{display:flex;justify-content:center;margin-bottom:20px}
