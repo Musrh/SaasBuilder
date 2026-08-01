@@ -14,7 +14,24 @@
       </div>
 
       <!-- Chargement -->
-      <div v-if="saving" class="ps-saving">
+      <div v-if="verifying" class="ps-saving">
+        <div class="ps-spinner"></div>
+        <p>Vérification du paiement...</p>
+      </div>
+
+      <!-- Paiement non confirmé (retour arrière, lien invalide, etc.) -->
+      <div v-else-if="verifyFailed" class="ps-fail">
+        <h1 class="ps-title">Paiement non confirmé</h1>
+        <p class="ps-subtitle">
+          Nous n'avons pas pu confirmer ce paiement auprès de Stripe.
+          Si vous avez été débité, contactez-nous ; sinon votre panier est conservé.
+        </p>
+        <div class="ps-actions">
+          <button class="ps-btn-primary" @click="goBack">← Retourner à la boutique</button>
+        </div>
+      </div>
+
+      <div v-else-if="saving" class="ps-saving">
         <div class="ps-spinner"></div>
         <p>Enregistrement de votre commande...</p>
       </div>
@@ -106,10 +123,75 @@ const auth = getAuth()
 
 const orderData = ref(null)
 const storeSlug = ref("")
-const saving = ref(true)   // ✅ AJOUT
-const saved = ref(false)   // ✅ AJOUT
+const saving = ref(true)
+const saved = ref(false)
+const verifying = ref(true)
+const verifyFailed = ref(false)
 
-onMounted(() => {
+// Si cette page est restaurée depuis le bfcache (retour arrière mobile/desktop
+// après avoir déjà visité cette page plus tôt), aucun code JS ne se réexécute
+// par défaut : le navigateur réaffiche juste l'ancien rendu tel quel (ce qui
+// pouvait laisser croire qu'un paiement annulé avait réussi). On force donc
+// un rechargement complet pour que la vérification ci-dessous soit rejouée.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) {
+    location.reload()
+  }
+})
+
+async function verifyPayment() {
+  const sessionId = route.query.session_id
+  const backend   = route.query.backend
+
+  // Pas de session_id (ancien lien, config manquante) : on ne peut rien
+  // confirmer avec certitude → on refuse d'afficher un faux succès.
+  if (!sessionId || !backend || sessionId === "{CHECKOUT_SESSION_ID}") {
+    verifyFailed.value = true
+    verifying.value = false
+    return false
+  }
+
+  // Un retour arrière trop rapide (plusieurs "back" d'un coup) peut faire
+  // atterrir le navigateur sur une ANCIENNE page payment-success — celle
+  // d'une session précédente qui, elle, avait réellement été payée. Notre
+  // vérification Stripe la confirmerait alors "payée" à raison, mais pour
+  // la mauvaise tentative. On exige donc que la session affichée soit bien
+  // la toute dernière tentative de paiement lancée par ce navigateur.
+  const lastSessionId = localStorage.getItem("stripeLastSessionId")
+  if (lastSessionId && sessionId !== lastSessionId) {
+    verifyFailed.value = true
+    verifying.value = false
+    return false
+  }
+
+  try {
+    const res  = await fetch(`${backend}/verify-store-session?session_id=${encodeURIComponent(sessionId)}`)
+    const data = await res.json()
+    if (!res.ok || !data.paid) {
+      verifyFailed.value = true
+      verifying.value = false
+      return false
+    }
+  } catch (e) {
+    console.warn("verifyPayment:", e.message)
+    verifyFailed.value = true
+    verifying.value = false
+    return false
+  }
+
+  // Cette session a été confirmée : on l'invalide immédiatement pour que
+  // toute page restaurée plus tard (bfcache, retour arrière) sur cette
+  // même URL ne puisse plus jamais réafficher "succès".
+  localStorage.removeItem("stripeLastSessionId")
+
+  verifying.value = false
+  return true
+}
+
+onMounted(async () => {
+  const isPaid = await verifyPayment()
+  if (!isPaid) return   // n'efface pas le panier, n'affiche pas "succès"
+
   const raw = localStorage.getItem("pendingStripeOrder")
   if (raw) {
     try {
@@ -128,7 +210,8 @@ onMounted(() => {
     const ownerUid =
       user?.uid ||
       localStorage.getItem("stripeOwnerUid") ||
-      orderData.value?.ownerUid
+      orderData.value?.ownerUid ||
+      route.query.owner
 
     if (ownerUid) {
       try {
@@ -149,8 +232,12 @@ onMounted(() => {
 })
 
 function goBack() {
+  const slug = storeSlug.value ||
+    route.query.slug ||
+    localStorage.getItem("stripeSiteSlug") ||
+    ""
   localStorage.removeItem("stripeSiteSlug")
-  router.push(storeSlug.value ? `/${storeSlug.value}` : "/")
+  router.push(slug ? `/${slug}` : "/")
 }
 </script>
 
