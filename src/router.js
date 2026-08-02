@@ -74,8 +74,8 @@ const routes = [
   // ======================
   // PAIEMENT
   // ======================
-  { path: "/payment-success", name: "payment-success", component: () => import("./views/Paymentsuccess.vue") },
-  { path: "/payment-cancel",  name: "payment-cancel",  component: () => import("./views/Paymentcancel.vue") },
+  { path: "/payment-success/:meta?/:sessionId?", name: "payment-success", component: () => import("./views/Paymentsuccess.vue") },
+  { path: "/payment-cancel/:meta?",              name: "payment-cancel",  component: () => import("./views/Paymentcancel.vue") },
   { path: "/success",         name: "success",         component: () => import("./views/Success.vue") },
   { path: "/cancel",          name: "cancel",          component: () => import("./views/Cancel.vue") },
 
