@@ -1058,7 +1058,7 @@ const saveOrder = async (provider, transactionId) => {
       </div>
 
       <button class="sv-cart-btn" @click="showCart = true">
-        🛒 <span v-if="cartCount > 0" class="sv-cart-badge">{{ cartCount }}</span>
+       🔴TEST🔴  <span v-if="cartCount > 0" class="sv-cart-badge">{{ cartCount }}</span>
       </button>
     </nav>
 
