@@ -871,7 +871,7 @@ const payWithStripe = async () => {
     localStorage.setItem("stripePendingAttempt", attemptId)
 
     const successUrl =
-      `${origin}/#/payment-success?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}`
+      `${origin}/#/payment-success?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}&backend=${encodeURIComponent(BACKEND_URL.value)}&session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl =
       `${origin}/#/payment-cancel?slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}`
 
