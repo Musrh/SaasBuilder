@@ -41,6 +41,16 @@ function handleStripeReturn(params, pending) {
       if (slug) {
         localStorage.setItem("stripeSiteSlug", slug)
       }
+
+      // Ne jamais écraser un hash qui pointe déjà vers une page de paiement
+      // avec ses propres paramètres (attempt, session_id...).
+      var hash = window.location.hash || ""
+      var hashAlreadyTargetsPayment =
+        hash.indexOf("#/payment-success") === 0 || hash.indexOf("#/payment-cancel") === 0
+      if (hashAlreadyTargetsPayment) {
+        return
+      }
+
       window.history.replaceState({}, "", window.location.pathname)
       router.replace("/payment-success")
     } else {
@@ -55,6 +65,18 @@ function handleMobilePending(pending) {
   try {
     var order = JSON.parse(pending)
     var age   = Date.now() - new Date(order.createdAt).getTime()
+
+    // Ne jamais écraser un hash qui pointe déjà vers une page de paiement :
+    // c'est exactement ce qui supprimait tous les paramètres (attempt,
+    // session_id, backend...) avant même que Vue Router les lise.
+    var hash = window.location.hash || ""
+    var hashAlreadyTargetsPayment =
+      hash.indexOf("#/payment-success") === 0 || hash.indexOf("#/payment-cancel") === 0
+
+    if (hashAlreadyTargetsPayment) {
+      return
+    }
+
     if (age < 1800000 && window.location.pathname === "/") {
       router.replace("/payment-success")
     } else if (age >= 1800000) {
