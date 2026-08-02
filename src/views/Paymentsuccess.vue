@@ -132,8 +132,21 @@ window.addEventListener("pageshow", (event) => {
   }
 })
 
+// Les infos critiques voyagent désormais dans le CHEMIN de l'URL (voir
+// SiteViewer.vue) plutôt qu'après un "?" dans le hash, qui semblait être
+// supprimé quelque part dans la chaîne de redirection. On garde un repli
+// sur route.query pour ne pas casser d'anciens liens déjà en circulation.
+const meta = (() => {
+  try {
+    return route.params.meta ? JSON.parse(decodeURIComponent(route.params.meta)) : {}
+  } catch (e) {
+    return {}
+  }
+})()
+const sessionIdFromPath = route.params.sessionId
+
 function isCurrentAttempt() {
-  const attempt = route.query.attempt
+  const attempt = meta.attempt || route.query.attempt
   const pending = localStorage.getItem("stripePendingAttempt")
 
   // Pas de jeton stocké (navigation privée, storage vidé...) : on ne peut
@@ -151,8 +164,8 @@ function isCurrentAttempt() {
 // même). Sans backend/session_id disponibles (ancien lien), on ne bloque
 // pas — le jeton reste la seule protection dans ce cas.
 async function isReallyPaid() {
-  const sessionId = route.query.session_id
-  const backend   = route.query.backend
+  const sessionId = sessionIdFromPath || route.query.session_id
+  const backend   = meta.backend      || route.query.backend
 
   if (!sessionId || !backend || sessionId === "{CHECKOUT_SESSION_ID}") {
     return true
@@ -198,6 +211,7 @@ onMounted(async () => {
   }
 
   storeSlug.value =
+    meta.slug ||
     route.query.slug ||
     localStorage.getItem("stripeSiteSlug") ||
     orderData.value?.slug ||
@@ -209,6 +223,7 @@ onMounted(async () => {
       user?.uid ||
       localStorage.getItem("stripeOwnerUid") ||
       orderData.value?.ownerUid ||
+      meta.owner ||
       route.query.owner
 
     if (ownerUid) {
@@ -231,6 +246,7 @@ onMounted(async () => {
 
 function goBack() {
   const slug = storeSlug.value ||
+    meta.slug ||
     route.query.slug ||
     localStorage.getItem("stripeSiteSlug") ||
     ""
