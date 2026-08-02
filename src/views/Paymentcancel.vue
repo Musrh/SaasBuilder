@@ -32,13 +32,31 @@ const router = useRouter()
 const route  = useRoute()
 
 const goBack = () => {
-  // Essayer d'abord depuis localStorage (Stripe ignore les params après #)
-  const siteUid = localStorage.getItem("stripeSiteSlug")
-    || localStorage.getItem("stripeOwnerUid")
-    || route.query.uid
-  // Ne pas supprimer le localStorage ici (PaymentSuccess peut encore en avoir besoin)
-  if (siteUid) router.push(`/site/${siteUid}`)
-  else router.push("/")
+  // Les infos voyagent désormais dans le chemin (voir SiteViewer.vue) plutôt
+  // qu'après un "?" dans le hash. On garde un repli sur route.query pour ne
+  // pas casser d'anciens liens déjà en circulation.
+  let meta = {}
+  try {
+    if (route.params.meta) meta = JSON.parse(decodeURIComponent(route.params.meta))
+  } catch (e) {}
+
+  // Priorité : localStorage (posé juste avant la redirection vers Stripe),
+  // puis les paramètres transmis par Stripe dans le cancel_url.
+  const slug     = localStorage.getItem("stripeSiteSlug") || meta.slug  || route.query.slug  || ""
+  const ownerUid = localStorage.getItem("stripeOwnerUid") || meta.owner || route.query.owner || route.query.uid || ""
+
+  // Ne pas supprimer le localStorage ici (PaymentSuccess peut encore en avoir besoin
+  // si le client retente le paiement et réussit ensuite).
+
+  if (slug && slug !== ownerUid) {
+    // Slug convivial → route publique "/:slug"
+    router.push(`/${slug}`)
+  } else if (ownerUid) {
+    // Pas de slug distinct : on a un UID Firestore → route "/site/:uid"
+    router.push(`/site/${ownerUid}`)
+  } else {
+    router.push("/")
+  }
 }
 
 const goHome = () => router.push("/")
