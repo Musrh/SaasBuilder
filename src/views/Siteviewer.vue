@@ -870,10 +870,22 @@ const payWithStripe = async () => {
     const attemptId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
     localStorage.setItem("stripePendingAttempt", attemptId)
 
+    // On encode les infos critiques dans le CHEMIN de l'URL (pas après un "?")
+    // — un "?" à l'intérieur du hash (#/...?...) semble être supprimé quelque
+    // part dans la chaîne de redirection (Stripe ou autre), ce qui faisait
+    // disparaître systématiquement ces paramètres. Un segment de chemin ne
+    // peut pas être ambigu de cette façon.
+    const meta = encodeURIComponent(JSON.stringify({
+      slug:    slug,
+      owner:   ownerUid,
+      attempt: attemptId,
+      backend: BACKEND_URL.value,
+    }))
+
     const successUrl =
-      `${origin}/#/payment-success?stripe=ok&slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}&backend=${encodeURIComponent(BACKEND_URL.value)}&session_id={CHECKOUT_SESSION_ID}`
+      `${origin}/#/payment-success/${meta}/{CHECKOUT_SESSION_ID}`
     const cancelUrl =
-      `${origin}/#/payment-cancel?slug=${encodeURIComponent(slug)}&owner=${encodeURIComponent(ownerUid)}&attempt=${attemptId}`
+      `${origin}/#/payment-cancel/${meta}`
 
     const backendUrl = `${BACKEND_URL.value}/create-store-session`
 
@@ -1058,7 +1070,7 @@ const saveOrder = async (provider, transactionId) => {
       </div>
 
       <button class="sv-cart-btn" @click="showCart = true">
-       🔴TEST🔴  <span v-if="cartCount > 0" class="sv-cart-badge">{{ cartCount }}</span>
+        🛒 <span v-if="cartCount > 0" class="sv-cart-badge">{{ cartCount }}</span>
       </button>
     </nav>
 
