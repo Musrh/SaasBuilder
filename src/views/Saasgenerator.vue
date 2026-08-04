@@ -3,7 +3,6 @@ import { ref, computed, onMounted, watch } from "vue"
 import { db, auth } from "../firebase.js"
 import { doc, getDoc, setDoc, collection, writeBatch, deleteDoc, getDocs, query, where } from "firebase/firestore"
 import { onAuthStateChanged, signOut } from "firebase/auth" 
-import { stripeConfig, loadStripeSDK } from "./stripe.js"
 import { translations, langs } from "../langues.js"
 import { paypalConfig, loadPaypalSDK } from "./paypal.js"
 
@@ -36,13 +35,8 @@ const showNotif = ref(false)
 const notifMsg = ref("")
 const notifType = ref("success")
 const renamingPageIndex = ref(null)
-const showPaymentModal = ref(false)
-const paymentModalSection = ref(null)
-const paymentProvider = ref("stripe")
-const paymentProcessing = ref(false)
-const paymentSuccess = ref(false)
 const showConfigEditor = ref(false)
-const configEditorTarget = ref("stripe")
+const configEditorTarget = ref("anthropic")
 const configEditorContent = ref("")
 const showExportModal  = ref(false)
 const showLegalModal   = ref(false)
@@ -109,17 +103,9 @@ const cartCurrency = computed(() => cart.value[0]?.currency || '€')
 
 const checkoutCart = () => {
   showCart.value = false
-  // Ouvrir la modale de paiement avec les totaux du panier
-  paymentModalSection.value = {
-    title: t.value.cartCheckout || 'Finaliser la commande',
-    description: `${cartCount.value} article(s)`,
-    amount: cartTotal.value,
-    currency: cartCurrency.value,
-  }
-  paymentProvider.value = 'stripe'
-  paymentSuccess.value = false
-  paymentProcessing.value = false
-  showPaymentModal.value = true
+  // Le vrai paiement du panier passe par Stripe Connect sur le site publié —
+  // pas depuis cet aperçu du builder.
+  showPaySlugWarning.value = true
 }
 
 const emptyCart = () => { cart.value = [] }
@@ -129,6 +115,19 @@ const siteName = ref("WellShoppings")
 
 // ===== LOGO =====
 const siteLogo = ref("")
+// Devise du store — remplace l'ancienne config manuelle stripe.js.
+// Toujours enregistrée dans storePaymentConfig.stripe.currency (même
+// emplacement Firestore que lisait déjà SiteViewer.vue), donc aucun
+// changement nécessaire côté SiteViewer.vue.
+const storeCurrency = ref("EUR")
+const CURRENCY_OPTIONS = [
+  { code: "EUR", label: "€ Euro" },
+  { code: "USD", label: "$ Dollar US" },
+  { code: "GBP", label: "£ Livre sterling" },
+  { code: "MAD", label: "DH Dirham marocain" },
+  { code: "CAD", label: "$ Dollar canadien" },
+  { code: "CHF", label: "CHF Franc suisse" },
+]
 const uploadLogo = (e) => {
   const file = e.target.files[0]; if (!file) return
   const reader = new FileReader()
@@ -165,13 +164,12 @@ const saveDnsRecords = () => {
   showDnsInput.value = false
 }
 const publishInfo = ref(null)
-// Slug déjà publié par ce compte (s'il existe) — utilisé pour orienter
-// l'utilisateur vers un test de paiement réel plutôt que l'aperçu générique.
+// Slug déjà publié par ce compte (s'il existe) — utilisé pour rediriger
+// vers le vrai paiement (Stripe Connect) sur le site publié.
 const publishedSlugValue = ref("")
-// Avertissement affiché avant le test de paiement rapide : le rappelle
-// que ce test (depuis /#/saasgenerator) n'est pas un vrai parcours client.
+// Info affichée quand on clique sur un bouton de paiement dans l'aperçu :
+// le vrai paiement se fait uniquement sur le site publié, via Connect.
 const showPaySlugWarning = ref(false)
-const pendingPaymentSection = ref(null)
 
 const publishSite = async () => {
   if (!publishAddress.value.trim()) { notify("Entrez une adresse pour le site.", "error"); return }
@@ -199,6 +197,7 @@ const publishSite = async () => {
       publishedSlug: slug,
       publishedAt: new Date().toISOString(),
       customDomain: domain || null,
+      storePaymentConfig: { stripe: { currency: storeCurrency.value, storeName: siteName.value } },
     }, { merge: true })
 
     // 2. Créer l'entrée dans la collection publique slugs/{slug} → uid
@@ -320,6 +319,7 @@ onMounted(() => {
         if (d.siteName) siteName.value = d.siteName
         if (d.plan)     userPlan.value    = d.plan || "free"   // ← lire le vrai plan
         if (d.siteLogo) siteLogo.value = d.siteLogo
+        if (d.storePaymentConfig?.stripe?.currency) storeCurrency.value = d.storePaymentConfig.stripe.currency
         if (d.publishedSlug) publishedSlugValue.value = d.publishedSlug
         // Pas de fallback localStorage : un nouveau propriétaire démarre avec un site vierge
       } else {
@@ -340,15 +340,15 @@ onMounted(() => {
 watch(site, () => { isSaved.value = false }, { deep: true })
 watch(siteName, (v) => { localStorage.setItem("siteName", v) })
 watch(siteLogo, (v) => { localStorage.setItem("siteLogo", v) })
-watch(currentPageIndex, () => { activeSectionIndex.value = null })
-
-// Init Stripe Elements when payment modal opens on Stripe tab
-watch([() => showPaymentModal.value, () => paymentProvider.value], ([modalOpen, provider]) => {
-  if (modalOpen && provider === 'stripe') {
-    stripeCardMounted.value = false
-    setTimeout(() => initStripeElements(), 150)
-  }
+watch(storeCurrency, async (v) => {
+  if (!currentUser.value) return
+  try {
+    await setDoc(doc(db, "users", currentUser.value.uid), {
+      storePaymentConfig: { stripe: { currency: v, storeName: siteName.value } },
+    }, { merge: true })
+  } catch (e) { console.warn("storeCurrency save:", e.message) }
 })
+watch(currentPageIndex, () => { activeSectionIndex.value = null })
 
 const notify = (msg, type = "success") => {
   notifMsg.value = msg; notifType.value = type; showNotif.value = true
@@ -1036,196 +1036,16 @@ const addProduct = (section) => {
 }
 const removeProduct = (section, i) => { section.items.splice(i, 1) }
 
+// Le paiement réel des clients passe désormais par Stripe Connect
+// (compte plateforme), traité côté serveur pour le site publié — plus
+// besoin de logique Stripe Elements / PayPal SDK ici. On se contente
+// d'orienter l'utilisateur vers son site publié.
 const openPaymentModal = (section) => {
-  pendingPaymentSection.value = section
   showPaySlugWarning.value = true
 }
 
-// Lance effectivement le test de paiement rapide (comportement historique,
-// inchangé) une fois que l'utilisateur a vu l'avertissement et choisi de
-// continuer malgré tout.
-const proceedWithQuickPaymentTest = () => {
-  showPaySlugWarning.value = false
-  const section = pendingPaymentSection.value
-  paymentModalSection.value = section; paymentSuccess.value = false
-  paymentProcessing.value = false; showPaymentModal.value = true
-}
-
-const stripeInstance = ref(null)
-const stripeElements = ref(null)
-const stripeCardElement = ref(null)
-const stripeCardMounted = ref(false)
-
-const initStripeElements = async () => {
-  try {
-    const stripe = await loadStripeSDK(liveStripeConfig.value.publishableKey)
-    stripeInstance.value = stripe
-    const elements = stripe.elements()
-    stripeElements.value = elements
-    // Mount card element after DOM is ready
-    await new Promise(r => setTimeout(r, 100))
-    const cardEl = document.getElementById("stripe-card-element")
-    if (cardEl && !stripeCardMounted.value) {
-      const card = elements.create("card", {
-        style: {
-          base: {
-            fontSize: "16px",
-            color: "#f0f0f0",
-            fontFamily: "'DM Sans', sans-serif",
-            "::placeholder": { color: "#5a5a6a" },
-          },
-          invalid: { color: "#ef4444" },
-        },
-        hidePostalCode: true,
-      })
-      card.mount(cardEl)
-      stripeCardElement.value = card
-      stripeCardMounted.value = true
-    }
-  } catch(e) {
-    console.error("Stripe init error:", e)
-    notify("Erreur initialisation Stripe", "error")
-  }
-}
-
-const processStripePayment = async () => {
-  paymentProcessing.value = true
-  try {
-    const cfg = liveStripeConfig.value
-    // If no real key configured, show error
-    if (!cfg.publishableKey || cfg.publishableKey.includes("VOTRE_CLE")) {
-      notify("⚠️ Configurez votre clé Stripe (stripe.js)", "error")
-      paymentProcessing.value = false; return
-    }
-    if (!cfg.backendUrl || cfg.backendUrl.includes("votre-backend")) {
-      notify("⚠️ Configurez votre backendUrl dans stripe.js", "error")
-      paymentProcessing.value = false; return
-    }
-    const stripe = stripeInstance.value
-    const card = stripeCardElement.value
-    if (!stripe || !card) {
-      notify("Stripe non initialisé", "error")
-      paymentProcessing.value = false; return
-    }
-    // 1. Create PaymentIntent on backend
-    const amount = Math.round(parseFloat(paymentModalSection.value?.amount || "0") * 100)
-    // Construire les items du panier pour le backend
-    const orderItems = cart.value.length > 0
-      ? cart.value.map(i => ({ nom: i.name, prix: parseFloat(i.price), quantity: i.qty }))
-      : [{ nom: paymentModalSection.value?.title || "Commande", prix: parseFloat(paymentModalSection.value?.amount || 0), quantity: 1 }]
-    const res = await fetch(cfg.backendUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount,
-        currency: cfg.currency || "eur",
-        description: paymentModalSection.value?.description || "Commande",
-        items: orderItems,
-        storeName: cfg.storeName || siteName.value,
-        uid: currentUser.value?.uid,
-      }),
-    })
-    if (!res.ok) throw new Error(`Backend error: ${res.status}`)
-    const { clientSecret } = await res.json()
-    // 2. Confirm payment with Stripe
-    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: { card },
-    })
-    if (error) throw new Error(error.message)
-    if (paymentIntent.status === "succeeded") {
-      paymentSuccess.value = true
-      notify("✓ Paiement réussi !")
-    }
-  } catch (e) {
-    notify("Erreur Stripe : " + e.message, "error")
-    console.error(e)
-  } finally { paymentProcessing.value = false }
-}
-
-const processPaypalPayment = async () => {
-  paymentProcessing.value = true
-  try {
-    const cfg = livePaypalConfig.value
-    if (!cfg.clientId || cfg.clientId.includes("VOTRE_CLIENT_ID")) {
-      notify("⚠️ Configurez votre Client ID PayPal (paypal.js)", "error")
-      paymentProcessing.value = false; return
-    }
-    // Load PayPal SDK dynamically with the live clientId
-    if (!window.paypal) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement("script")
-        script.src = `https://www.paypal.com/sdk/js?client-id=${cfg.clientId}&currency=${cfg.currency || "EUR"}`
-        script.onload = resolve; script.onerror = reject
-        document.head.appendChild(script)
-      })
-    }
-    // Render PayPal buttons in #paypal-button-container
-    await new Promise(r => setTimeout(r, 100))
-    const container = document.getElementById("paypal-button-container")
-    if (container && container.innerHTML === "") {
-      window.paypal.Buttons({
-        createOrder: async () => {
-          if (cfg.createOrderUrl && !cfg.createOrderUrl.includes("votre-backend")) {
-            const res = await fetch(cfg.createOrderUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                amount: paymentModalSection.value?.amount,
-                currency: cfg.currency || "EUR",
-              }),
-            })
-            const data = await res.json()
-            return data.orderID
-          }
-          return null
-        },
-        onApprove: async (data) => {
-          if (cfg.captureOrderUrl && !cfg.captureOrderUrl.includes("votre-backend")) {
-            await fetch(cfg.captureOrderUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orderID: data.orderID }),
-            })
-          }
-          paymentSuccess.value = true
-          notify("✓ Paiement PayPal réussi !")
-          paymentProcessing.value = false
-        },
-        onError: (err) => {
-          notify("Erreur PayPal : " + err, "error")
-          paymentProcessing.value = false
-        }
-      }).render("#paypal-button-container")
-    }
-    paymentProcessing.value = false
-  } catch (e) {
-    notify("Erreur PayPal : " + e.message, "error")
-    paymentProcessing.value = false
-  }
-}
-
-// Live config objects du STORE (propres à chaque propriétaire)
-// Ces configs sont SÉPARÉES de stripe.js/paypal.js qui servent
-// pour les paiements des plans vers Sassbuilder
-const liveStripeConfig = ref({
-  publishableKey: "",
-  backendUrl: "",
-  currency: "eur",
-  storeName: "",
-  successUrl: "",
-  cancelUrl: "",
-  mode: "test",
-})
-const livePaypalConfig = ref({
-  clientId: "",
-  mode: "sandbox",
-  currency: "EUR",
-  locale: "fr_FR",
-  createOrderUrl: "",
-  captureOrderUrl: "",
-  successUrl: "",
-  brandName: "",
-})
+// Live config Anthropic (clé API) — utilisée pour une fonctionnalité IA
+// séparée, sans rapport avec les paiements.
 const liveAnthropicConfig = ref({
   apiKey: "",
 })
@@ -1235,16 +1055,9 @@ const loadSavedConfigs = async () => {
   if (!currentUser.value) return
   try {
     const { doc: fsDoc, getDoc: fsGet } = await import("firebase/firestore")
-    // Chercher dans users/{uid}/storePaymentConfig
     const userSnap = await fsGet(fsDoc(db, "users", currentUser.value.uid))
     if (userSnap.exists()) {
       const d = userSnap.data()
-      if (d.storePaymentConfig?.stripe) {
-        liveStripeConfig.value = { ...liveStripeConfig.value, ...d.storePaymentConfig.stripe }
-      }
-      if (d.storePaymentConfig?.paypal) {
-        livePaypalConfig.value = { ...livePaypalConfig.value, ...d.storePaymentConfig.paypal }
-      }
       if (d.storePaymentConfig?.anthropic) {
         liveAnthropicConfig.value = { ...liveAnthropicConfig.value, ...d.storePaymentConfig.anthropic }
       }
@@ -1254,57 +1067,8 @@ const loadSavedConfigs = async () => {
 
 const openConfigEditor = (target) => {
   configEditorTarget.value = target
-  // Auto-générer les URLs selon le slug publié du store
-  const uid  = currentUser.value?.uid || ""
-  const slug = publishAddress.value?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || uid
-  const base = "https://mronlinestores.com/#"
-
-  if (target === "stripe") {
-    const cfg = liveStripeConfig.value
-    // Si pas d'URLs configurées, générer automatiquement
-    // Stripe supprime tout après # → URL racine simple
-    // La détection du retour Stripe se fait dans main.js de SaasBuilder
-    const origin = "https://mronlinestores.com"
-    const successUrl = cfg.successUrl || `${origin}/`
-    const cancelUrl  = cfg.cancelUrl  || `${origin}/`
-    configEditorContent.value =
-`// ============================================================
-//  Config Stripe de VOTRE STORE
-//  Ces paramètres permettent à vos CLIENTS de vous payer.
-//  Différent de stripe.js (qui sert pour les plans Sassbuilder)
-// ============================================================
-{
-  "publishableKey": "${cfg.publishableKey || "pk_test_VOTRE_CLE_PUBLIQUE"}",
-  "backendUrl": "${cfg.backendUrl || "https://votre-backend.com/create-payment-intent"}",
-  "currency": "${cfg.currency || "eur"}",
-  "storeName": "${cfg.storeName || siteName.value}",
-  "successUrl": "${successUrl}",
-  "cancelUrl": "${cancelUrl}",
-  "mode": "${cfg.mode || "test"}"
-}`
-  } else {
-    const cfg = livePaypalConfig.value
-    const origin2 = "https://mronlinestores.com"
-    const successUrl = cfg.successUrl || `${origin2}/`
-    configEditorContent.value =
-`// ============================================================
-//  Config PayPal de VOTRE STORE
-//  Vos clients vous paient via votre propre compte PayPal.
-// ============================================================
-{
-  "clientId": "${cfg.clientId || "VOTRE_CLIENT_ID_PAYPAL"}",
-  "mode": "${cfg.mode || "sandbox"}",
-  "currency": "${cfg.currency || "EUR"}",
-  "locale": "${cfg.locale || "fr_FR"}",
-  "createOrderUrl": "${cfg.createOrderUrl || "https://votre-backend.com/paypal/create-order"}",
-  "captureOrderUrl": "${cfg.captureOrderUrl || "https://votre-backend.com/paypal/capture-order"}",
-  "successUrl": "${successUrl}",
-  "brandName": "${cfg.brandName || siteName.value}"
-}`
-  }
-  if (target === "anthropic") {
-    const cfg = liveAnthropicConfig.value
-    configEditorContent.value =
+  const cfg = liveAnthropicConfig.value
+  configEditorContent.value =
 `// ============================================================
 //  Clé API Anthropic — Produits Tendance 🔥
 //  Obtenez votre clé sur : https://console.anthropic.com/
@@ -1313,8 +1077,6 @@ const openConfigEditor = (target) => {
 {
   "apiKey": "${cfg.apiKey || "sk-ant-VOTRE_CLE_API_ICI"}"
 }`
-  }
-
   showConfigEditor.value = true
 }
 
@@ -1331,23 +1093,13 @@ const saveConfigFile = async () => {
     if (!jsonMatch) throw new Error("Format invalide — doit contenir { ... }")
     const parsed = JSON.parse(jsonMatch[0])
 
-    if (configEditorTarget.value === "stripe") {
-      liveStripeConfig.value = { ...liveStripeConfig.value, ...parsed }
-    } else if (configEditorTarget.value === "anthropic") {
-      liveAnthropicConfig.value = { ...liveAnthropicConfig.value, ...parsed }
-    } else {
-      livePaypalConfig.value = { ...livePaypalConfig.value, ...parsed }
-    }
+    liveAnthropicConfig.value = { ...liveAnthropicConfig.value, ...parsed }
 
-    // Sauvegarder dans Firestore users/{uid}/storePaymentConfig
-    const storePaymentConfig = {
-      stripe:    { ...liveStripeConfig.value },
-      paypal:    { ...livePaypalConfig.value },
-      anthropic: { ...liveAnthropicConfig.value },
-    }
+    // Sauvegarder dans Firestore users/{uid}/storePaymentConfig.anthropic
+    // (merge:true — ne touche pas à storePaymentConfig.stripe, où vit la devise du store)
     await setDoc(
       doc(db, "users", currentUser.value.uid),
-      { storePaymentConfig },
+      { storePaymentConfig: { anthropic: { ...liveAnthropicConfig.value } } },
       { merge: true }
     )
 
@@ -1363,7 +1115,7 @@ const downloadConfigFile = () => {
   const blob = new Blob([configEditorContent.value], { type: "text/javascript" })
   const a = document.createElement("a")
   a.href = URL.createObjectURL(blob)
-  a.download = configEditorTarget.value === "stripe" ? "stripe.js" : "paypal.js"
+  a.download = `${configEditorTarget.value}.js`
   a.click()
   notify(`${configEditorTarget.value}.js téléchargé ✓`)
 }
@@ -1949,18 +1701,18 @@ const setPageStyle = (type, value) => {
     </div>
   </Transition>
 
-  <!-- AVERTISSEMENT TEST DE PAIEMENT — s'affiche avant le test rapide -->
+  <!-- INFO PAIEMENT — rappelle que le vrai paiement passe par le site publié -->
   <Transition name="modal">
     <div v-if="showPaySlugWarning" class="modal-overlay" @click.self="showPaySlugWarning=false">
       <div class="modal-box pay-slug-warning-box">
         <button class="modal-close" @click="showPaySlugWarning=false">✕</button>
-        <div class="pay-slug-warning-icon">⚠️</div>
-        <h3 class="pay-slug-warning-title">Test de paiement réel</h3>
+        <div class="pay-slug-warning-icon">💳</div>
+        <h3 class="pay-slug-warning-title">Paiement réel via votre site publié</h3>
 
         <template v-if="publishedSlugValue">
           <p class="pay-slug-warning-text">
-            Ce test rapide reste utile pour vérifier votre configuration, mais ne suit pas le vrai parcours d'achat de vos clients.
-            Pour un test complet (panier, confirmation, annulation...), utilisez l'adresse publique de votre site déjà publié :
+            Le paiement de vos clients se fait via Stripe Connect, lié à votre boutique publiée — pas depuis cet aperçu.
+            Pour tester ou finaliser un achat, utilisez l'adresse publique de votre site :
           </p>
           <a
             class="pay-slug-warning-link"
@@ -1974,77 +1726,18 @@ const setPageStyle = (type, value) => {
               target="_blank" rel="noopener"
               style="text-align:center;text-decoration:none"
             >Ouvrir mon site publié</a>
-            <button class="btn-action pay-slug-btn" @click="proceedWithQuickPaymentTest">Continuer avec le test rapide</button>
           </div>
         </template>
 
         <template v-else>
           <p class="pay-slug-warning-text">
-            Ce test rapide reste utile pour vérifier votre configuration, mais ne suit pas le vrai parcours d'achat de vos clients.
-            Pour un test complet (panier, confirmation, annulation...), votre site doit d'abord être publié afin d'obtenir une adresse — par exemple <code>mronlinestores.com/#/mjz</code>.
+            Le paiement de vos clients se fait via Stripe Connect, lié à votre boutique une fois publiée — pas depuis cet aperçu.
+            Publiez d'abord votre site pour obtenir une adresse — par exemple <code>mronlinestores.com/#/mjz</code> — puis testez le paiement à cette adresse.
           </p>
           <div class="pay-slug-warning-actions">
             <button class="btn-action primary pay-slug-btn" @click="showPaySlugWarning=false; showPublishModal=true">Publier mon site</button>
-            <button class="btn-action pay-slug-btn" @click="proceedWithQuickPaymentTest">Continuer avec le test rapide</button>
           </div>
         </template>
-      </div>
-    </div>
-  </Transition>
-
-  <!-- PAYMENT MODAL -->
-  <Transition name="modal">
-    <div v-if="showPaymentModal" class="modal-overlay" @click.self="showPaymentModal=false">
-      <div class="modal-box payment-modal">
-        <button class="modal-close" @click="showPaymentModal=false">✕</button>
-        <div v-if="!paymentSuccess">
-          <div class="modal-header">
-            <span class="modal-icon">💳</span>
-            <h2>{{ paymentModalSection?.title || 'Finaliser le paiement' }}</h2>
-            <p class="modal-desc">{{ paymentModalSection?.description }}</p>
-            <div class="modal-amount">{{ paymentModalSection?.amount }}{{ paymentModalSection?.currency }}</div>
-          </div>
-          <div class="pay-tabs">
-            <button :class="['pay-tab-btn', { active: paymentProvider==='stripe' }]" @click="paymentProvider='stripe'">💳 Stripe</button>
-            <button :class="['pay-tab-btn', 'paypal-tab', { active: paymentProvider==='paypal' }]" @click="paymentProvider='paypal'">🅿 PayPal</button>
-          </div>
-          <div v-if="paymentProvider==='stripe'" class="pay-form">
-            <div class="pay-form-row">
-              <label>Informations de carte</label>
-              <!-- Stripe Elements s'injecte ici -->
-              <div id="stripe-card-element" class="stripe-card-el"></div>
-              <div id="stripe-card-errors" class="stripe-card-errors"></div>
-            </div>
-            <p class="pay-note">🔒 Paiement sécurisé via Stripe — <code>{{ liveStripeConfig.mode==='test'?'MODE TEST':'MODE LIVE' }}</code></p>
-            <button class="pay-submit stripe-submit" @click="processStripePayment" :disabled="paymentProcessing">
-              <span v-if="paymentProcessing" class="spinner"/>
-              {{ paymentProcessing?'Traitement...':`Payer ${paymentModalSection?.amount}${paymentModalSection?.currency}` }}
-            </button>
-          </div>
-          <div v-if="paymentProvider==='paypal'" class="pay-form">
-            <div class="paypal-info">
-              <div class="paypal-logo">PayPal</div>
-              <p>Paiement sécurisé via votre compte PayPal.</p>
-              <p class="pay-note">Mode : <code>{{ livePaypalConfig.mode==='sandbox'?'SANDBOX (test)':'LIVE' }}</code></p>
-            </div>
-            <!-- PayPal SDK injecte ses boutons ici -->
-            <div id="paypal-button-container" class="paypal-buttons-wrap"></div>
-            <button v-if="!paymentProcessing" class="pay-submit paypal-submit" @click="processPaypalPayment">
-              🅿 Initialiser PayPal
-            </button>
-            <span v-if="paymentProcessing" class="spinner paypal-spinner" style="margin:0 auto"/>
-          </div>
-          <div class="pay-config-links">
-            <button @click="openConfigEditor('stripe');showPaymentModal=false">⚙ stripe.js</button>
-            <button @click="openConfigEditor('paypal');showPaymentModal=false">⚙ paypal.js</button>
-          </div>
-        </div>
-        <div v-else class="pay-success">
-          <div class="pay-success-icon">✓</div>
-          <h2>Paiement réussi !</h2>
-          <p>Votre paiement a bien été traité.</p>
-          <button class="pay-submit stripe-submit" @click="showPaymentModal=false">Fermer</button>
-        </div>
       </div>
     </div>
   </Transition>
@@ -2055,8 +1748,8 @@ const setPageStyle = (type, value) => {
       <div class="modal-box config-modal">
         <button class="modal-close" @click="showConfigEditor=false">✕</button>
         <div class="modal-header">
-          <span class="modal-icon">{{ configEditorTarget==='stripe' ? '💳' : configEditorTarget==='anthropic' ? '🔑' : '🅿' }}</span>
-          <h2>Config {{ configEditorTarget==='stripe' ? 'Stripe' : configEditorTarget==='anthropic' ? 'Anthropic API' : 'PayPal' }} de votre store</h2>
+          <span class="modal-icon">🔑</span>
+          <h2>Config Anthropic API</h2>
           <p class="modal-desc">
             Configurez vos clés pour recevoir les paiements de <strong>vos clients</strong>.
             Sauvegardé dans Firestore — actif immédiatement.
@@ -2102,6 +1795,13 @@ const setPageStyle = (type, value) => {
             <input v-model="publishDomain" class="pub-input" :placeholder="t.domainPlaceholder"/>
           </div>
 
+          <div class="pub-field">
+            <label>Devise du store</label>
+            <select v-model="storeCurrency" class="pub-input">
+              <option v-for="c in CURRENCY_OPTIONS" :key="c.code" :value="c.code">{{ c.label }}</option>
+            </select>
+          </div>
+
           <button class="pay-submit stripe-submit" @click="publishSite" style="margin-top:8px">
             🚀 {{ t.publishBtn }}
           </button>
@@ -2109,6 +1809,13 @@ const setPageStyle = (type, value) => {
 
         <div v-else class="publish-result">
           <div class="pub-success-badge">✓ {{ t.publishSuccess }}</div>
+
+          <div class="pub-field" style="margin-bottom:14px">
+            <label>Devise du store</label>
+            <select v-model="storeCurrency" class="pub-input">
+              <option v-for="c in CURRENCY_OPTIONS" :key="c.code" :value="c.code">{{ c.label }}</option>
+            </select>
+          </div>
 
           <!-- URL slug (conviviale) -->
           <div class="pub-url-card">
@@ -2325,8 +2032,7 @@ const setPageStyle = (type, value) => {
             <p class="prev-payment-desc">{{ s.description }}</p>
             <div class="prev-payment-amount">{{ s.amount }}{{ s.currency }}</div>
             <div class="prev-payment-btns">
-              <button class="prev-pay-btn stripe-btn" @click="paymentProvider='stripe';openPaymentModal(s)">{{ t.prevPayStripe }}</button>
-              <button class="prev-pay-btn paypal-btn" @click="paymentProvider='paypal';openPaymentModal(s)">{{ t.prevPayPaypal }}</button>
+              <button class="prev-pay-btn stripe-btn" @click="openPaymentModal(s)">💳 Payer (vrai site uniquement)</button>
             </div>
           </div>
           <div v-else-if="s.type==='form'" class="prev-form" :style="s.style">
@@ -2886,14 +2592,7 @@ const setPageStyle = (type, value) => {
                 </div>
               </div>
               <div class="payment-preview-btns">
-                <button class="preview-pay-btn stripe-preview" @click.stop="paymentProvider='stripe';openPaymentModal(s)">{{ t.testStripe }}</button>
-                <button class="preview-pay-btn paypal-preview" @click.stop="paymentProvider='paypal';openPaymentModal(s)">{{ t.testPaypal }}</button>
-              </div>
-              <div class="payment-config-hint">
-                <span>⚙</span>
-                <button @click.stop="openConfigEditor('stripe')">stripe.js</button>
-                <span>·</span>
-                <button @click.stop="openConfigEditor('paypal')">paypal.js</button>
+                <button class="preview-pay-btn stripe-preview" @click.stop="openPaymentModal(s)">💳 Payer (vrai site uniquement)</button>
               </div>
             </div>
             <!-- FORM -->
@@ -2989,8 +2688,7 @@ const setPageStyle = (type, value) => {
                 <p class="prev-payment-desc">{{ s.description }}</p>
                 <div class="prev-payment-amount">{{ s.amount }}{{ s.currency }}</div>
                 <div class="prev-payment-btns">
-                  <button class="prev-pay-btn stripe-btn" @click="paymentProvider='stripe';openPaymentModal(s)">{{ t.prevPayStripe }}</button>
-                  <button class="prev-pay-btn paypal-btn" @click="paymentProvider='paypal';openPaymentModal(s)">{{ t.prevPayPaypal }}</button>
+                  <button class="prev-pay-btn stripe-btn" @click="openPaymentModal(s)">💳 Payer (vrai site uniquement)</button>
                 </div>
               </div>
               <div v-else-if="s.type==='form'" class="prev-form" :style="s.style">
