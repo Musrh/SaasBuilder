@@ -165,6 +165,13 @@ const saveDnsRecords = () => {
   showDnsInput.value = false
 }
 const publishInfo = ref(null)
+// Slug déjà publié par ce compte (s'il existe) — utilisé pour orienter
+// l'utilisateur vers un test de paiement réel plutôt que l'aperçu générique.
+const publishedSlugValue = ref("")
+// Avertissement affiché avant le test de paiement rapide : le rappelle
+// que ce test (depuis /#/saasgenerator) n'est pas un vrai parcours client.
+const showPaySlugWarning = ref(false)
+const pendingPaymentSection = ref(null)
 
 const publishSite = async () => {
   if (!publishAddress.value.trim()) { notify("Entrez une adresse pour le site.", "error"); return }
@@ -211,6 +218,7 @@ const publishSite = async () => {
 
     publishInfo.value = { slug, urlUid, urlSlug, domain, uid }
     publishStatus.value = "published"
+    publishedSlugValue.value = slug
 
     // 4. Générer publier.txt
     let txt = `=== WellShoppings — Publication du site ===\n`
@@ -312,6 +320,7 @@ onMounted(() => {
         if (d.siteName) siteName.value = d.siteName
         if (d.plan)     userPlan.value    = d.plan || "free"   // ← lire le vrai plan
         if (d.siteLogo) siteLogo.value = d.siteLogo
+        if (d.publishedSlug) publishedSlugValue.value = d.publishedSlug
         // Pas de fallback localStorage : un nouveau propriétaire démarre avec un site vierge
       } else {
         // Nouveau propriétaire : on garde le site vide initialisé en ref()
@@ -1028,6 +1037,16 @@ const addProduct = (section) => {
 const removeProduct = (section, i) => { section.items.splice(i, 1) }
 
 const openPaymentModal = (section) => {
+  pendingPaymentSection.value = section
+  showPaySlugWarning.value = true
+}
+
+// Lance effectivement le test de paiement rapide (comportement historique,
+// inchangé) une fois que l'utilisateur a vu l'avertissement et choisi de
+// continuer malgré tout.
+const proceedWithQuickPaymentTest = () => {
+  showPaySlugWarning.value = false
+  const section = pendingPaymentSection.value
   paymentModalSection.value = section; paymentSuccess.value = false
   paymentProcessing.value = false; showPaymentModal.value = true
 }
@@ -1926,6 +1945,49 @@ const setPageStyle = (type, value) => {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- AVERTISSEMENT TEST DE PAIEMENT — s'affiche avant le test rapide -->
+  <Transition name="modal">
+    <div v-if="showPaySlugWarning" class="modal-overlay" @click.self="showPaySlugWarning=false">
+      <div class="modal-box pay-slug-warning-box">
+        <button class="modal-close" @click="showPaySlugWarning=false">✕</button>
+        <div class="pay-slug-warning-icon">⚠️</div>
+        <h3 class="pay-slug-warning-title">Test de paiement réel</h3>
+
+        <template v-if="publishedSlugValue">
+          <p class="pay-slug-warning-text">
+            Ce test rapide reste utile pour vérifier votre configuration, mais ne suit pas le vrai parcours d'achat de vos clients.
+            Pour un test complet (panier, confirmation, annulation...), utilisez l'adresse publique de votre site déjà publié :
+          </p>
+          <a
+            class="pay-slug-warning-link"
+            :href="`https://mronlinestores.com/#/${publishedSlugValue}`"
+            target="_blank" rel="noopener"
+          >🔗 mronlinestores.com/#/{{ publishedSlugValue }}</a>
+          <div class="pay-slug-warning-actions">
+            <a
+              class="btn-action primary pay-slug-btn"
+              :href="`https://mronlinestores.com/#/${publishedSlugValue}`"
+              target="_blank" rel="noopener"
+              style="text-align:center;text-decoration:none"
+            >Ouvrir mon site publié</a>
+            <button class="btn-action pay-slug-btn" @click="proceedWithQuickPaymentTest">Continuer avec le test rapide</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <p class="pay-slug-warning-text">
+            Ce test rapide reste utile pour vérifier votre configuration, mais ne suit pas le vrai parcours d'achat de vos clients.
+            Pour un test complet (panier, confirmation, annulation...), votre site doit d'abord être publié afin d'obtenir une adresse — par exemple <code>mronlinestores.com/#/mjz</code>.
+          </p>
+          <div class="pay-slug-warning-actions">
+            <button class="btn-action primary pay-slug-btn" @click="showPaySlugWarning=false; showPublishModal=true">Publier mon site</button>
+            <button class="btn-action pay-slug-btn" @click="proceedWithQuickPaymentTest">Continuer avec le test rapide</button>
+          </div>
+        </template>
       </div>
     </div>
   </Transition>
@@ -2966,6 +3028,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .modal-header{text-align:center;margin-bottom:24px}
 .modal-icon{font-size:36px;display:block;margin-bottom:12px}
 .modal-header h2{font-family:'Playfair Display',serif;font-size:24px;color:var(--text);margin-bottom:6px}
+
+.pay-slug-warning-box{text-align:center;max-width:440px}
+.pay-slug-warning-icon{font-size:36px;margin-bottom:8px}
+.pay-slug-warning-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--text);margin:0 0 12px}
+.pay-slug-warning-text{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:16px;text-align:left}
+.pay-slug-warning-text code{background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:13px}
+.pay-slug-warning-link{display:block;font-size:14px;font-weight:600;color:var(--accent,#6c63ff);text-decoration:none;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:16px;word-break:break-all}
+.pay-slug-warning-link:hover{text-decoration:underline}
+.pay-slug-warning-actions{display:flex;flex-direction:column;gap:10px}
+.pay-slug-btn{justify-content:center;width:100%;padding:11px;font-size:14px}
 .modal-desc{font-size:14px;color:var(--text2)}
 .modal-amount{font-size:42px;font-weight:700;color:var(--accent);margin-top:12px}
 .modal-enter-active,.modal-leave-active{transition:all .25s ease}
