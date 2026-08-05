@@ -35,6 +35,7 @@ const routes = [
   // PAGE D'ACCUEIL = AuthForm
   // ======================
   { path: "/", name: "auth", component: AuthForm },
+  { path: "/auth", name: "auth1", component: AuthForm },
 
   //Page Guide Saas
   { path: "/guide", name: "guide", component: Guide },
