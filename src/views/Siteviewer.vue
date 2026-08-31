@@ -74,7 +74,7 @@ const currentPageIndex = ref(0)
 
 const storePayConfig = ref({ stripe: null, paypal: null })
 
-const storeOwner = ref({ plan: "free", paye: false, stripeVerified: false })
+const storeOwner = ref({ plan: "free", paye: false, stripeVerified: false, expiry: null })
 
 const isPro = computed(() =>
   storeOwner.value.plan === "pro" || storeOwner.value.paye === true
@@ -82,8 +82,12 @@ const isPro = computed(() =>
 
 // Plan Free  → paiement test toujours autorisé
 // Plan Pro   → autorisé seulement si stripeVerified === true (validé par admin SaaS)
+//              ET si l'abonnement n'est pas expiré (storeOwner.expiry)
 const paymentAllowed = computed(() => {
   if (!isPro.value) return true
+  // Abonnement Pro expiré → achats bloqués, quel que soit stripeVerified.
+  // Pas de champ expiry (anciens comptes) → on ne bloque pas par ce critère.
+  if (storeOwner.value.expiry && Date.now() > storeOwner.value.expiry) return false
   return storeOwner.value.stripeVerified === true
 })
 
@@ -318,7 +322,7 @@ const loadSite = async () => {
         site.value           = data.siteData
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
-        storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false, stripeVerified: data.stripeVerified === true }
+        storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false, stripeVerified: data.stripeVerified === true, expiry: data.expiry || null }
         // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
         if (data.lang && !sessionStorage.getItem("sv_lang_override")) {
           svLang.value = data.lang
@@ -363,7 +367,7 @@ const loadSite = async () => {
           site.value           = rd.siteData
           siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
           resolvedUid.value    = realUid
-          storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false, stripeVerified: rd.stripeVerified === true }
+          storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false, stripeVerified: rd.stripeVerified === true, expiry: rd.expiry || null }
           // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
           if (rd.lang && !sessionStorage.getItem("sv_lang_override")) {
             svLang.value = rd.lang
