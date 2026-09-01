@@ -91,6 +91,13 @@ const paymentAllowed = computed(() => {
   return storeOwner.value.stripeVerified === true
 })
 
+// Raison précise du blocage, pour afficher un message clair aux visiteurs.
+const paymentBlockedReason = computed(() => {
+  if (paymentAllowed.value) return null
+  if (storeOwner.value.expiry && Date.now() > storeOwner.value.expiry) return "expired"
+  return "unverified"
+})
+
 const BACKEND_URL = computed(() =>
   isPro.value
     ? "https://backendfinal-production-afd2.up.railway.app"
@@ -1112,6 +1119,15 @@ const saveOrder = async (provider, transactionId) => {
         </div>
 
         <div v-else-if="s.type==='products'" class="sv-products" :style="s.style">
+          <div v-if="!paymentAllowed" class="sv-payment-blocked-banner">
+            <span class="sv-payment-blocked-icon">🔒</span>
+            <span v-if="paymentBlockedReason==='expired'">
+              Les achats sont temporairement indisponibles : l'abonnement de cette boutique a expiré.
+            </span>
+            <span v-else>
+              Les achats sont temporairement indisponibles : le compte Stripe de cette boutique n'a pas encore été activé par le propriétaire.
+            </span>
+          </div>
           <div class="sv-products-grid">
             <div v-for="p in s.items" :key="p.id" class="sv-product-card">
               <div class="sv-product-img-wrap">
@@ -1152,7 +1168,8 @@ const saveOrder = async (provider, transactionId) => {
           <div v-if="!paymentAllowed" class="sv-payment-suspended">
             <div class="sv-payment-suspended-icon">🔒</div>
             <p class="sv-payment-suspended-title">Paiement temporairement suspendu</p>
-            <p class="sv-payment-suspended-msg">Le propriétaire de ce store finalise la configuration des paiements. Revenez bientôt.</p>
+            <p v-if="paymentBlockedReason==='expired'" class="sv-payment-suspended-msg">L'abonnement de cette boutique a expiré. Revenez bientôt.</p>
+            <p v-else class="sv-payment-suspended-msg">Le compte Stripe de cette boutique n'a pas encore été activé par le propriétaire. Revenez bientôt.</p>
           </div>
           <div v-else class="sv-payment-btns">
             <button class="sv-pay-btn sv-stripe"
@@ -1714,6 +1731,14 @@ const saveOrder = async (provider, transactionId) => {
 .sv-payment-suspended-icon  { font-size: 28px; margin-bottom: 8px; }
 .sv-payment-suspended-title { font-size: 15px; font-weight: 700; color: #ef4444; margin: 0 0 6px; }
 .sv-payment-suspended-msg   { font-size: 13px; color: #6b7280; margin: 0; line-height: 1.6; }
+
+.sv-payment-blocked-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(239,68,68,.06); border: 1px dashed rgba(239,68,68,.3);
+  border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;
+  font-size: 13px; color: #6b7280; line-height: 1.5;
+}
+.sv-payment-blocked-icon { font-size: 20px; flex-shrink: 0; }
 .sv-buy-suspended {
   background: #e5e7eb !important; color: #9ca3af !important;
   cursor: not-allowed !important; border-color: transparent !important;
