@@ -158,6 +158,39 @@ const svZip      = ref("")
 const svCity     = ref("")
 const svCountry  = ref("France")
 const cart         = ref([])
+
+// ── Persistance du panier ──────────────────────────────────────
+// Le panier ne vivait qu'en mémoire : n'importe quel rechargement de
+// page (zoom, retour accidentel, fermeture d'onglet...) l'effaçait.
+// On le sauvegarde maintenant dans localStorage, propre à chaque
+// boutique (clé basée sur resolvedUid), et on le restaure au chargement.
+const cartStorageKey = computed(() =>
+  resolvedUid.value ? `sv_cart_${resolvedUid.value}` : null
+)
+
+function loadCartFromStorage() {
+  if (!cartStorageKey.value) return
+  try {
+    const raw = localStorage.getItem(cartStorageKey.value)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) cart.value = parsed
+    }
+  } catch (e) { console.warn("loadCartFromStorage:", e.message) }
+}
+
+function saveCartToStorage() {
+  if (!cartStorageKey.value) return
+  try {
+    if (cart.value.length === 0) {
+      localStorage.removeItem(cartStorageKey.value)
+    } else {
+      localStorage.setItem(cartStorageKey.value, JSON.stringify(cart.value))
+    }
+  } catch (e) { console.warn("saveCartToStorage:", e.message) }
+}
+
+watch(cart, saveCartToStorage, { deep: true })
 const showCart     = ref(false)
 const showPayModal = ref(false)
 const payProvider  = ref("stripe")
@@ -330,6 +363,7 @@ const loadSite = async () => {
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false, stripeVerified: data.stripeVerified === true, expiry: data.expiry || null }
+        loadCartFromStorage()
         // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
         if (data.lang && !sessionStorage.getItem("sv_lang_override")) {
           svLang.value = data.lang
@@ -375,6 +409,7 @@ const loadSite = async () => {
           siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
           resolvedUid.value    = realUid
           storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false, stripeVerified: rd.stripeVerified === true, expiry: rd.expiry || null }
+          loadCartFromStorage()
           // Initialiser la langue depuis le store (si pas déjà choisie par le visiteur)
           if (rd.lang && !sessionStorage.getItem("sv_lang_override")) {
             svLang.value = rd.lang
