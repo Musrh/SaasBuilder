@@ -1,18 +1,26 @@
 <template>
-  <div class="af-root">
-    <!-- Logo en haut à gauche -->
+  <div class="af-root" :dir="isRtl ? 'rtl' : 'ltr'">
+    <!-- Logo en haut à gauche + sélecteur de langue -->
     <div class="af-topbar">
       <img :src="logo" alt="SaasBuilder" class="af-logo" />
+      <div class="af-lang-sel" dir="ltr">
+        <button
+          v-for="l in LANGS" :key="l.code"
+          :class="['af-lang-flag', lang===l.code && 'af-lang-active']"
+          @click="lang = l.code"
+          :title="l.label"
+        >{{ l.flag }}</button>
+      </div>
     </div>
 
     <div class="af-layout">
       <!-- Colonne gauche : présentation + offres -->
       <div class="af-left">
         <h1 class="af-hero-title">
-          Créez votre boutique en ligne en minutes
+          {{ t.heroTitle }}
         </h1>
         <p class="af-hero-sub">
-          Lancez un store professionnel sans écrire une ligne de code.
+          {{ t.heroSub }}
         </p>
 
         <!-- Features -->
@@ -20,45 +28,45 @@
           <div class="af-feature">
             <div class="af-feature-icon">🏗️</div>
             <div>
-              <div class="af-feature-title">Builder visuel</div>
-              <div class="af-feature-desc">Glissez-déposez vos sections. Aucun code requis.</div>
+              <div class="af-feature-title">{{ t.feat1Title }}</div>
+              <div class="af-feature-desc">{{ t.feat1Desc }}</div>
             </div>
           </div>
           <div class="af-feature">
             <div class="af-feature-icon">💳</div>
             <div>
-              <div class="af-feature-title">Paiements intégrés</div>
-              <div class="af-feature-desc">Stripe Connect pour recevoir les paiements directement.</div>
+              <div class="af-feature-title">{{ t.feat2Title }}</div>
+              <div class="af-feature-desc">{{ t.feat2Desc }}</div>
             </div>
           </div>
           <div class="af-feature">
             <div class="af-feature-icon">📦</div>
             <div>
-              <div class="af-feature-title">Gestion commandes</div>
-              <div class="af-feature-desc">Dashboard complet pour suivre vos ventes en temps réel.</div>
+              <div class="af-feature-title">{{ t.feat3Title }}</div>
+              <div class="af-feature-desc">{{ t.feat3Desc }}</div>
             </div>
           </div>
           <div class="af-feature">
             <div class="af-feature-icon">🌍</div>
             <div>
-              <div class="af-feature-title">Multi-langues</div>
-              <div class="af-feature-desc">Votre store en Français, Anglais, Arabe et Espagnol.</div>
+              <div class="af-feature-title">{{ t.feat4Title }}</div>
+              <div class="af-feature-desc">{{ t.feat4Desc }}</div>
             </div>
           </div>
         </div>
 
         <!-- Badges -->
         <div class="af-badges">
-          <span class="af-badge">🔒 Paiement sécurisé</span>
-          <span class="af-badge">⚡ Sans engagement</span>
-          <span class="af-badge">🛟 Support inclus</span>
+          <span class="af-badge">{{ t.trustSecure }}</span>
+          <span class="af-badge">{{ t.trustNoCommit }}</span>
+          <span class="af-badge">{{ t.trustSupport }}</span>
         </div>
 
         <div class="af-badges">
           
          <span class="af-badge"> 
      <button @click="goToGuide" class="af-back">
-          Comment utiliser se site
+          {{ t.guideBtn }}
       
         
      </button>
@@ -68,38 +76,38 @@
         
 
         <!-- Offres -->
-        <h2 class="af-offers-title">Nos offres</h2>
+        <h2 class="af-offers-title">{{ t.offersTitle }}</h2>
         <div class="af-plans">
           <div class="af-plan">
-            <div class="af-plan-name">Gratuit</div>
-            <div class="af-plan-price">0€<span>/mois</span></div>
-            <div class="af-plan-tag">Pour commencer sans risque</div>
+            <div class="af-plan-name">{{ t.freeName }}</div>
+            <div class="af-plan-price">0€<span>{{ t.perMonth }}</span></div>
+            <div class="af-plan-tag">{{ t.freeTagline }}</div>
             <ul class="af-plan-list">
-              <li class="ok">✓ Builder visuel</li>
+              <li class="ok">✓ {{ t.freeFeat1 }}</li>
               
-              <li class="ok">✓Multi-pages</li>
-              <li class="ok">✓Catalogue produits</li>
-              <li class="ok">✓Formulaires</li>
-              <li class="ok">✓Insertion videos</li>
-              <li class="ok">✓ Gestion commandes</li>
-              <li class="ok"> ✓Paiements clients(en mode test)</li>
+              <li class="ok">✓{{ t.freeFeat2 }}</li>
+              <li class="ok">✓{{ t.freeFeat3 }}</li>
+              <li class="ok">✓{{ t.freeFeat4 }}</li>
+              <li class="ok">✓{{ t.freeFeat5 }}</li>
+              <li class="ok">✓ {{ t.freeFeat6 }}</li>
+              <li class="ok"> ✓{{ t.freeFeat7 }}</li>
             </ul>
           </div>
           <div class="af-plan af-plan-pro">
-            <div class="af-plan-badge">Recommandé</div>
-            <div class="af-plan-name">Pro</div>
-            <div class="af-plan-price">10€<span>/mois</span></div>
-            <div class="af-plan-tag">Tout ce qu'il vous faut pour vendre</div>
+            <div class="af-plan-badge">{{ t.proBadge }}</div>
+            <div class="af-plan-name">{{ t.proName }}</div>
+            <div class="af-plan-price">10€<span>{{ t.perMonth }}</span></div>
+            <div class="af-plan-tag">{{ t.proTagline }}</div>
             <ul class="af-plan-list">
               
-              <li class="ok">✓ Builder complet</li>
-              <li class="ok">✓ Pages illimitées</li>
-              <li class="ok">✓ Paiements Stripe (en mode production)</li>
-              <li class="ok">✓ Catalogue produits</li>
-              <li class="ok">✓ Formulaires</li>
-              <li class="ok">✓ Insertion Videos</li>
-              <li class="ok">✓ Gestion Commandes</li>
-              <li class="ok">✓ Support prioritaire</li>
+              <li class="ok">✓ {{ t.proFeat1 }}</li>
+              <li class="ok">✓ {{ t.proFeat2 }}</li>
+              <li class="ok">✓ {{ t.proFeat3 }}</li>
+              <li class="ok">✓ {{ t.proFeat4 }}</li>
+              <li class="ok">✓ {{ t.proFeat5 }}</li>
+              <li class="ok">✓ {{ t.proFeat6 }}</li>
+              <li class="ok">✓ {{ t.proFeat7 }}</li>
+              <li class="ok">✓ {{ t.proFeat8 }}</li>
             </ul>
           </div>
         </div>
@@ -110,13 +118,13 @@
         <div class="af-card">
           <div class="af-header">
             <div class="af-emoji">👋</div>
-            <h2 class="af-title">Connexion / Inscription</h2>
-            <p class="af-sub">Accédez à votre espace SaasBuilder</p>
+            <h2 class="af-title">{{ t.authTitle }}</h2>
+            <p class="af-sub">{{ t.authSub }}</p>
           </div>
 
           <template v-if="!disabledUser">
           <div class="af-field">
-            <label class="af-label">Email</label>
+            <label class="af-label">{{ t.emailLabel }}</label>
             <input
               v-model="email"
               type="email"
@@ -127,7 +135,7 @@
           </div>
 
           <div class="af-field">
-            <label class="af-label">Mot de passe</label>
+            <label class="af-label">{{ t.passwordLabel }}</label>
             <input
               v-model="password"
               type="password"
@@ -145,7 +153,7 @@
               :disabled="loading"
               @click="forgotPassword"
             >
-              Mot de passe oublié ?
+              {{ t.forgotPassword }}
             </button>
           </div>
           </template><!-- /!disabledUser -->
@@ -197,15 +205,15 @@
 
           <div class="af-actions" v-if="!disabledUser">
             <button @click="login" :disabled="loading" class="af-btn af-btn-login">
-              🔑 Se connecter
+              {{ t.loginBtn }}
             </button>
             <button @click="register" :disabled="loading || pendingVerification" class="af-btn af-btn-register">
-              ✨ S'inscrire
+              {{ t.registerBtn }}
             </button>
           </div>
 
           <button @click="goToPlans" class="af-back" v-if="!disabledUser">
-            ← Retour au choix du plan
+            {{ t.backToPlans }}
           </button>
         </div>
       </div>
@@ -219,18 +227,18 @@
           © {{ new Date().getFullYear() }} SaasBuilder
         </div>
         <nav class="ps-footer-links">
-          <router-link to="/privacy">Privacy Policy</router-link>
-          <router-link to="/remboursement">Remboursement</router-link>
-          <router-link to="/confidentialite">Confidentialité</router-link>
-          <router-link to="/mentions">Mentions légales</router-link>
-          <router-link to="/conditions">Conditions générales</router-link>
+          <router-link to="/privacy">{{ t.footerPrivacy }}</router-link>
+          <router-link to="/remboursement">{{ t.footerRefund }}</router-link>
+          <router-link to="/confidentialite">{{ t.footerConfidentiality }}</router-link>
+          <router-link to="/mentions">{{ t.footerLegal }}</router-link>
+          <router-link to="/conditions">{{ t.footerTerms }}</router-link>
         </nav>
       </div>
     </footer>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, computed, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { db, auth } from "../firebase"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
@@ -249,6 +257,123 @@ const logo = "/logo.png"
 
 const route  = useRoute()
 const router = useRouter()
+
+// ── Langue (contenu marketing statique uniquement — les messages
+// d'erreur/succès liés à Firebase restent en français) ─────────
+const LANGS = [
+  { code: "fr", flag: "🇫🇷", label: "Français" },
+  { code: "en", flag: "🇬🇧", label: "English" },
+  { code: "ar", flag: "🇲🇦", label: "العربية" },
+  { code: "es", flag: "🇪🇸", label: "Español" },
+]
+const lang = ref(localStorage.getItem("af_lang") || "fr")
+watch(lang, (v) => localStorage.setItem("af_lang", v))
+const isRtl = computed(() => lang.value === "ar")
+
+const TRANSLATIONS = {
+  fr: {
+    heroTitle: "Créez votre boutique en ligne en minutes",
+    heroSub: "Lancez un store professionnel sans écrire une ligne de code.",
+    feat1Title: "Builder visuel", feat1Desc: "Glissez-déposez vos sections. Aucun code requis.",
+    feat2Title: "Paiements intégrés", feat2Desc: "Stripe Connect pour recevoir les paiements directement.",
+    feat3Title: "Gestion commandes", feat3Desc: "Dashboard complet pour suivre vos ventes en temps réel.",
+    feat4Title: "Multi-langues", feat4Desc: "Votre store en Français, Anglais, Arabe et Espagnol.",
+    trustSecure: "🔒 Paiement sécurisé", trustNoCommit: "⚡ Sans engagement", trustSupport: "🛟 Support inclus",
+    guideBtn: "Comment utiliser ce site",
+    offersTitle: "Nos offres",
+    perMonth: "/mois",
+    freeName: "Gratuit", freeTagline: "Pour commencer sans risque",
+    freeFeat1: "Builder visuel", freeFeat2: "Multi-pages", freeFeat3: "Catalogue produits",
+    freeFeat4: "Formulaires", freeFeat5: "Insertion videos", freeFeat6: "Gestion commandes",
+    freeFeat7: "Paiements clients (en mode test)",
+    proBadge: "Recommandé", proName: "Pro", proTagline: "Tout ce qu'il vous faut pour vendre",
+    proFeat1: "Builder complet", proFeat2: "Pages illimitées", proFeat3: "Paiements Stripe (en mode production)",
+    proFeat4: "Catalogue produits", proFeat5: "Formulaires", proFeat6: "Insertion Videos",
+    proFeat7: "Gestion Commandes", proFeat8: "Support prioritaire",
+    authTitle: "Connexion / Inscription", authSub: "Accédez à votre espace SaasBuilder",
+    emailLabel: "Email", passwordLabel: "Mot de passe", forgotPassword: "Mot de passe oublié ?",
+    loginBtn: "🔑 Se connecter", registerBtn: "✨ S'inscrire", backToPlans: "← Retour au choix du plan",
+    footerPrivacy: "Privacy Policy", footerRefund: "Remboursement",
+    footerConfidentiality: "Confidentialité", footerLegal: "Mentions légales", footerTerms: "Conditions générales",
+  },
+  en: {
+    heroTitle: "Build your online store in minutes",
+    heroSub: "Launch a professional store without writing a line of code.",
+    feat1Title: "Visual builder", feat1Desc: "Drag and drop your sections. No code required.",
+    feat2Title: "Built-in payments", feat2Desc: "Stripe Connect to receive payments directly.",
+    feat3Title: "Order management", feat3Desc: "Full dashboard to track your sales in real time.",
+    feat4Title: "Multi-language", feat4Desc: "Your store in French, English, Arabic and Spanish.",
+    trustSecure: "🔒 Secure payment", trustNoCommit: "⚡ No commitment", trustSupport: "🛟 Support included",
+    guideBtn: "How to use this site",
+    offersTitle: "Our plans",
+    perMonth: "/month",
+    freeName: "Free", freeTagline: "Start risk-free",
+    freeFeat1: "Visual builder", freeFeat2: "Multiple pages", freeFeat3: "Product catalog",
+    freeFeat4: "Forms", freeFeat5: "Video embeds", freeFeat6: "Order management",
+    freeFeat7: "Customer payments (test mode)",
+    proBadge: "Recommended", proName: "Pro", proTagline: "Everything you need to sell",
+    proFeat1: "Full builder", proFeat2: "Unlimited pages", proFeat3: "Stripe payments (production mode)",
+    proFeat4: "Product catalog", proFeat5: "Forms", proFeat6: "Video embeds",
+    proFeat7: "Order management", proFeat8: "Priority support",
+    authTitle: "Log in / Sign up", authSub: "Access your SaasBuilder space",
+    emailLabel: "Email", passwordLabel: "Password", forgotPassword: "Forgot password?",
+    loginBtn: "🔑 Log in", registerBtn: "✨ Sign up", backToPlans: "← Back to plan selection",
+    footerPrivacy: "Privacy Policy", footerRefund: "Refunds",
+    footerConfidentiality: "Confidentiality", footerLegal: "Legal Notice", footerTerms: "Terms of Service",
+  },
+  ar: {
+    heroTitle: "أنشئ متجرك الإلكتروني في دقائق",
+    heroSub: "أطلق متجراً محترفاً دون كتابة أي سطر من الكود.",
+    feat1Title: "منشئ مرئي", feat1Desc: "اسحب وأسقط أقسامك. لا حاجة للكود.",
+    feat2Title: "مدفوعات مدمجة", feat2Desc: "Stripe Connect لاستقبال المدفوعات مباشرة.",
+    feat3Title: "إدارة الطلبات", feat3Desc: "لوحة تحكم كاملة لتتبع مبيعاتك في الوقت الفعلي.",
+    feat4Title: "متعدد اللغات", feat4Desc: "متجرك بالفرنسية والإنجليزية والعربية والإسبانية.",
+    trustSecure: "🔒 دفع آمن", trustNoCommit: "⚡ بدون التزام", trustSupport: "🛟 دعم مشمول",
+    guideBtn: "كيفية استخدام هذا الموقع",
+    offersTitle: "عروضنا",
+    perMonth: "/شهرياً",
+    freeName: "مجاني", freeTagline: "ابدأ بدون مخاطرة",
+    freeFeat1: "منشئ مرئي", freeFeat2: "صفحات متعددة", freeFeat3: "كتالوج المنتجات",
+    freeFeat4: "نماذج", freeFeat5: "إدراج فيديوهات", freeFeat6: "إدارة الطلبات",
+    freeFeat7: "مدفوعات العملاء (وضع الاختبار)",
+    proBadge: "موصى به", proName: "Pro", proTagline: "كل ما تحتاجه للبيع",
+    proFeat1: "منشئ كامل", proFeat2: "صفحات غير محدودة", proFeat3: "مدفوعات Stripe (وضع الإنتاج)",
+    proFeat4: "كتالوج المنتجات", proFeat5: "نماذج", proFeat6: "إدراج فيديوهات",
+    proFeat7: "إدارة الطلبات", proFeat8: "دعم أولوي",
+    authTitle: "تسجيل الدخول / إنشاء حساب", authSub: "الوصول إلى مساحة SaasBuilder الخاصة بك",
+    emailLabel: "البريد الإلكتروني", passwordLabel: "كلمة المرور", forgotPassword: "نسيت كلمة المرور؟",
+    loginBtn: "🔑 تسجيل الدخول", registerBtn: "✨ إنشاء حساب", backToPlans: "← رجوع لاختيار الخطة",
+    footerPrivacy: "سياسة الخصوصية", footerRefund: "الاستعادة",
+    footerConfidentiality: "السرية", footerLegal: "الإشعار القانوني", footerTerms: "الشروط العامة",
+  },
+  es: {
+    heroTitle: "Crea tu tienda en línea en minutos",
+    heroSub: "Lanza una tienda profesional sin escribir una línea de código.",
+    feat1Title: "Constructor visual", feat1Desc: "Arrastra y suelta tus secciones. Sin código.",
+    feat2Title: "Pagos integrados", feat2Desc: "Stripe Connect para recibir pagos directamente.",
+    feat3Title: "Gestión de pedidos", feat3Desc: "Panel completo para seguir tus ventas en tiempo real.",
+    feat4Title: "Multilingüe", feat4Desc: "Tu tienda en francés, inglés, árabe y español.",
+    trustSecure: "🔒 Pago seguro", trustNoCommit: "⚡ Sin compromiso", trustSupport: "🛟 Soporte incluido",
+    guideBtn: "Cómo usar este sitio",
+    offersTitle: "Nuestros planes",
+    perMonth: "/mes",
+    freeName: "Gratis", freeTagline: "Empieza sin riesgo",
+    freeFeat1: "Constructor visual", freeFeat2: "Múltiples páginas", freeFeat3: "Catálogo de productos",
+    freeFeat4: "Formularios", freeFeat5: "Inserción de videos", freeFeat6: "Gestión de pedidos",
+    freeFeat7: "Pagos de clientes (modo prueba)",
+    proBadge: "Recomendado", proName: "Pro", proTagline: "Todo lo que necesitas para vender",
+    proFeat1: "Constructor completo", proFeat2: "Páginas ilimitadas", proFeat3: "Pagos Stripe (modo producción)",
+    proFeat4: "Catálogo de productos", proFeat5: "Formularios", proFeat6: "Inserción de videos",
+    proFeat7: "Gestión de pedidos", proFeat8: "Soporte prioritario",
+    authTitle: "Iniciar sesión / Registrarse", authSub: "Accede a tu espacio SaasBuilder",
+    emailLabel: "Correo electrónico", passwordLabel: "Contraseña", forgotPassword: "¿Olvidaste tu contraseña?",
+    loginBtn: "🔑 Iniciar sesión", registerBtn: "✨ Registrarse", backToPlans: "← Volver a los planes",
+    footerPrivacy: "Política de Privacidad", footerRefund: "Reembolsos",
+    footerConfidentiality: "Confidencialidad", footerLegal: "Aviso Legal", footerTerms: "Términos y Condiciones",
+  },
+}
+
+const t = computed(() => TRANSLATIONS[lang.value] || TRANSLATIONS.fr)
 
 const email               = ref("")
 const password            = ref("")
@@ -498,12 +623,21 @@ const goToGuide = () => router.push("/guide")
   margin: 0 auto 24px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 .af-logo {
   height: 44px;
   width: auto;
   object-fit: contain;
 }
+.af-lang-sel { display: flex; gap: 4px; }
+.af-lang-flag {
+  background: rgba(0,0,0,.04); border: 1px solid transparent;
+  border-radius: 8px; padding: 5px 8px; font-size: 17px; line-height: 1;
+  cursor: pointer; transition: .15s;
+}
+.af-lang-flag:hover { background: rgba(0,0,0,.08); }
+.af-lang-active { border-color: #6c63ff; background: rgba(108,99,255,.12); }
 
 /* Layout 2 colonnes */
 .af-layout {
