@@ -180,6 +180,8 @@ const publishedSlugValue = ref("")
 const showPaySlugWarning = ref(false)
 
 const publishSite = async () => {
+  // Recopier les éditeurs contenteditable avant d'enregistrer/publication.
+  syncAllTextEditors()
   if (!publishAddress.value.trim()) { notify("Entrez une adresse pour le site.", "error"); return }
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
 
@@ -888,6 +890,29 @@ const saveSite = async () => {
   } finally { isSaving.value = false }
 }
 
+// Sauvegarder avant de quitter l'éditeur : sinon l'aperçu public ou le slug
+// relisent l'ancienne version stockée dans Firestore.
+const persistBeforePreview = async () => {
+  syncAllTextEditors()
+  if (!isSaved.value) {
+    await saveSite()
+  }
+}
+
+const toggleEditorPreview = async () => {
+  if (mode.value === "preview") {
+    mode.value = "edit"
+    return
+  }
+  await persistBeforePreview()
+  mode.value = "preview"
+}
+
+const openPublicPreview = async () => {
+  await persistBeforePreview()
+  showPublicPreview.value = true
+}
+
 // Synchroniser la collection prodinfos depuis siteData
 const syncProdinfos = async (uid, rawSite) => {
   try {
@@ -1122,6 +1147,15 @@ const syncTextEditorContent = () => {
   const editor = activeTextEditor.value
   const section = currentPage.value?.sections?.find(s => String(s.id) === String(textEditorSectionId.value))
   if (editor && section) section.content = editor.innerHTML
+}
+
+const syncAllTextEditors = () => {
+  document.querySelectorAll(".rich-text-editor").forEach(editor => {
+    const section = currentPage.value?.sections?.find(
+      s => String(s.id) === String(editor.dataset.sectionId)
+    )
+    if (section) section.content = editor.innerHTML
+  })
 }
 
 const applyTextFormat = (command, value = null) => {
@@ -2513,12 +2547,12 @@ const setPageStyle = (type, value) => {
       <div class="brand-quick-btns">
         <button
           class="btn-action bqb"
-          @click="mode = mode==='preview' ? 'edit' : 'preview'"
+          @click="toggleEditorPreview"
           :title="mode==='preview' ? t.edit : t.preview"
         >{{ mode==='preview' ? '✏️' : '👁' }}</button>
         <button
           class="btn-action bqb"
-          @click="showPublicPreview=true"
+          @click="openPublicPreview"
           title="Aperçu public"
         >🔍</button>
       </div>
