@@ -300,6 +300,70 @@ const getEmbedUrl = (url) => {
   return url
 }
 
+const escapeHtml = (value = "") => String(value)
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;")
+
+// Les sections texte du builder peuvent contenir du HTML riche (gras,
+// souligné, listes, images et vidéos intégrées). Les anciennes données
+// contiennent encore du texte simple : elles restent donc compatibles.
+const sanitizeRichText = (html) => {
+  if (typeof document === "undefined") return html
+
+  const template = document.createElement("template")
+  template.innerHTML = html
+  const allowedTags = new Set([
+    "P", "BR", "DIV", "SPAN", "STRONG", "B", "EM", "I", "U", "S", "DEL",
+    "H1", "H2", "H3", "UL", "OL", "LI", "BLOCKQUOTE", "A", "IMG",
+    "VIDEO", "IFRAME"
+  ])
+  const allowedAttributes = new Set([
+    "class", "style", "href", "target", "rel", "src", "alt", "title",
+    "controls", "allow", "allowfullscreen", "loading"
+  ])
+
+  template.content.querySelectorAll("*").forEach((node) => {
+    if (!allowedTags.has(node.tagName)) {
+      node.replaceWith(...Array.from(node.childNodes))
+      return
+    }
+
+    Array.from(node.attributes).forEach((attribute) => {
+      const name = attribute.name.toLowerCase()
+      const value = attribute.value.trim()
+      if (name.startsWith("on") || !allowedAttributes.has(name)) {
+        node.removeAttribute(attribute.name)
+        return
+      }
+      if (name === "style" && /expression|javascript:|url\s*\(/i.test(value)) {
+        node.removeAttribute(attribute.name)
+        return
+      }
+      if ((name === "href" || name === "src") && /^(javascript|vbscript):/i.test(value)) {
+        node.removeAttribute(attribute.name)
+      }
+    })
+
+    if (node.tagName === "IFRAME" && !/^https:\/\//i.test(node.getAttribute("src") || "")) {
+      node.remove()
+    }
+  })
+
+  return template.innerHTML
+}
+
+const contentToHtml = (content = "") => {
+  const raw = String(content ?? "")
+  if (!raw) return "<p><br></p>"
+  const html = /<[a-z][^>]*>/i.test(raw)
+    ? raw
+    : escapeHtml(raw).replace(/\r?\n/g, "<br>")
+  return sanitizeRichText(html)
+}
+
 const debugInfo = ref("")
 
 // ── Helper : vérifie si le compte est actif ───────────────
@@ -1131,7 +1195,7 @@ const saveOrder = async (provider, transactionId) => {
         </div>
 
         <div v-else-if="s.type==='text'" class="sv-text" :style="s.style">
-          <p>{{ s.content }}</p>
+          <div class="sv-rich-text" v-html="contentToHtml(s.content)"></div>
         </div>
 
         <div v-else-if="s.type==='image'" class="sv-image" :style="s.style">
@@ -1549,7 +1613,17 @@ const saveOrder = async (provider, transactionId) => {
 .sv-hero-sub{font-size:20px;color:#6b7280;margin-bottom:32px}
 .sv-hero-cta{background:#6c63ff;color:white;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
 .sv-hero-cta:hover{transform:translateY(-2px)}
-.sv-text{padding:48px 60px}.sv-text p{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
+.sv-text{padding:48px 60px}
+.sv-rich-text{font-size:17px;line-height:1.8;color:#374151;max-width:720px;overflow-wrap:anywhere}
+.sv-rich-text p,.sv-rich-text div{margin:0 0 10px}
+.sv-rich-text h1,.sv-rich-text h2,.sv-rich-text h3{color:var(--theme-text,#1a1a2e);line-height:1.25;margin:10px 0}
+.sv-rich-text ul,.sv-rich-text ol{padding-left:24px;margin:10px 0}
+.sv-rich-text blockquote{border-left:3px solid var(--theme-accent,#6c63ff);padding-left:12px;color:#6b7280;margin:10px 0}
+.sv-rich-text a{color:var(--theme-accent,#6c63ff);text-decoration:underline}
+.sv-rich-text img{display:block;max-width:100%;height:auto;border-radius:12px;margin:16px 0}
+.sv-rich-text .inline-media-video-wrap{width:100%;aspect-ratio:16/9;margin:16px 0}
+.sv-rich-text .inline-media-video-wrap iframe{width:100%;height:100%;border:0;border-radius:12px}
+.sv-rich-text .inline-media-video{display:block;width:100%;max-height:560px;border-radius:12px;margin:16px 0}
 .sv-image{padding:32px 60px}.sv-image img{width:100%;border-radius:12px;display:block}
 .sv-gallery{padding:32px 60px}.sv-gallery-grid{display:grid;gap:10px}
 .sv-gallery-item{border-radius:10px;overflow:hidden;aspect-ratio:1}
