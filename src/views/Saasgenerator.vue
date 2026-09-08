@@ -33,6 +33,8 @@ const textEditorSectionId = ref(null)
 const textSelectionActive = ref(false)
 const activeTextEditor = ref(null)
 const savedTextRange = ref(null)
+let siteReadyForAutoSave = false
+let autoSaveTimer = null
 const isSaved = ref(true)
 const isSaving = ref(false)
 const currentUser = ref(null)
@@ -302,6 +304,7 @@ onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     if (!user) return
     currentUser.value = user
+    siteReadyForAutoSave = false
     await loadSavedConfigs()
 
     // Ne recharger Firestore que lors de la première auth
@@ -343,11 +346,16 @@ onMounted(() => {
       notify(t.value.loadError, "error")
       const saved = localStorage.getItem("siteDataPro")
       if (saved) site.value = JSON.parse(saved)
+    } finally {
+      siteReadyForAutoSave = true
     }
   })
 })
 
-watch(site, () => { isSaved.value = false }, { deep: true })
+watch(site, () => {
+  isSaved.value = false
+  if (siteReadyForAutoSave && currentUser.value) scheduleAutoSave()
+}, { deep: true })
 watch(siteName, (v) => { localStorage.setItem("siteName", v) })
 watch(siteLogo, (v) => { localStorage.setItem("siteLogo", v) })
 watch(storeCurrency, async (v) => {
@@ -850,6 +858,7 @@ const signOutUser = async () => {
 
 const saveSite = async () => {
   if (isSaving.value) return
+  syncAllTextEditors()
   // Si currentUser pas encore chargé → attendre jusqu'à 3s
   if (!currentUser.value) {
     let waited = 0
@@ -870,6 +879,12 @@ const saveSite = async () => {
     const docRef  = doc(db, "users", uid)
     const rawSite = JSON.parse(JSON.stringify(site.value))
 
+    // Garder aussi une copie locale : elle permet de récupérer les dernières
+    // modifications si la connexion Firestore est momentanément indisponible.
+    try { localStorage.setItem("siteDataPro", JSON.stringify(rawSite)) } catch (storageError) {
+      console.warn("Copie locale impossible :", storageError.message)
+    }
+
     // 1. Sauvegarder siteData dans users/{uid}
     await setDoc(docRef, {
       siteData:  rawSite,
@@ -886,8 +901,23 @@ const saveSite = async () => {
     notify(t.value.saved)
   } catch (e) {
     console.error("Erreur sauvegarde :", e)
-    notify(t.value.saveError, "error")
+    const detail = e?.code === "resource-exhausted"
+      ? "Le contenu dépasse la limite Firestore (notamment si une vidéo est très volumineuse)."
+      : (e?.message ? ` (${e.message})` : "")
+    notify(t.value.saveError + detail, "error")
   } finally { isSaving.value = false }
+}
+
+const scheduleAutoSave = () => {
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(async () => {
+    if (!siteReadyForAutoSave || !currentUser.value) return
+    if (isSaving.value) {
+      scheduleAutoSave()
+      return
+    }
+    await saveSite()
+  }, 900)
 }
 
 // Sauvegarder avant de quitter l'éditeur : sinon l'aperçu public ou le slug
