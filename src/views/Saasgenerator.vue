@@ -28,6 +28,7 @@ const activeSectionIndex = ref(null)
 const dragSectionIndex = ref(null)
 const dragOverSectionIndex = ref(null)
 const textImageInput = ref(null)
+const textVideoInput = ref(null)
 const textEditorSectionId = ref(null)
 const textSelectionActive = ref(false)
 const activeTextEditor = ref(null)
@@ -1073,6 +1074,29 @@ const captureTextSelection = (event) => {
   textSelectionActive.value = !selection.isCollapsed && selection.toString().trim().length > 0
 }
 
+const activateTextEditor = (sectionId) => {
+  const editor = Array.from(document.querySelectorAll(".rich-text-editor"))
+    .find(node => String(node.dataset.sectionId) === String(sectionId))
+  if (!editor) return false
+
+  activeTextEditor.value = editor
+  textEditorSectionId.value = String(sectionId)
+
+  // Si aucun texte n'est sélectionné, insérer à la fin du contenu.
+  const selection = window.getSelection()
+  const hasValidRange = savedTextRange.value &&
+    editor.contains(savedTextRange.value.commonAncestorContainer)
+  if (!hasValidRange) {
+    const range = document.createRange()
+    range.selectNodeContents(editor)
+    range.collapse(false)
+    savedTextRange.value = range
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+  return true
+}
+
 const updateTextContent = (event, section) => {
   section.content = event.currentTarget.innerHTML
   activeTextEditor.value = event.currentTarget
@@ -1107,7 +1131,8 @@ const applyTextFormat = (command, value = null) => {
   captureTextSelection({ currentTarget: activeTextEditor.value })
 }
 
-const openTextImagePicker = () => {
+const openTextImagePicker = (sectionId) => {
+  if (sectionId !== undefined) activateTextEditor(sectionId)
   textImageInput.value?.click()
 }
 
@@ -1129,7 +1154,31 @@ const insertTextImage = (event) => {
   reader.readAsDataURL(file)
 }
 
-const insertTextVideo = () => {
+const openTextVideoPicker = (sectionId) => {
+  activateTextEditor(sectionId)
+  textVideoInput.value?.click()
+}
+
+const insertTextVideoFile = (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ""
+  if (!file || !restoreTextSelection()) return
+  const reader = new FileReader()
+  reader.onload = (loadEvent) => {
+    const src = loadEvent.target.result
+    document.execCommand(
+      "insertHTML",
+      false,
+      `<video controls class="inline-media-video" src="${src}"></video>`
+    )
+    syncTextEditorContent()
+    textSelectionActive.value = false
+  }
+  reader.readAsDataURL(file)
+}
+
+const insertTextVideo = (sectionId = null) => {
+  if (sectionId !== null) activateTextEditor(sectionId)
   const url = window.prompt("Collez l'URL de la vidéo (YouTube, Vimeo ou fichier MP4/WebM) :")
   if (!url || !restoreTextSelection()) return
   const cleanUrl = url.trim()
@@ -1822,6 +1871,13 @@ const setPageStyle = (type, value) => {
     accept="image/*"
     hidden
     @change="insertTextImage"
+  />
+  <input
+    ref="textVideoInput"
+    type="file"
+    accept="video/*"
+    hidden
+    @change="insertTextVideoFile"
   />
 
   <!-- NOTIFICATION -->
@@ -2695,7 +2751,7 @@ const setPageStyle = (type, value) => {
             <!-- TEXT -->
             <div v-else-if="s.type==='text'" class="sec-text" :style="s.style">
               <div
-                v-if="activeSectionIndex===i && textEditorSectionId===String(s.id) && textSelectionActive"
+                v-if="activeSectionIndex===i"
                 class="text-format-toolbar"
                 @mousedown.stop
               >
@@ -2710,8 +2766,9 @@ const setPageStyle = (type, value) => {
                 <button type="button" title="Aligner à gauche" @mousedown.prevent="applyTextFormat('justifyLeft')">≡</button>
                 <button type="button" title="Centrer" @mousedown.prevent="applyTextFormat('justifyCenter')">≡</button>
                 <span class="toolbar-separator"></span>
-                <button type="button" title="Insérer une image" @mousedown.prevent="openTextImagePicker">🖼️</button>
-                <button type="button" title="Insérer une vidéo" @mousedown.prevent="insertTextVideo">▶️</button>
+                <button type="button" class="toolbar-media-btn" title="Téléverser une image dans le texte" @mousedown.prevent="openTextImagePicker(s.id)">🖼️ Image</button>
+                <button type="button" class="toolbar-media-btn" title="Téléverser une vidéo dans le texte" @mousedown.prevent="openTextVideoPicker(s.id)">🎬 Vidéo</button>
+                <button type="button" class="toolbar-media-btn" title="Insérer une vidéo depuis une URL" @mousedown.prevent="insertTextVideo(s.id)">🔗 URL</button>
               </div>
               <div
                 class="text-input rich-text-editor"
@@ -3099,6 +3156,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .text-format-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px 8px;background:#1f1f23;border:1px solid #35353c;border-radius:8px;box-shadow:0 5px 16px rgba(0,0,0,.16);position:sticky;top:8px;z-index:12}
 .text-format-toolbar button{min-width:28px;height:28px;padding:3px 7px;border:1px solid #4a4a55;border-radius:5px;background:#2a2a30;color:#f0f0f0;cursor:pointer;font-family:'DM Sans',sans-serif}
 .text-format-toolbar button:hover{background:var(--accent);border-color:var(--accent)}
+.text-format-toolbar .toolbar-media-btn{font-size:11px;font-weight:600}
 .text-format-toolbar .toolbar-separator{width:1px;height:20px;background:#4a4a55;margin:0 2px}
 .inline-media-image{display:block;max-width:100%;height:auto;border-radius:8px;margin:12px 0}
 .inline-media-video-wrap{width:100%;margin:12px 0;aspect-ratio:16/9}
