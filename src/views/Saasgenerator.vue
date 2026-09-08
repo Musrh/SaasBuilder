@@ -25,6 +25,13 @@ const site = ref({
 const mode = ref("edit")
 const currentPageIndex = ref(0)
 const activeSectionIndex = ref(null)
+const dragSectionIndex = ref(null)
+const dragOverSectionIndex = ref(null)
+const textImageInput = ref(null)
+const textEditorSectionId = ref(null)
+const textSelectionActive = ref(false)
+const activeTextEditor = ref(null)
+const savedTextRange = ref(null)
 const isSaved = ref(true)
 const isSaving = ref(false)
 const currentUser = ref(null)
@@ -965,6 +972,7 @@ const sectionTypes = computed(() => [
   // { key: "payment", ... } masqué — Stripe Connect
   { key: "form",     label: t.value.contactLabel.split(" ")[0], icon: "✉️", desc: t.value.sForm },
   { key: "divider",  label: t.value.publish==="نشر"?"فاصل":"Séparateur", icon: "—", desc: t.value.sDivider },
+  { key: "spacer",   label: "Espace",       icon: "↕️", desc: "Saut de ligne entre sections" },
 ])
 
 const sectionDefaults = {
@@ -985,7 +993,8 @@ const sectionDefaults = {
   ], style: {} },
   payment:  { type: "payment", title: "Finaliser l'achat", amount: "29.99", currency: "€", description: "Accès Premium — 1 mois", style: {} },
   form:     { type: "form", style: {} },
-  divider:  { type: "divider", style: {} }
+  divider:  { type: "divider", style: {} },
+  spacer:   { type: "spacer", height: 32, style: {} }
 }
 
 const addSection = (key) => {
@@ -1029,6 +1038,151 @@ const getEmbedUrl = (url) => {
   const vm = url.match(/vimeo\.com\/(\d+)/)
   if (vm) return `https://player.vimeo.com/video/${vm[1]}`
   return url
+}
+
+// ── Éditeur de texte riche ───────────────────────────────────────
+// Les anciennes sections texte contiennent du texte brut. On le convertit
+// seulement à l'affichage afin de conserver la compatibilité des sites déjà
+// enregistrés, tout en permettant maintenant de stocker du HTML riche.
+const escapeHtml = (value = "") => String(value)
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;")
+
+const contentToHtml = (content = "") => {
+  const raw = String(content ?? "")
+  if (!raw) return "<p><br></p>"
+  if (/<[a-z][^>]*>/i.test(raw)) {
+    return raw
+  }
+  return escapeHtml(raw).replace(/\r?\n/g, "<br>")
+}
+
+const captureTextSelection = (event) => {
+  const editor = event?.currentTarget || event?.target?.closest?.(".rich-text-editor")
+  if (!editor) return
+  const selection = window.getSelection()
+  if (!selection || !selection.rangeCount) return
+  if (!editor.contains(selection.anchorNode) || !editor.contains(selection.focusNode)) return
+
+  activeTextEditor.value = editor
+  savedTextRange.value = selection.getRangeAt(0).cloneRange()
+  textEditorSectionId.value = editor.dataset.sectionId
+  textSelectionActive.value = !selection.isCollapsed && selection.toString().trim().length > 0
+}
+
+const updateTextContent = (event, section) => {
+  section.content = event.currentTarget.innerHTML
+  activeTextEditor.value = event.currentTarget
+  textEditorSectionId.value = String(section.id)
+}
+
+const restoreTextSelection = () => {
+  const editor = activeTextEditor.value
+  const range = savedTextRange.value
+  if (!editor || !range) return false
+  try {
+    editor.focus()
+    const selection = window.getSelection()
+    selection.removeAllRanges()
+    selection.addRange(range)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+const syncTextEditorContent = () => {
+  const editor = activeTextEditor.value
+  const section = currentPage.value?.sections?.find(s => String(s.id) === String(textEditorSectionId.value))
+  if (editor && section) section.content = editor.innerHTML
+}
+
+const applyTextFormat = (command, value = null) => {
+  if (!restoreTextSelection()) return
+  document.execCommand(command, false, value)
+  syncTextEditorContent()
+  captureTextSelection({ currentTarget: activeTextEditor.value })
+}
+
+const openTextImagePicker = () => {
+  textImageInput.value?.click()
+}
+
+const insertTextImage = (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ""
+  if (!file || !restoreTextSelection()) return
+  const reader = new FileReader()
+  reader.onload = (loadEvent) => {
+    const src = loadEvent.target.result
+    document.execCommand(
+      "insertHTML",
+      false,
+      `<img src="${src}" alt="Image insérée" class="inline-media-image"/>`
+    )
+    syncTextEditorContent()
+    textSelectionActive.value = false
+  }
+  reader.readAsDataURL(file)
+}
+
+const insertTextVideo = () => {
+  const url = window.prompt("Collez l'URL de la vidéo (YouTube, Vimeo ou fichier MP4/WebM) :")
+  if (!url || !restoreTextSelection()) return
+  const cleanUrl = url.trim()
+  const safeUrl = escapeHtml(cleanUrl)
+  const isDirectVideo = /\.(mp4|webm|ogg)(?:[?#].*)?$/i.test(cleanUrl)
+  const html = isDirectVideo
+    ? `<video controls class="inline-media-video" src="${safeUrl}"></video>`
+    : `<div class="inline-media-video-wrap"><iframe src="${escapeHtml(getEmbedUrl(cleanUrl))}" title="Vidéo insérée" allowfullscreen></iframe></div>`
+  document.execCommand("insertHTML", false, html)
+  syncTextEditorContent()
+  textSelectionActive.value = false
+}
+
+// ── Déplacement des sections par glisser-déposer ─────────────────
+const startSectionDrag = (index, event) => {
+  dragSectionIndex.value = index
+  dragOverSectionIndex.value = index
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", String(index))
+  }
+}
+
+const dragOverSection = (index, event) => {
+  event.preventDefault()
+  if (dragSectionIndex.value !== null) dragOverSectionIndex.value = index
+}
+
+const dropSection = (targetIndex, event) => {
+  event.preventDefault()
+  const fromIndex = dragSectionIndex.value
+  if (fromIndex === null || fromIndex === targetIndex) {
+    endSectionDrag()
+    return
+  }
+
+  const sections = currentPage.value.sections
+  const activeId = activeSectionIndex.value === null
+    ? null
+    : sections[activeSectionIndex.value]?.id
+  const [movedSection] = sections.splice(fromIndex, 1)
+  const insertIndex = fromIndex < targetIndex ? targetIndex - 1 : targetIndex
+  sections.splice(insertIndex, 0, movedSection)
+
+  if (activeId !== null) {
+    activeSectionIndex.value = sections.findIndex(section => section.id === activeId)
+  }
+  endSectionDrag()
+}
+
+const endSectionDrag = () => {
+  dragSectionIndex.value = null
+  dragOverSectionIndex.value = null
 }
 
 const addProduct = (section) => {
@@ -1120,10 +1274,17 @@ const downloadConfigFile = () => {
   notify(`${configEditorTarget.value}.js téléchargé ✓`)
 }
 
+const sectionStyleString = (s) => {
+  const styles = Object.entries(s.style || {})
+    .map(([k,v]) => `${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`)
+  if (s.spacingAfter) styles.push(`margin-bottom:${Number(s.spacingAfter)}px`)
+  return styles.join(';')
+}
+
 const renderSectionHTML = (s) => {
-  const st = Object.entries(s.style||{}).map(([k,v])=>`${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`).join(';')
+  const st = sectionStyleString(s)
   if (s.type==="hero") return `<div class="hero" style="${st}"><h1>${s.content}</h1><p>${s.subtitle||''}</p>${s.cta?`<button class="cta">${s.cta}</button>`:''}</div>`
-  if (s.type==="text") return `<div class="sec-text" style="${st}"><p>${s.content}</p></div>`
+  if (s.type==="text") return `<div class="sec-text" style="${st}"><div class="rich-text-content">${contentToHtml(s.content)}</div></div>`
   if (s.type==="image") return s.url?`<div class="sec-image" style="${st}"><img src="${s.url}" alt="${s.alt||''}"/></div>`:''
   if (s.type==="gallery") return `<div class="gallery" style="${st}"><div class="gallery-grid" style="grid-template-columns:repeat(${s.columns||3},1fr)">${(s.images||[]).map(i=>`<img src="${i.url}" alt="${i.alt||''}"/>`).join('')}</div></div>`
   if (s.type==="video") return s.url?`<div class="video-wrap" style="${st}"><iframe src="${getEmbedUrl(s.url)}" allowfullscreen></iframe></div>`:''
@@ -1132,12 +1293,13 @@ const renderSectionHTML = (s) => {
   if (s.type==="payment") return `<div class="payment-sec" style="${st}"><h2>${s.title||''}</h2><p>${s.description||''}</p><div class="payment-amount">${s.amount||'0'}${s.currency||'€'}</div><div class="pay-btns"><button class="pay-btn stripe">💳 Payer avec Stripe</button><button class="pay-btn paypal">🅿 Payer avec PayPal</button></div></div>`
   if (s.type==="form") return `<div class="form-sec" style="${st}"><h3>Contactez-nous</h3><input placeholder="Nom complet"/><input placeholder="Email"/><textarea rows="4" placeholder="Message..."></textarea><button>Envoyer →</button></div>`
   if (s.type==="divider") return `<hr class="divider" style="${st}"/>`
+  if (s.type==="spacer") return `<div class="section-spacer" style="${st};height:${Number(s.height)||32}px" aria-hidden="true"></div>`
   return ''
 }
 
 // ── Générateur HTML complet (multi-pages, thème, responsive) ──
 const buildSectionHtml = (s) => {
-  const st = s.style ? Object.entries(s.style).map(([k,v]) => `${k.replace(/([A-Z])/g,'-$1').toLowerCase()}:${v}`).join(';') : ''
+  const st = sectionStyleString(s)
   const inlineStyle = st ? ` style="${st}"` : ''
 
   if (s.type === 'hero') return `
@@ -1148,7 +1310,7 @@ const buildSectionHtml = (s) => {
     </section>`
 
   if (s.type === 'text') return `
-    <section class="sec-text"${inlineStyle}><p>${(s.content||'').replace(/\n/g,'<br/>')}</p></section>`
+    <section class="sec-text"${inlineStyle}><div class="rich-text-content">${contentToHtml(s.content)}</div></section>`
 
   if (s.type === 'image') return s.url ? `
     <section class="sec-image"${inlineStyle}><img src="${s.url}" alt="${s.alt||''}" loading="lazy"/></section>` : ''
@@ -1208,6 +1370,8 @@ const buildSectionHtml = (s) => {
     </section>`
 
   if (s.type === 'divider') return `<div class="sec-divider"${inlineStyle}><hr/></div>`
+
+  if (s.type === 'spacer') return `<div class="section-spacer" style="${st};height:${Number(s.height)||32}px" aria-hidden="true"></div>`
 
   return ''
 }
@@ -1394,7 +1558,14 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 
 /* TEXTE */
 .sec-text{padding:clamp(32px,5vw,60px) clamp(20px,6vw,80px)}
-.sec-text p{font-size:clamp(14px,2vw,17px);line-height:1.8;color:var(--text);max-width:760px}
+.sec-text .rich-text-content{font-size:clamp(14px,2vw,17px);line-height:1.8;color:var(--text);max-width:760px}
+.sec-text .rich-text-content p,.sec-text .rich-text-content div{margin:0 0 10px}
+.sec-text .rich-text-content h1,.sec-text .rich-text-content h2,.sec-text .rich-text-content h3{color:var(--text);line-height:1.25;margin:10px 0}
+.sec-text .rich-text-content ul,.sec-text .rich-text-content ol{padding-left:24px;margin:10px 0}
+.inline-media-image{display:block;max-width:100%;height:auto;border-radius:12px;margin:16px 0}
+.inline-media-video-wrap{width:100%;aspect-ratio:16/9;margin:16px 0}
+.inline-media-video-wrap iframe{width:100%;height:100%;border:0;border-radius:12px}
+.inline-media-video{display:block;width:100%;max-height:560px;border-radius:12px;margin:16px 0}
 
 /* IMAGE */
 .sec-image{padding:clamp(20px,4vw,40px) clamp(20px,6vw,80px)}
@@ -1447,6 +1618,7 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 /* DIVIDER */
 .sec-divider{padding:8px 60px}
 .sec-divider hr{border:none;border-top:1px solid var(--nav-border)}
+.section-spacer{width:100%;min-height:8px}
 
 /* PANIER */
 .cart-fab{position:fixed;bottom:24px;right:24px;z-index:200;background:var(--accent);color:#fff;border:none;border-radius:100px;padding:12px 20px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;transition:all .2s}
@@ -1644,6 +1816,13 @@ const setPageStyle = (type, value) => {
 
 <template>
 <div class="saas-root" :dir="isRtl?'rtl':'ltr'">
+  <input
+    ref="textImageInput"
+    type="file"
+    accept="image/*"
+    hidden
+    @change="insertTextImage"
+  />
 
   <!-- NOTIFICATION -->
   <Transition name="notif">
@@ -1981,13 +2160,13 @@ const setPageStyle = (type, value) => {
       </nav>
       <!-- Contenu du site -->
       <div class="pub-preview-content" :style="currentPage?.style">
-        <div v-for="s in currentPage?.sections" :key="s.id">
+       <div v-for="s in currentPage?.sections" :key="s.id" :style="{ marginBottom: (s.spacingAfter || 0) + 'px' }">
           <div v-if="s.type==='hero'" class="prev-hero" :style="s.style">
             <h1 class="prev-hero-title">{{ s.content }}</h1>
             <p class="prev-hero-sub">{{ s.subtitle }}</p>
             <button v-if="s.cta" class="prev-hero-cta">{{ s.cta }}</button>
           </div>
-          <div v-else-if="s.type==='text'" class="prev-text" :style="s.style"><p>{{ s.content }}</p></div>
+           <div v-else-if="s.type==='text'" class="prev-text" :style="s.style"><div class="prev-rich-text" v-html="contentToHtml(s.content)"></div></div>
           <div v-else-if="s.type==='image'" class="prev-image" :style="s.style">
             <img v-if="s.url" :src="s.url" :alt="s.alt" class="prev-img"/>
           </div>
@@ -2043,6 +2222,7 @@ const setPageStyle = (type, value) => {
             <button class="prev-form-btn">{{ t.prevSendBtn }}</button>
           </div>
           <div v-else-if="s.type==='divider'" class="prev-divider" :style="s.style"><hr class="prev-divider-line"/></div>
+           <div v-else-if="s.type==='spacer'" class="prev-spacer" :style="{...s.style,height:(s.height||32)+'px'}"></div>
         </div>
       </div>
     </div>
@@ -2365,6 +2545,11 @@ const setPageStyle = (type, value) => {
               <option :value="4">{{ t.colOption4 }}</option>
             </select>
           </div>
+          <div v-if="activeSection.type==='spacer'" class="prop-row">
+            <label>Hauteur du saut de ligne</label>
+            <input v-model.number="activeSection.height" type="range" min="8" max="160" step="8" class="prop-range"/>
+            <span class="spacer-size-value">{{ activeSection.height || 32 }}px</span>
+          </div>
           <div v-if="['text','hero'].includes(activeSection.type)" class="prop-row">
             <label>{{ t.typography }}</label>
             <div class="style-btns">
@@ -2485,8 +2670,18 @@ const setPageStyle = (type, value) => {
           <div v-if="!currentPage.sections.length" class="empty-page">
             <span>✦</span><p>{{ t.emptyPage }}</p><p>{{ t.addSectionHint }}</p>
           </div>
-          <div v-for="(s,i) in currentPage.sections" :key="s.id" class="section-block" :class="{'is-active':activeSectionIndex===i}" @click="activeSectionIndex=i">
+           <div
+             v-for="(s,i) in currentPage.sections"
+             :key="s.id"
+             class="section-block"
+             :class="{'is-active':activeSectionIndex===i,'is-dragging':dragSectionIndex===i,'drag-over':dragOverSectionIndex===i}"
+             :style="{ marginBottom: (s.spacingAfter || 0) + 'px' }"
+             @click="activeSectionIndex=i"
+             @dragover="dragOverSection(i,$event)"
+             @drop.stop.prevent="dropSection(i,$event)"
+           >
             <div class="section-actions">
+               <button class="drag-handle" draggable="true" @dragstart.stop="startSectionDrag(i,$event)" @dragend="endSectionDrag" title="Déplacer la section">⠿</button>
               <button @click.stop="moveSection(i,-1)" :disabled="i===0">↑</button>
               <button @click.stop="moveSection(i,1)" :disabled="i===currentPage.sections.length-1">↓</button>
               <button @click.stop="deleteSection(i)" class="del-btn">✕</button>
@@ -2499,7 +2694,37 @@ const setPageStyle = (type, value) => {
             </div>
             <!-- TEXT -->
             <div v-else-if="s.type==='text'" class="sec-text" :style="s.style">
-              <textarea v-model="s.content" class="text-input" :placeholder="t.textPh"/>
+              <div
+                v-if="activeSectionIndex===i && textEditorSectionId===String(s.id) && textSelectionActive"
+                class="text-format-toolbar"
+                @mousedown.stop
+              >
+                <button type="button" title="Gras" @mousedown.prevent="applyTextFormat('bold')"><b>B</b></button>
+                <button type="button" title="Italique" @mousedown.prevent="applyTextFormat('italic')"><i>I</i></button>
+                <button type="button" title="Souligné" @mousedown.prevent="applyTextFormat('underline')"><u>U</u></button>
+                <button type="button" title="Barré" @mousedown.prevent="applyTextFormat('strikeThrough')"><s>S</s></button>
+                <span class="toolbar-separator"></span>
+                <button type="button" title="Titre" @mousedown.prevent="applyTextFormat('formatBlock','h2')">H</button>
+                <button type="button" title="Liste à puces" @mousedown.prevent="applyTextFormat('insertUnorderedList')">•☰</button>
+                <button type="button" title="Liste numérotée" @mousedown.prevent="applyTextFormat('insertOrderedList')">1☰</button>
+                <button type="button" title="Aligner à gauche" @mousedown.prevent="applyTextFormat('justifyLeft')">≡</button>
+                <button type="button" title="Centrer" @mousedown.prevent="applyTextFormat('justifyCenter')">≡</button>
+                <span class="toolbar-separator"></span>
+                <button type="button" title="Insérer une image" @mousedown.prevent="openTextImagePicker">🖼️</button>
+                <button type="button" title="Insérer une vidéo" @mousedown.prevent="insertTextVideo">▶️</button>
+              </div>
+              <div
+                class="text-input rich-text-editor"
+                contenteditable="true"
+                v-once
+                :data-section-id="s.id"
+                :data-placeholder="t.textPh"
+                v-html="contentToHtml(s.content)"
+                @focus="captureTextSelection"
+                @mouseup="captureTextSelection"
+                @keyup="captureTextSelection"
+                @input="updateTextContent($event,s)"
+              ></div>
             </div>
             <!-- IMAGE -->
             <div v-else-if="s.type==='image'" class="sec-image" :style="s.style">
@@ -2609,6 +2834,10 @@ const setPageStyle = (type, value) => {
             <div v-else-if="s.type==='divider'" class="sec-divider" :style="s.style">
               <div class="divider-line"></div>
             </div>
+            <!-- ESPACE ENTRE SECTIONS -->
+            <div v-else-if="s.type==='spacer'" class="sec-spacer" :style="{...s.style,height:(s.height||32)+'px'}">
+              <span>↕ Espace entre les sections — {{ s.height || 32 }}px</span>
+            </div>
           </div>
         </template>
 
@@ -2634,13 +2863,13 @@ const setPageStyle = (type, value) => {
               </div>
             </nav>
 
-            <div v-for="s in currentPage.sections" :key="s.id">
+             <div v-for="s in currentPage.sections" :key="s.id" :style="{ marginBottom: (s.spacingAfter || 0) + 'px' }">
               <div v-if="s.type==='hero'" class="prev-hero" :style="s.style">
                 <h1 class="prev-hero-title">{{ s.content }}</h1>
                 <p class="prev-hero-sub">{{ s.subtitle }}</p>
                 <button v-if="s.cta" class="prev-hero-cta">{{ s.cta }}</button>
               </div>
-              <div v-else-if="s.type==='text'" class="prev-text" :style="s.style"><p>{{ s.content }}</p></div>
+               <div v-else-if="s.type==='text'" class="prev-text" :style="s.style"><div class="prev-rich-text" v-html="contentToHtml(s.content)"></div></div>
               <div v-else-if="s.type==='image'" class="prev-image" :style="s.style">
                 <img v-if="s.url" :src="s.url" :alt="s.alt" class="prev-img"/>
                 <div v-else class="prev-img-placeholder">{{ t.prevImgEmpty }}</div>
@@ -2701,6 +2930,7 @@ const setPageStyle = (type, value) => {
               <div v-else-if="s.type==='divider'" class="prev-divider" :style="s.style">
                 <hr class="prev-divider-line"/>
               </div>
+               <div v-else-if="s.type==='spacer'" class="prev-spacer" :style="{...s.style,height:(s.height||32)+'px'}"></div>
             </div>
           </div>
         </template>
@@ -2842,10 +3072,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .section-block{position:relative;border:2px solid transparent;cursor:pointer;transition:border-color .15s}
 .section-block:hover{border-color:rgba(108,99,255,.3)}
 .section-block.is-active{border-color:var(--accent)!important}
+.section-block.is-dragging{opacity:.45}
+.section-block.drag-over{border-color:var(--accent2);box-shadow:inset 0 -3px 0 var(--accent2)}
 .section-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:10;opacity:0;transition:opacity .15s}
 .section-block:hover .section-actions,.section-block.is-active .section-actions{opacity:1}
 .section-actions button{background:#fff;border:1px solid #ddd;border-radius:4px;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;transition:all .15s}
 .section-actions button:hover{background:#f0f0f0}
+.section-actions .drag-handle{cursor:grab;font-size:17px;color:#8b5cf6}
+.section-actions .drag-handle:active{cursor:grabbing}
 .section-actions button.del-btn:hover{background:#fef2f2;color:var(--red);border-color:#fecaca}
 .section-actions button:disabled{opacity:.3;cursor:default}
 .sec-type-label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px}
@@ -2856,6 +3090,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .sec-text{padding:32px 40px}
 .text-input{width:100%;min-height:120px;resize:vertical;border:1px dashed #d1d5db;border-radius:6px;padding:12px;font-size:16px;line-height:1.7;color:#374151;outline:none;background:#fafafa;font-family:'DM Sans',sans-serif;transition:border-color .15s}
 .text-input:focus{border-color:var(--accent);background:white}
+.rich-text-editor{white-space:normal;overflow-wrap:anywhere}
+.rich-text-editor:empty::before{content:attr(data-placeholder);color:#9ca3af;pointer-events:none}
+.rich-text-editor p,.rich-text-editor div{margin:0 0 8px}
+.rich-text-editor h1,.rich-text-editor h2,.rich-text-editor h3{color:#1a1a2e;margin:8px 0 10px;line-height:1.25}
+.rich-text-editor ul,.rich-text-editor ol{padding-left:24px;margin:8px 0}
+.rich-text-editor blockquote{border-left:3px solid var(--accent);padding-left:12px;color:#6b7280;margin:8px 0}
+.text-format-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px 8px;background:#1f1f23;border:1px solid #35353c;border-radius:8px;box-shadow:0 5px 16px rgba(0,0,0,.16);position:sticky;top:8px;z-index:12}
+.text-format-toolbar button{min-width:28px;height:28px;padding:3px 7px;border:1px solid #4a4a55;border-radius:5px;background:#2a2a30;color:#f0f0f0;cursor:pointer;font-family:'DM Sans',sans-serif}
+.text-format-toolbar button:hover{background:var(--accent);border-color:var(--accent)}
+.text-format-toolbar .toolbar-separator{width:1px;height:20px;background:#4a4a55;margin:0 2px}
+.inline-media-image{display:block;max-width:100%;height:auto;border-radius:8px;margin:12px 0}
+.inline-media-video-wrap{width:100%;margin:12px 0;aspect-ratio:16/9}
+.inline-media-video-wrap iframe{width:100%;height:100%;border:0;border-radius:8px}
+.inline-media-video{display:block;width:100%;max-height:460px;border-radius:8px;margin:12px 0}
+.sec-spacer{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(135deg,#fafafa,#fafafa 8px,#f3f4f6 8px,#f3f4f6 16px);color:#9ca3af;font-size:11px;letter-spacing:.2px;min-height:8px}
+.spacer-size-value{display:block;color:#9ca3af;font-size:11px;margin-top:4px}
 .sec-image{padding:20px 40px}
 .img-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed #d1d5db;border-radius:12px;padding:50px 20px;cursor:pointer;color:#9ca3af;transition:all .15s}
 .img-drop:hover{border-color:var(--accent);color:#6c63ff}
@@ -2937,7 +3187,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .prev-hero-cta{background:#6c63ff;color:white;border:none;border-radius:10px;padding:14px 32px;font-size:16px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:transform .2s}
 .prev-hero-cta:hover{transform:translateY(-2px)}
 .prev-text{padding:48px 60px}
-.prev-text p{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
+.prev-rich-text{font-size:17px;line-height:1.8;color:#374151;max-width:720px}
+.prev-rich-text p,.prev-rich-text div{margin:0 0 10px}
+.prev-rich-text h1,.prev-rich-text h2,.prev-rich-text h3{color:#1a1a2e;line-height:1.25;margin:10px 0}
+.prev-rich-text ul,.prev-rich-text ol{padding-left:24px;margin:10px 0}
+.prev-rich-text .inline-media-image{display:block;max-width:100%;height:auto;border-radius:12px;margin:16px 0}
+.prev-rich-text .inline-media-video-wrap{width:100%;aspect-ratio:16/9;margin:16px 0}
+.prev-rich-text .inline-media-video-wrap iframe{width:100%;height:100%;border:0;border-radius:12px}
+.prev-rich-text .inline-media-video{display:block;width:100%;max-height:560px;border-radius:12px;margin:16px 0}
 .prev-image{padding:32px 60px}
 .prev-img{width:100%;border-radius:12px}
 .prev-img-placeholder{height:200px;background:#f3f4f6;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;margin:32px 60px}
@@ -2985,6 +3242,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .prev-form-btn{background:#6c63ff;color:white;border:none;border-radius:10px;padding:13px 28px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 .prev-divider{padding:8px 60px}
 .prev-divider-line{border:none;border-top:1px solid #e5e7eb}
+.prev-spacer{width:100%;min-height:8px}
 .logo-area{display:flex;align-items:center;cursor:pointer;border-radius:6px;overflow:hidden;width:32px;height:32px;flex-shrink:0}
 .site-logo-img{width:32px;height:32px;object-fit:contain;border-radius:6px}
 .publish-modal{max-width:560px}
