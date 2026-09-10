@@ -1005,6 +1005,9 @@ const syncProdinfos = async (uid, rawSite) => {
 const goToPage = (i) => { currentPageIndex.value = i; activeSectionIndex.value = null; showPageMenu.value = false }
 
 const addPage = () => {
+  const confirmed = window.confirm("Voulez-vous vraiment ajouter une nouvelle page ?")
+  if (!confirmed) return
+
   site.value.pages.push({ id: Date.now(), name: "Nouvelle page", style: {}, sections: [] })
   currentPageIndex.value = site.value.pages.length - 1
   renamingPageIndex.value = site.value.pages.length - 1
@@ -1012,6 +1015,13 @@ const addPage = () => {
 
 const deletePage = (i) => {
   if (site.value.pages.length === 1) { notify(t.value.keepOnePage, "error"); return }
+
+  const pageName = site.value.pages[i]?.name || "cette page"
+  const confirmed = window.confirm(
+    `Voulez-vous vraiment supprimer la page « ${pageName} » ?\n\nCette action supprimera son contenu.`
+  )
+  if (!confirmed) return
+
   site.value.pages.splice(i, 1)
   currentPageIndex.value = Math.max(0, Math.min(i, site.value.pages.length - 1))
   activeSectionIndex.value = null
@@ -1191,6 +1201,21 @@ const syncAllTextEditors = () => {
 const applyTextFormat = (command, value = null) => {
   if (!restoreTextSelection()) return
   document.execCommand(command, false, value)
+  syncTextEditorContent()
+  captureTextSelection({ currentTarget: activeTextEditor.value })
+}
+
+// Couleur du texte et couleur d'arrière-plan de la sélection.
+// La sélection est restaurée avant execCommand afin que les contrôles
+// de la barre d'outils fonctionnent aussi sur mobile.
+const applyTextColor = (color, background = false) => {
+  if (!color || !restoreTextSelection()) return
+  const command = background ? "hiliteColor" : "foreColor"
+  let applied = document.execCommand(command, false, color)
+  if (!applied && background) {
+    applied = document.execCommand("backColor", false, color)
+  }
+  if (!applied) return
   syncTextEditorContent()
   captureTextSelection({ currentTarget: activeTextEditor.value })
 }
@@ -2829,6 +2854,53 @@ const setPageStyle = (type, value) => {
                 <button type="button" title="Liste numérotée" @mousedown.prevent="applyTextFormat('insertOrderedList')">1☰</button>
                 <button type="button" title="Aligner à gauche" @mousedown.prevent="applyTextFormat('justifyLeft')">≡</button>
                 <button type="button" title="Centrer" @mousedown.prevent="applyTextFormat('justifyCenter')">≡</button>
+
+                <span class="toolbar-separator"></span>
+
+                <!-- Palette de couleurs : texte -->
+                <span class="toolbar-color-group" title="Couleur du texte">
+                  <span class="toolbar-color-label">A</span>
+                  <button
+                    v-for="color in ['#000000','#ffffff','#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#6366f1','#8b5cf6','#ec4899','#6b7280']"
+                    :key="'text-'+color"
+                    type="button"
+                    class="toolbar-color-swatch"
+                    :style="{ backgroundColor: color }"
+                    :title="'Texte ' + color"
+                    @mousedown.prevent="applyTextColor(color, false)"
+                  ></button>
+                  <input
+                    type="color"
+                    class="toolbar-color-picker"
+                    value="#111111"
+                    title="Choisir une couleur de texte"
+                    @mousedown.stop
+                    @change="applyTextColor($event.target.value, false)"
+                  />
+                </span>
+
+                <!-- Palette de couleurs : arrière-plan -->
+                <span class="toolbar-color-group" title="Couleur d'arrière-plan">
+                  <span class="toolbar-color-label toolbar-bg-label">A</span>
+                  <button
+                    v-for="color in ['#ffffff','#fef2f2','#fff7ed','#fefce8','#f0fdf4','#ecfeff','#eff6ff','#eef2ff','#f5f3ff','#fdf2f8','#e5e7eb','#111827']"
+                    :key="'bg-'+color"
+                    type="button"
+                    class="toolbar-color-swatch"
+                    :style="{ backgroundColor: color }"
+                    :title="'Arrière-plan ' + color"
+                    @mousedown.prevent="applyTextColor(color, true)"
+                  ></button>
+                  <input
+                    type="color"
+                    class="toolbar-color-picker"
+                    value="#ffff00"
+                    title="Choisir une couleur d'arrière-plan"
+                    @mousedown.stop
+                    @change="applyTextColor($event.target.value, true)"
+                  />
+                </span>
+
                 <span class="toolbar-separator"></span>
                 <button type="button" class="toolbar-media-btn" title="Téléverser une image dans le texte" @mousedown.prevent="openTextImagePicker(s.id)">🖼️ Image</button>
                 <button type="button" class="toolbar-media-btn" title="Téléverser une vidéo dans le texte" @mousedown.prevent="openTextVideoPicker(s.id)">🎬 Vidéo</button>
@@ -3222,6 +3294,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .text-format-toolbar button:hover{background:var(--accent);border-color:var(--accent)}
 .text-format-toolbar .toolbar-media-btn{font-size:11px;font-weight:600}
 .text-format-toolbar .toolbar-separator{width:1px;height:20px;background:#4a4a55;margin:0 2px}
+.text-format-toolbar .toolbar-color-group{display:flex;align-items:center;gap:3px;padding:2px 4px;border:1px solid #41414a;border-radius:6px;background:#24242a}
+.text-format-toolbar .toolbar-color-label{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:#fff;color:#111;font-weight:800;font-family:serif;font-size:15px;border:1px solid #777}
+.text-format-toolbar .toolbar-bg-label{background:linear-gradient(135deg,#fff 0 48%,#111 49% 100%);color:#111;text-shadow:0 0 1px #fff}
+.text-format-toolbar .toolbar-color-swatch{width:20px!important;min-width:20px!important;height:20px!important;padding:0!important;border:2px solid rgba(255,255,255,.65)!important;border-radius:4px!important;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18);cursor:pointer}
+.text-format-toolbar .toolbar-color-swatch:hover{transform:scale(1.12);background-color:var(--swatch-color);border-color:#fff!important}
+.text-format-toolbar .toolbar-color-picker{width:26px;height:26px;padding:1px;border:1px solid #4a4a55;border-radius:5px;background:#2a2a30;cursor:pointer}
+.text-format-toolbar .toolbar-color-picker::-webkit-color-swatch-wrapper{padding:2px}
+.text-format-toolbar .toolbar-color-picker::-webkit-color-swatch{border:none;border-radius:3px}
 .inline-media-image{display:block;max-width:100%;height:auto;border-radius:8px;margin:12px 0}
 .inline-media-video-wrap{width:100%;margin:12px 0;aspect-ratio:16/9}
 .inline-media-video-wrap iframe{width:100%;height:100%;border:0;border-radius:8px}
