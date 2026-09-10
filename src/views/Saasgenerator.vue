@@ -1004,6 +1004,10 @@ const syncProdinfos = async (uid, rawSite) => {
 
 const goToPage = (i) => { currentPageIndex.value = i; activeSectionIndex.value = null; showPageMenu.value = false }
 
+const startPageRename = (i) => {
+  renamingPageIndex.value = i
+}
+
 const addPage = () => {
   const confirmed = window.confirm("Voulez-vous vraiment ajouter une nouvelle page ?")
   if (!confirmed) return
@@ -1066,7 +1070,17 @@ const sectionDefaults = {
 const addSection = (key) => {
   currentPage.value.sections.push({ id: Date.now(), ...JSON.parse(JSON.stringify(sectionDefaults[key])) })
 }
-const deleteSection = (i) => { currentPage.value.sections.splice(i, 1); activeSectionIndex.value = null }
+const deleteSection = (i) => {
+  const section = currentPage.value?.sections?.[i]
+  if (!section) return
+  const labels = { hero:"la section Hero", text:"la zone de texte", image:"l'image", gallery:"la galerie", video:"la vidéo", products:"les produits", features:"les fonctionnalités", payment:"le paiement", form:"le formulaire", divider:"le séparateur", spacer:"l'espace" }
+  const label = labels[section.type] || "cet élément"
+  if (!window.confirm(`Voulez-vous vraiment supprimer ${label} ?
+
+Cette action supprimera son contenu.`)) return
+  currentPage.value.sections.splice(i, 1)
+  activeSectionIndex.value = null
+}
 const moveSection = (i, dir) => {
   const arr = currentPage.value.sections; const j = i + dir
   if (j < 0 || j >= arr.length) return
@@ -1088,7 +1102,10 @@ const uploadGalleryImage = (e, section) => {
   })
 }
 
-const removeGalleryImage = (section, idx) => { section.images.splice(idx, 1) }
+const removeGalleryImage = (section, idx) => {
+  if (!window.confirm("Voulez-vous vraiment supprimer cette image de la galerie ?")) return
+  section.images.splice(idx, 1)
+}
 
 const uploadProductImage = (e, product) => {
   const file = e.target.files[0]; if (!file) return
@@ -1199,25 +1216,43 @@ const syncAllTextEditors = () => {
 }
 
 const applyTextFormat = (command, value = null) => {
+  const editor = activeTextEditor.value
+  const range = savedTextRange.value
+  if (!editor || !range || !editor.contains(range.commonAncestorContainer)) return
   if (!restoreTextSelection()) return
+
   document.execCommand(command, false, value)
   syncTextEditorContent()
-  captureTextSelection({ currentTarget: activeTextEditor.value })
+
+  const selection = window.getSelection()
+  if (selection && selection.rangeCount) {
+    savedTextRange.value = selection.getRangeAt(0).cloneRange()
+  }
+  captureTextSelection({ currentTarget: editor })
 }
 
 // Couleur du texte et couleur d'arrière-plan de la sélection.
 // La sélection est restaurée avant execCommand afin que les contrôles
 // de la barre d'outils fonctionnent aussi sur mobile.
 const applyTextColor = (color, background = false) => {
-  if (!color || !restoreTextSelection()) return
+  const editor = activeTextEditor.value
+  const range = savedTextRange.value
+  if (!color || !editor || !range || !editor.contains(range.commonAncestorContainer)) return
+  if (!restoreTextSelection()) return
+
   const command = background ? "hiliteColor" : "foreColor"
   let applied = document.execCommand(command, false, color)
   if (!applied && background) {
     applied = document.execCommand("backColor", false, color)
   }
   if (!applied) return
+
   syncTextEditorContent()
-  captureTextSelection({ currentTarget: activeTextEditor.value })
+  const selection = window.getSelection()
+  if (selection && selection.rangeCount) {
+    savedTextRange.value = selection.getRangeAt(0).cloneRange()
+  }
+  captureTextSelection({ currentTarget: editor })
 }
 
 const openTextImagePicker = (sectionId) => {
@@ -1326,7 +1361,11 @@ const endSectionDrag = () => {
 const addProduct = (section) => {
   section.items.push({ id: Date.now(), name: "Nouveau produit", price: "0.00", currency: "€", image: "", description: "Description...", badge: "" })
 }
-const removeProduct = (section, i) => { section.items.splice(i, 1) }
+const removeProduct = (section, i) => {
+  const productName = section?.items?.[i]?.name || "ce produit"
+  if (!window.confirm(`Voulez-vous vraiment supprimer « ${productName} » ?`)) return
+  section.items.splice(i, 1)
+}
 
 // Le paiement réel des clients passe désormais par Stripe Connect
 // (compte plateforme), traité côté serveur pour le site publié — plus
@@ -2613,9 +2652,10 @@ const setPageStyle = (type, value) => {
       </div>
     </div>
     <nav class="page-tabs">
-      <button v-for="(p,i) in site.pages" :key="p.id" class="page-tab" :class="{active:currentPageIndex===i}" @click="goToPage(i)" @dblclick="renamingPageIndex=i">
+      <button v-for="(p,i) in site.pages" :key="p.id" class="page-tab" :class="{active:currentPageIndex===i}" @click="goToPage(i)" @dblclick="startPageRename(i)">
         <span v-if="renamingPageIndex!==i">{{ p.name }}</span>
-        <input v-else v-model="p.name" class="page-tab-input" @blur="renamingPageIndex=null" @keydown.enter="renamingPageIndex=null" @click.stop autofocus/>
+        <input v-else v-model="p.name" class="page-tab-input" @blur="renamingPageIndex=null" @keydown.enter="renamingPageIndex=null" @keydown.esc="renamingPageIndex=null" @click.stop autofocus/>
+        <button v-if="renamingPageIndex!==i" type="button" class="tab-rename" title="Renommer la page" @click.stop="startPageRename(i)">✎</button>
         <span v-if="renamingPageIndex!==i && site.pages.length>1" class="tab-del" @click.stop="deletePage(i)">×</span>
       </button>
       <button class="page-tab add-tab" @click="addPage">+</button>
@@ -2916,6 +2956,8 @@ const setPageStyle = (type, value) => {
                 @focus="captureTextSelection"
                 @mouseup="captureTextSelection"
                 @keyup="captureTextSelection"
+  @touchend="captureTextSelection"
+                @select="captureTextSelection"
                 @input="updateTextContent($event,s)"
               ></div>
             </div>
@@ -3217,6 +3259,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .page-tab.add-tab{color:var(--accent);font-size:16px;padding:3px 10px}
 .tab-del{opacity:0;font-size:12px;color:var(--text3);transition:opacity .15s;margin-left:4px}
 .page-tab:hover .tab-del{opacity:1}
+.tab-rename{display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--text3);font-size:12px;padding:0 2px;cursor:pointer;opacity:0;transition:opacity .15s}
+.page-tab:hover .tab-rename{opacity:1}
 .page-tab-input{background:transparent;border:none;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:1px solid var(--accent);border-radius:4px;padding:1px 4px;min-width:80px;max-width:140px}
 .topbar-actions{display:flex;align-items:center;gap:8px;padding-left:16px;border-left:1px solid var(--border)}
 .save-status{font-size:12px;color:var(--text3);white-space:nowrap}
