@@ -1,5 +1,4 @@
 
-
 name: Deploy to GitHub Pages
 
 on:
@@ -11,9 +10,15 @@ permissions:
   pages: write
   id-token: write
 
+# Évite plusieurs déploiements GitHub Pages en même temps
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
