@@ -33,6 +33,8 @@ const textEditorSectionId = ref(null)
 const textSelectionActive = ref(false)
 const activeTextEditor = ref(null)
 const savedTextRange = ref(null)
+const selectedInlineMedia = ref(null)
+const selectedInlineMediaStyle = ref({ top: "0px", left: "0px" })
 let siteReadyForAutoSave = false
 let autoSaveTimer = null
 const isSaved = ref(true)
@@ -1215,21 +1217,58 @@ const syncAllTextEditors = () => {
   })
 }
 
+const positionInlineMediaDeleteButton = (media, editor) => {
+  if (!media || !editor) return
+  const mediaRect = media.getBoundingClientRect()
+  const editorRect = editor.getBoundingClientRect()
+  const buttonWidth = 150
+  const gap = 6
+  const top = Math.max(4, mediaRect.top - editorRect.top - 30 - gap + editor.scrollTop)
+  const left = Math.min(
+    Math.max(4, mediaRect.left - editorRect.left + editor.scrollLeft),
+    Math.max(4, editor.clientWidth - buttonWidth - 4)
+  )
+  selectedInlineMediaStyle.value = { top: `${top}px`, left: `${left}px` }
+}
+
+const selectInlineMedia = (media, editor) => {
+  if (!media || !editor || !editor.contains(media)) return
+  document.querySelectorAll(".inline-media-selected").forEach(node => node.classList.remove("inline-media-selected"))
+  media.classList.add("inline-media-selected")
+  selectedInlineMedia.value = media
+  activeTextEditor.value = editor
+  textEditorSectionId.value = editor.dataset.sectionId
+  positionInlineMediaDeleteButton(media, editor)
+}
+
+const handleRichTextMediaClick = (event) => {
+  const editor = event.currentTarget
+  const target = event.target
+  const media = target?.closest?.(".inline-media-image, .inline-media-video-wrap, .inline-media-video")
+  if (media && editor.contains(media)) selectInlineMedia(media, editor)
+  else selectedInlineMedia.value = null
+}
+
 const deleteSelectedInlineMedia = () => {
   const editor = activeTextEditor.value
   const selection = window.getSelection()
-  if (!editor || !selection || !selection.rangeCount) return false
+  if (!editor) return false
 
-  let node = selection.anchorNode
-  if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement
-
-  const media = node?.closest?.(".inline-media-image, .inline-media-video-wrap, .inline-media-video")
+  let media = selectedInlineMedia.value
+  if (!media || !editor.contains(media)) {
+    if (!selection || !selection.rangeCount) return false
+    let node = selection.anchorNode
+    if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement
+    media = node?.closest?.(".inline-media-image, .inline-media-video-wrap, .inline-media-video")
+  }
   if (!media || !editor.contains(media)) return false
 
   const label = media.matches(".inline-media-image") ? "cette image" : "cette vidéo"
   if (!window.confirm(`Voulez-vous vraiment supprimer ${label} de la zone de texte ?`)) return true
 
+  media.classList.remove("inline-media-selected")
   media.remove()
+  selectedInlineMedia.value = null
   syncTextEditorContent()
   captureTextSelection({ currentTarget: editor })
   return true
@@ -2970,8 +3009,8 @@ const setPageStyle = (type, value) => {
                 <button type="button" class="toolbar-media-btn" title="Téléverser une image dans le texte" @mousedown.prevent="openTextImagePicker(s.id)">🖼️ Image</button>
                 <button type="button" class="toolbar-media-btn" title="Téléverser une vidéo dans le texte" @mousedown.prevent="openTextVideoPicker(s.id)">🎬 Vidéo</button>
                 <button type="button" class="toolbar-media-btn" title="Insérer une vidéo depuis une URL" @mousedown.prevent="insertTextVideo(s.id)">🔗 URL</button>
-  <button type="button" class="toolbar-media-btn toolbar-delete-media-btn" title="Supprimer l'image ou la vidéo sélectionnée" @mousedown.prevent="deleteSelectedInlineMedia()">🗑️ Supprimer média</button>
               </div>
+              <div class="rich-text-editor-wrap">
               <div
                 class="text-input rich-text-editor"
                 contenteditable="true"
@@ -2982,11 +3021,21 @@ const setPageStyle = (type, value) => {
                 @focus="captureTextSelection"
                 @mouseup="captureTextSelection"
                 @keyup="captureTextSelection"
-  @touchend="captureTextSelection"
+                @touchend="captureTextSelection"
                 @select="captureTextSelection"
-  @keydown="handleRichTextKeydown($event)"
+                @keydown="handleRichTextKeydown($event)"
+                @click="handleRichTextMediaClick($event)"
                 @input="updateTextContent($event,s)"
               ></div>
+              <button
+                v-if="selectedInlineMedia && String(textEditorSectionId) === String(s.id)"
+                type="button"
+                class="inline-media-delete-btn"
+                :style="selectedInlineMediaStyle"
+                title="Supprimer le média sélectionné"
+                @mousedown.prevent="deleteSelectedInlineMedia"
+              >🗑️ Supprimer</button>
+              </div>
             </div>
             <!-- IMAGE -->
             <div v-else-if="s.type==='image'" class="sec-image" :style="s.style">
@@ -3355,6 +3404,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .text-input{width:100%;min-height:120px;resize:vertical;border:1px dashed #d1d5db;border-radius:6px;padding:12px;font-size:16px;line-height:1.7;color:#374151;outline:none;background:#fafafa;font-family:'DM Sans',sans-serif;transition:border-color .15s}
 .text-input:focus{border-color:var(--accent);background:white}
 .rich-text-editor{white-space:normal;overflow-wrap:anywhere}
+.rich-text-editor-wrap{position:relative}
+.inline-media-delete-btn{position:absolute;z-index:30;height:30px;padding:4px 10px;border:1px solid #ef4444;border-radius:6px;background:#ef4444;color:#fff;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap}
+.inline-media-delete-btn:hover{background:#dc2626;border-color:#dc2626}
+.inline-media-selected{outline:2px solid var(--red);outline-offset:3px}
 .rich-text-editor:empty::before{content:attr(data-placeholder);color:#9ca3af;pointer-events:none}
 .rich-text-editor p,.rich-text-editor div{margin:0 0 8px}
 .rich-text-editor h1,.rich-text-editor h2,.rich-text-editor h3{color:#1a1a2e;margin:8px 0 10px;line-height:1.25}
