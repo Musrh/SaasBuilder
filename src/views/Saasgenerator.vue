@@ -1045,6 +1045,7 @@ const sectionTypes = computed(() => [
   { key: "form",     label: t.value.contactLabel.split(" ")[0], icon: "✉️", desc: t.value.sForm },
   { key: "divider",  label: t.value.publish==="نشر"?"فاصل":"Séparateur", icon: "—", desc: t.value.sDivider },
   { key: "spacer",   label: "Espace",       icon: "↕️", desc: "Saut de ligne entre sections" },
+  { key: "data",     label: "Données",      icon: "🗄️", desc: "Importer CSV ou JSON et afficher les données" },
 ])
 
 const sectionDefaults = {
@@ -1066,7 +1067,8 @@ const sectionDefaults = {
   payment:  { type: "payment", title: "Finaliser l'achat", amount: "29.99", currency: "€", description: "Accès Premium — 1 mois", style: {} },
   form:     { type: "form", style: {} },
   divider:  { type: "divider", style: {} },
-  spacer:   { type: "spacer", height: 32, style: {} }
+  spacer:   { type: "spacer", height: 32, style: {} },
+  data:     { type: "data", title: "Données externes", columns: [], rows: [], display: "table", pageSize: 10, sourceName: "", style: {} }
 }
 
 const addSection = (key) => {
@@ -1075,7 +1077,7 @@ const addSection = (key) => {
 const deleteSection = (i) => {
   const section = currentPage.value?.sections?.[i]
   if (!section) return
-  const labels = { hero:"la section Hero", text:"la zone de texte", image:"l'image", gallery:"la galerie", video:"la vidéo", products:"les produits", features:"les fonctionnalités", payment:"le paiement", form:"le formulaire", divider:"le séparateur", spacer:"l'espace" }
+  const labels = { hero:"la section Hero", text:"la zone de texte", image:"l'image", gallery:"la galerie", video:"la vidéo", products:"les produits", features:"les fonctionnalités", payment:"le paiement", form:"le formulaire", divider:"le séparateur", spacer:"l'espace", data:"les données externes" }
   const label = labels[section.type] || "cet élément"
   if (!window.confirm(`Voulez-vous vraiment supprimer ${label} ?
 
@@ -1114,6 +1116,132 @@ const uploadProductImage = (e, product) => {
   const reader = new FileReader()
   reader.onload = (ev) => { product.image = ev.target.result }
   reader.readAsDataURL(file)
+}
+
+// ── Données externes importées ───────────────────────────────────
+const dataFileInput = ref(null)
+const dataImportTarget = ref(null)
+const dataImportError = ref("")
+const dataImportLoading = ref(false)
+
+const openDataFilePicker = (section) => {
+  dataImportTarget.value = section
+  dataImportError.value = ""
+  dataFileInput.value?.click()
+}
+
+const parseCsvText = (text) => {
+  const rows = []
+  let row = [], cell = "", quoted = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    const next = text[i + 1]
+    if (ch === '"') {
+      if (quoted && next === '"') { cell += '"'; i++ }
+      else quoted = !quoted
+    } else if (ch === ',' && !quoted) {
+      row.push(cell); cell = ""
+    } else if ((ch === '\n' || ch === '\r') && !quoted) {
+      if (ch === '\r' && next === '\n') i++
+      row.push(cell); cell = ""
+      if (row.some(v => String(v).trim() !== "")) rows.push(row)
+      row = []
+    } else {
+      cell += ch
+    }
+  }
+  if (cell !== "" || row.length) { row.push(cell); if (row.some(v => String(v).trim() !== "")) rows.push(row) }
+  if (!rows.length) return { columns: [], rows: [] }
+  const columns = rows[0].map((v, i) => String(v).trim() || `Colonne ${i + 1}`)
+  const dataRows = rows.slice(1).map(values => {
+    const obj = {}
+    columns.forEach((key, i) => { obj[key] = values[i] ?? "" })
+    return obj
+  })
+  return { columns, rows: dataRows }
+}
+
+const parseDataFile = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    try {
+      const text = String(event.target.result || "")
+      const lower = file.name.toLowerCase()
+      if (lower.endsWith('.json')) {
+        const parsed = JSON.parse(text)
+        const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.data) ? parsed.data : [])
+        if (!list.length || typeof list[0] !== 'object') throw new Error("Le JSON doit contenir un tableau d'objets.")
+        const columns = [...new Set(list.flatMap(item => Object.keys(item || {})))]
+        resolve({ columns, rows: list.map(item => { const obj = {}; columns.forEach(c => obj[c] = item?.[c] ?? ""); return obj }) })
+      } else {
+        resolve(parseCsvText(text.replace(/^\uFEFF/, "")))
+      }
+    } catch (err) { reject(err) }
+  }
+  reader.onerror = () => reject(new Error("Impossible de lire le fichier."))
+  reader.readAsText(file, 'UTF-8')
+})
+
+const importDataFile = async (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ""
+  const section = dataImportTarget.value
+  if (!file || !section) return
+  dataImportLoading.value = true
+  dataImportError.value = ""
+  try {
+    const lower = file.name.toLowerCase()
+    if (!lower.endsWith('.csv') && !lower.endsWith('.json') && !lower.endsWith('.txt')) {
+      throw new Error("Format non pris en charge. Utilisez CSV ou JSON.")
+    }
+    if (file.size > 8 * 1024 * 1024) throw new Error("Le fichier est trop volumineux (8 Mo maximum).")
+    const parsed = await parseDataFile(file)
+    if (!parsed.columns.length) throw new Error("Aucune colonne détectée.")
+    if (parsed.rows.length > 5000) throw new Error("Le fichier contient plus de 5 000 lignes. Réduisez-le avant l'import.")
+    section.columns = parsed.columns
+    section.rows = parsed.rows
+    section.sourceName = file.name
+    if (!section.display) section.display = "table"
+    notify(`${parsed.rows.length} lignes importées depuis ${file.name} ✓`)
+  } catch (err) {
+    console.error("Import données :", err)
+    dataImportError.value = err.message || "Erreur lors de l'import."
+    notify("Import impossible", "error")
+  } finally {
+    dataImportLoading.value = false
+  }
+}
+
+const clearExternalData = (section) => {
+  if (!window.confirm("Voulez-vous vraiment supprimer les données importées ?")) return
+  section.columns = []
+  section.rows = []
+  section.sourceName = ""
+}
+
+const externalDataVisibleColumns = (section) => {
+  const selected = Array.isArray(section.visibleColumns) ? section.visibleColumns : []
+  return selected.length ? selected.filter(c => section.columns.includes(c)) : section.columns
+}
+
+const externalDataDisplayRows = (section) => {
+  const rows = Array.isArray(section.rows) ? section.rows : []
+  const size = Number(section.pageSize) || 10
+  const page = Math.max(1, Number(section.currentPage) || 1)
+  return rows.slice((page - 1) * size, page * size)
+}
+
+const externalDataPageCount = (section) => Math.max(1, Math.ceil((section.rows?.length || 0) / (Number(section.pageSize) || 10)))
+
+const setExternalDataPage = (section, page) => {
+  section.currentPage = Math.min(Math.max(1, page), externalDataPageCount(section))
+}
+
+const toggleExternalDataColumn = (section, column) => {
+  const selected = new Set(Array.isArray(section.visibleColumns) ? section.visibleColumns : section.columns)
+  if (selected.has(column)) selected.delete(column)
+  else selected.add(column)
+  section.visibleColumns = section.columns.filter(c => selected.has(c))
 }
 
 const getEmbedUrl = (url) => {
@@ -1535,6 +1663,14 @@ const renderSectionHTML = (s) => {
   if (s.type==="form") return `<div class="form-sec" style="${st}"><h3>Contactez-nous</h3><input placeholder="Nom complet"/><input placeholder="Email"/><textarea rows="4" placeholder="Message..."></textarea><button>Envoyer →</button></div>`
   if (s.type==="divider") return `<hr class="divider" style="${st}"/>`
   if (s.type==="spacer") return `<div class="section-spacer" style="${st};height:${Number(s.height)||32}px" aria-hidden="true"></div>`
+  if (s.type==="data") {
+    const cols = externalDataVisibleColumns(s)
+    const rows = externalDataDisplayRows(s)
+    if (!cols.length) return `<div class="external-data-section" style="${st}"><h2>${escapeHtml(s.title||'Données externes')}</h2><p>Aucune donnée importée.</p></div>`
+    const head = cols.map(c => `<th>${escapeHtml(c)}</th>`).join('')
+    const body = rows.map(r => `<tr>${cols.map(c => `<td>${escapeHtml(r?.[c] ?? '')}</td>`).join('')}</tr>`).join('')
+    return `<div class="external-data-section" style="${st}"><h2>${escapeHtml(s.title||'Données externes')}</h2><div class="external-data-table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`
+  }
   return ''
 }
 
@@ -2071,6 +2207,13 @@ const setPageStyle = (type, value) => {
     hidden
     @change="insertTextVideoFile"
   />
+  <input
+    ref="dataFileInput"
+    type="file"
+    accept=".csv,.json,.txt,application/json,text/csv"
+    hidden
+    @change="importDataFile"
+  />
 
   <!-- NOTIFICATION -->
   <Transition name="notif">
@@ -2470,7 +2613,15 @@ const setPageStyle = (type, value) => {
             <button class="prev-form-btn">{{ t.prevSendBtn }}</button>
           </div>
           <div v-else-if="s.type==='divider'" class="prev-divider" :style="s.style"><hr class="prev-divider-line"/></div>
-           <div v-else-if="s.type==='spacer'" class="prev-spacer" :style="{...s.style,height:(s.height||32)+'px'}"></div>
+           <div v-else-if="s.type==='data'" class="prev-external-data" :style="s.style">
+            <h2 v-if="s.title" class="prev-external-data-title">{{ s.title }}</h2>
+            <div v-if="s.rows?.length && s.display==='cards'" class="prev-external-data-cards">
+              <article v-for="(row,ri) in externalDataDisplayRows(s)" :key="ri" class="prev-external-data-card"><div v-for="col in externalDataVisibleColumns(s)" :key="col"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div></article>
+            </div>
+            <div v-else-if="s.rows?.length" class="prev-external-data-table-wrap"><table class="prev-external-data-table"><thead><tr><th v-for="col in externalDataVisibleColumns(s)" :key="col">{{ col }}</th></tr></thead><tbody><tr v-for="(row,ri) in externalDataDisplayRows(s)" :key="ri"><td v-for="col in externalDataVisibleColumns(s)" :key="col">{{ row[col] }}</td></tr></tbody></table></div>
+            <p v-else class="prev-external-data-empty">Aucune donnée importée.</p>
+          </div>
+          <div v-else-if="s.type==='spacer'" class="prev-spacer" :style="{...s.style,height:(s.height||32)+'px'}"></div>
         </div>
       </div>
     </div>
@@ -3145,6 +3296,54 @@ const setPageStyle = (type, value) => {
             <div v-else-if="s.type==='divider'" class="sec-divider" :style="s.style">
               <div class="divider-line"></div>
             </div>
+            <!-- DONNÉES EXTERNES -->
+            <div v-else-if="s.type==='data'" class="sec-external-data" :style="s.style">
+              <div class="external-data-toolbar">
+                <span class="sec-type-label">🗄️ Données externes</span>
+                <div class="external-data-actions">
+                  <button class="btn-action small" @click.stop="openDataFilePicker(s)" :disabled="dataImportLoading">{{ dataImportLoading ? 'Import...' : '📥 Importer CSV / JSON' }}</button>
+                  <button v-if="s.rows?.length" class="btn-action small" @click.stop="clearExternalData(s)">🗑️ Vider</button>
+                </div>
+              </div>
+              <div v-if="dataImportError" class="external-data-error">{{ dataImportError }}</div>
+              <div class="external-data-config">
+                <input v-model="s.title" class="data-title-input" placeholder="Titre de la section"/>
+                <label>Affichage
+                  <select v-model="s.display" class="data-select">
+                    <option value="table">Tableau</option>
+                    <option value="cards">Cartes</option>
+                  </select>
+                </label>
+                <label>Lignes / page
+                  <select v-model.number="s.pageSize" class="data-select">
+                    <option :value="5">5</option><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option>
+                  </select>
+                </label>
+              </div>
+              <div v-if="s.columns?.length" class="external-data-columns">
+                <span class="data-columns-label">Colonnes :</span>
+                <label v-for="col in s.columns" :key="col" class="data-column-check">
+                  <input type="checkbox" :checked="externalDataVisibleColumns(s).includes(col)" @change="toggleExternalDataColumn(s,col)"/> {{ col }}
+                </label>
+              </div>
+              <div v-if="s.rows?.length" class="external-data-summary">📄 {{ s.sourceName }} — {{ s.rows.length }} ligne(s), {{ s.columns.length }} colonne(s)</div>
+              <div v-if="s.rows?.length && s.display==='table'" class="external-data-table-wrap">
+                <table class="external-data-table"><thead><tr><th v-for="col in externalDataVisibleColumns(s)" :key="col">{{ col }}</th></tr></thead>
+                  <tbody><tr v-for="(row,ri) in externalDataDisplayRows(s)" :key="ri"><td v-for="col in externalDataVisibleColumns(s)" :key="col">{{ row[col] }}</td></tr></tbody>
+                </table>
+              </div>
+              <div v-else-if="s.rows?.length" class="external-data-cards">
+                <article v-for="(row,ri) in externalDataDisplayRows(s)" :key="ri" class="external-data-card">
+                  <div v-for="col in externalDataVisibleColumns(s)" :key="col" class="external-data-card-row"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div>
+                </article>
+              </div>
+              <div v-else class="external-data-empty">📥 Importez un fichier CSV ou JSON pour afficher ses données ici.</div>
+              <div v-if="s.rows?.length && externalDataPageCount(s)>1" class="external-data-pagination">
+                <button class="btn-action small" :disabled="(s.currentPage||1)<=1" @click.stop="setExternalDataPage(s,(s.currentPage||1)-1)">‹</button>
+                <span>Page {{ s.currentPage || 1 }} / {{ externalDataPageCount(s) }}</span>
+                <button class="btn-action small" :disabled="(s.currentPage||1)>=externalDataPageCount(s)" @click.stop="setExternalDataPage(s,(s.currentPage||1)+1)">›</button>
+              </div>
+            </div>
             <!-- ESPACE ENTRE SECTIONS -->
             <div v-else-if="s.type==='spacer'" class="sec-spacer" :style="{...s.style,height:(s.height||32)+'px'}">
               <span>↕ Espace entre les sections — {{ s.height || 32 }}px</span>
@@ -3241,7 +3440,15 @@ const setPageStyle = (type, value) => {
               <div v-else-if="s.type==='divider'" class="prev-divider" :style="s.style">
                 <hr class="prev-divider-line"/>
               </div>
-               <div v-else-if="s.type==='spacer'" class="prev-spacer" :style="{...s.style,height:(s.height||32)+'px'}"></div>
+               <div v-else-if="s.type==='data'" class="prev-external-data" :style="s.style">
+            <h2 v-if="s.title" class="prev-external-data-title">{{ s.title }}</h2>
+            <div v-if="s.rows?.length && s.display==='cards'" class="prev-external-data-cards">
+              <article v-for="(row,ri) in externalDataDisplayRows(s)" :key="ri" class="prev-external-data-card"><div v-for="col in externalDataVisibleColumns(s)" :key="col"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div></article>
+            </div>
+            <div v-else-if="s.rows?.length" class="prev-external-data-table-wrap"><table class="prev-external-data-table"><thead><tr><th v-for="col in externalDataVisibleColumns(s)" :key="col">{{ col }}</th></tr></thead><tbody><tr v-for="(row,ri) in externalDataDisplayRows(s)" :key="ri"><td v-for="col in externalDataVisibleColumns(s)" :key="col">{{ row[col] }}</td></tr></tbody></table></div>
+            <p v-else class="prev-external-data-empty">Aucune donnée importée.</p>
+          </div>
+          <div v-else-if="s.type==='spacer'" class="prev-spacer" :style="{...s.style,height:(s.height||32)+'px'}"></div>
             </div>
           </div>
         </template>
@@ -4022,6 +4229,35 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
   display: block;
   margin: 0 auto;
 }
+
+
+/* ── DONNÉES EXTERNES ─────────────────────────────────────────── */
+.sec-external-data,.prev-external-data,.external-data-section{padding:28px 32px;background:#fff}
+.external-data-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.external-data-actions{display:flex;gap:6px;flex-wrap:wrap}
+.external-data-config{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.data-title-input{flex:1;min-width:220px;border:1px solid #d1d5db;border-radius:7px;padding:8px 10px;font-size:14px}
+.external-data-config label{display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563}
+.data-select{border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;background:#fff}
+.external-data-columns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:9px;background:#f8fafc;border-radius:7px}
+.data-columns-label{font-size:12px;font-weight:700;color:#475569}
+.data-column-check{font-size:12px;color:#475569;cursor:pointer}
+.external-data-summary{font-size:11px;color:#64748b;margin:8px 0}
+.external-data-table-wrap,.prev-external-data-table-wrap{overflow:auto;border:1px solid #e5e7eb;border-radius:8px}
+.external-data-table,.prev-external-data-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+.external-data-table th,.external-data-table td,.prev-external-data-table th,.prev-external-data-table td{padding:9px 10px;border-bottom:1px solid #e5e7eb;text-align:left;white-space:nowrap}
+.external-data-table th,.prev-external-data-table th{background:#f8fafc;font-weight:700;color:#334155}
+.external-data-table tr:last-child td,.prev-external-data-table tr:last-child td{border-bottom:0}
+.external-data-empty,.prev-external-data-empty{padding:28px;text-align:center;color:#94a3b8;background:#f8fafc;border-radius:8px}
+.external-data-error{padding:8px 10px;margin:8px 0;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:7px;font-size:12px}
+.external-data-pagination{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px;font-size:12px;color:#64748b}
+.external-data-cards,.prev-external-data-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.external-data-card,.prev-external-data-card{border:1px solid #e5e7eb;border-radius:9px;padding:13px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+.external-data-card-row,.prev-external-data-card>div{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px}
+.external-data-card-row:last-child,.prev-external-data-card>div:last-child{border-bottom:0}
+.external-data-card-row strong,.prev-external-data-card strong{color:#64748b}
+.prev-external-data{padding:28px 32px}
+.prev-external-data-title{margin:0 0 16px;color:#1f2937}
 
 /* ══ THÈMES ══════════════════════════════════════════════════════ */
 .theme-panel { overflow-y: auto; max-height: calc(100vh - 120px); }
