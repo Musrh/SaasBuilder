@@ -1215,6 +1215,31 @@ const syncAllTextEditors = () => {
   })
 }
 
+const deleteSelectedInlineMedia = () => {
+  const editor = activeTextEditor.value
+  const selection = window.getSelection()
+  if (!editor || !selection || !selection.rangeCount) return false
+
+  let node = selection.anchorNode
+  if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement
+
+  const media = node?.closest?.(".inline-media-image, .inline-media-video-wrap, .inline-media-video")
+  if (!media || !editor.contains(media)) return false
+
+  const label = media.matches(".inline-media-image") ? "cette image" : "cette vidéo"
+  if (!window.confirm(`Voulez-vous vraiment supprimer ${label} de la zone de texte ?`)) return true
+
+  media.remove()
+  syncTextEditorContent()
+  captureTextSelection({ currentTarget: editor })
+  return true
+}
+
+const handleRichTextKeydown = (event) => {
+  if (event.key !== "Delete" && event.key !== "Backspace") return
+  if (deleteSelectedInlineMedia()) event.preventDefault()
+}
+
 const applyTextFormat = (command, value = null) => {
   const editor = activeTextEditor.value
   const range = savedTextRange.value
@@ -2945,6 +2970,7 @@ const setPageStyle = (type, value) => {
                 <button type="button" class="toolbar-media-btn" title="Téléverser une image dans le texte" @mousedown.prevent="openTextImagePicker(s.id)">🖼️ Image</button>
                 <button type="button" class="toolbar-media-btn" title="Téléverser une vidéo dans le texte" @mousedown.prevent="openTextVideoPicker(s.id)">🎬 Vidéo</button>
                 <button type="button" class="toolbar-media-btn" title="Insérer une vidéo depuis une URL" @mousedown.prevent="insertTextVideo(s.id)">🔗 URL</button>
+  <button type="button" class="toolbar-media-btn toolbar-delete-media-btn" title="Supprimer l'image ou la vidéo sélectionnée" @mousedown.prevent="deleteSelectedInlineMedia()">🗑️ Supprimer média</button>
               </div>
               <div
                 class="text-input rich-text-editor"
@@ -2958,6 +2984,7 @@ const setPageStyle = (type, value) => {
                 @keyup="captureTextSelection"
   @touchend="captureTextSelection"
                 @select="captureTextSelection"
+  @keydown="handleRichTextKeydown($event)"
                 @input="updateTextContent($event,s)"
               ></div>
             </div>
