@@ -1161,22 +1161,74 @@ const parseCsvText = (text) => {
   return { columns, rows: dataRows }
 }
 
+const jsonValueToCell = (value) => {
+  if (value === null || value === undefined) return ""
+  if (typeof value === "object") {
+    try { return JSON.stringify(value) }
+    catch { return String(value) }
+  }
+  return String(value)
+}
+
+const parseJsonData = (parsed) => {
+  // Tableau : chaque élément devient une ligne. Les objets utilisent leurs
+  // propriétés comme colonnes ; les autres valeurs sont placées dans
+  // une colonne unique "Valeur". Aucun type de JSON valide n'est rejeté.
+  if (Array.isArray(parsed)) {
+    if (!parsed.length) return { columns: ["Valeur"], rows: [] }
+
+    const objectItems = parsed.filter(item => item !== null && typeof item === "object" && !Array.isArray(item))
+    const allObjects = objectItems.length === parsed.length
+
+    if (allObjects) {
+      const columns = [...new Set(parsed.flatMap(item => Object.keys(item)))]
+      return {
+        columns: columns.length ? columns : ["Valeur"],
+        rows: parsed.map(item => {
+          const obj = {}
+          columns.forEach(column => { obj[column] = jsonValueToCell(item[column]) })
+          return obj
+        })
+      }
+    }
+
+    return {
+      columns: ["Valeur"],
+      rows: parsed.map(value => ({ Valeur: jsonValueToCell(value) }))
+    }
+  }
+
+  // Objet JSON : il est représenté par une seule ligne. Les valeurs
+  // imbriquées (objets/tableaux) restent intactes sous forme JSON dans la cellule.
+  if (parsed !== null && typeof parsed === "object") {
+    const columns = Object.keys(parsed)
+    if (!columns.length) return { columns: ["Valeur"], rows: [] }
+    const row = {}
+    columns.forEach(column => { row[column] = jsonValueToCell(parsed[column]) })
+    return { columns, rows: [row] }
+  }
+
+  // Chaîne, nombre, booléen ou null à la racine.
+  return { columns: ["Valeur"], rows: [{ Valeur: jsonValueToCell(parsed) }] }
+}
+
 const parseDataFile = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader()
   reader.onload = (event) => {
+    const lower = file.name.toLowerCase()
     try {
-      const text = String(event.target.result || "")
-      const lower = file.name.toLowerCase()
+      const text = String(event.target.result || "").replace(/^\uFEFF/, "")
       if (lower.endsWith('.json')) {
         const parsed = JSON.parse(text)
-        const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.data) ? parsed.data : [])
-        if (!list.length || typeof list[0] !== 'object') throw new Error("Le JSON doit contenir un tableau d'objets.")
-        const columns = [...new Set(list.flatMap(item => Object.keys(item || {})))]
-        resolve({ columns, rows: list.map(item => { const obj = {}; columns.forEach(c => obj[c] = item?.[c] ?? ""); return obj }) })
+        resolve(parseJsonData(parsed))
       } else {
-        resolve(parseCsvText(text.replace(/^\uFEFF/, "")))
+        // Import CSV/TXT conservé tel quel.
+        resolve(parseCsvText(text))
       }
-    } catch (err) { reject(err) }
+    } catch (err) {
+      if (lower?.endsWith?.('.json')) reject(new Error(`JSON invalide : ${err.message || "format incorrect"}`))
+      else reject(err)
+    }
   }
   reader.onerror = () => reject(new Error("Impossible de lire le fichier."))
   reader.readAsText(file, 'UTF-8')
