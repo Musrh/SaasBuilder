@@ -202,7 +202,7 @@ const publishSite = async () => {
   try {
     // 1. Sauvegarder siteData + slug dans le document de l'utilisateur
     const userRef = doc(db, "users", uid)
-    const rawSiteData = JSON.parse(JSON.stringify(site.value))
+    const rawSiteData = prepareSiteForPersistence(JSON.parse(JSON.stringify(site.value)))
     await setDoc(userRef, {
       siteData:  rawSiteData,
       siteName:  siteName.value,
@@ -858,6 +858,22 @@ const signOutUser = async () => {
   }
 }
 
+const prepareSiteForPersistence = (rawSite) => {
+  try {
+    rawSite.pages?.forEach(page => {
+      page.sections?.forEach(section => {
+        if (section.type === 'data' && section.mysql) {
+          // Ne jamais enregistrer le mot de passe MySQL dans Firestore/localStorage.
+          section.mysql.password = ''
+        }
+      })
+    })
+  } catch (err) {
+    console.warn('Nettoyage des identifiants MySQL :', err.message)
+  }
+  return rawSite
+}
+
 const saveSite = async () => {
   if (isSaving.value) return
   syncAllTextEditors()
@@ -879,7 +895,7 @@ const saveSite = async () => {
   try {
     const uid     = currentUser.value.uid
     const docRef  = doc(db, "users", uid)
-    const rawSite = JSON.parse(JSON.stringify(site.value))
+    const rawSite = prepareSiteForPersistence(JSON.parse(JSON.stringify(site.value)))
 
     // Garder aussi une copie locale : elle permet de récupérer les dernières
     // modifications si la connexion Firestore est momentanément indisponible.
@@ -1068,7 +1084,7 @@ const sectionDefaults = {
   form:     { type: "form", style: {} },
   divider:  { type: "divider", style: {} },
   spacer:   { type: "spacer", height: 32, style: {} },
-  data:     { type: "data", title: "Données externes", columns: [], rows: [], display: "table", pageSize: 10, sourceName: "", style: {} }
+  data:     { type: "data", title: "Données externes", columns: [], rows: [], display: "table", pageSize: 10, sourceName: "", sourceType: "file", dataServerUrl: "", accessSessionId: "", accessTables: [], accessTable: "", mysql: { host: "", port: 3306, user: "", password: "", database: "", tables: [], table: "", connected: false }, style: {} }
 }
 
 const addSection = (key) => {
@@ -1123,42 +1139,91 @@ const dataFileInput = ref(null)
 const dataImportTarget = ref(null)
 const dataImportError = ref("")
 const dataImportLoading = ref(false)
+const accessFileInput = ref(null)
+const dataAccessTarget = ref(null)
 
 const openDataFilePicker = (section) => {
   dataImportTarget.value = section
-  dataImportError.value = ""
+  dataImportError.value = ''
   dataFileInput.value?.click()
 }
 
-const parseCsvText = (text) => {
+const openAccessFilePicker = (section) => {
+  dataAccessTarget.value = section
+  dataImportError.value = ''
+  accessFileInput.value?.click()
+}
+
+
+const detectDelimitedSeparator = (text) => {
+  const clean = String(text || '').replace(/^\uFEFF/, '')
+  const lines = clean.split(/\r?\n/).filter(line => line.trim() !== '').slice(0, 20)
+  if (!lines.length) return ','
+  const candidates = ['\t', ';', ',', '|', ':']
+  let best = ','
+  let bestScore = 0
+  for (const sep of candidates) {
+    let score = 0
+    let counts = []
+    for (const line of lines) {
+      let quoted = false, count = 0
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"') {
+          if (quoted && line[i + 1] === '"') i++
+          else quoted = !quoted
+        } else if (ch === sep && !quoted) count++
+      }
+      counts.push(count)
+    }
+    const positive = counts.filter(n => n > 0)
+    if (positive.length) {
+      const consistency = positive.length / counts.length
+      score = positive.reduce((a,b) => a+b, 0) * consistency
+      if (score > bestScore) { bestScore = score; best = sep }
+    }
+  }
+  return best
+}
+
+const parseDelimitedText = (text, separator = ',') => {
   const rows = []
-  let row = [], cell = "", quoted = false
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-    const next = text[i + 1]
+  let row = [], cell = '', quoted = false
+  const clean = String(text || '').replace(/^\uFEFF/, '')
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i]
+    const next = clean[i + 1]
     if (ch === '"') {
       if (quoted && next === '"') { cell += '"'; i++ }
       else quoted = !quoted
-    } else if (ch === ',' && !quoted) {
-      row.push(cell); cell = ""
+    } else if (ch === separator && !quoted) {
+      row.push(cell); cell = ''
     } else if ((ch === '\n' || ch === '\r') && !quoted) {
       if (ch === '\r' && next === '\n') i++
-      row.push(cell); cell = ""
-      if (row.some(v => String(v).trim() !== "")) rows.push(row)
+      row.push(cell); cell = ''
+      if (row.some(v => String(v).trim() !== '')) rows.push(row)
       row = []
     } else {
       cell += ch
     }
   }
-  if (cell !== "" || row.length) { row.push(cell); if (row.some(v => String(v).trim() !== "")) rows.push(row) }
+  if (cell !== '' || row.length) {
+    row.push(cell)
+    if (row.some(v => String(v).trim() !== '')) rows.push(row)
+  }
   if (!rows.length) return { columns: [], rows: [] }
   const columns = rows[0].map((v, i) => String(v).trim() || `Colonne ${i + 1}`)
   const dataRows = rows.slice(1).map(values => {
     const obj = {}
-    columns.forEach((key, i) => { obj[key] = values[i] ?? "" })
+    columns.forEach((key, i) => { obj[key] = values[i] ?? '' })
     return obj
   })
   return { columns, rows: dataRows }
+}
+
+const parseCsvText = (text, separator = null) => {
+  const sep = separator || detectDelimitedSeparator(text)
+  return parseDelimitedText(text, sep)
 }
 
 const jsonValueToCell = (value) => {
@@ -1212,53 +1277,342 @@ const parseJsonData = (parsed) => {
   return { columns: ["Valeur"], rows: [{ Valeur: jsonValueToCell(parsed) }] }
 }
 
-const parseDataFile = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader()
-  reader.onload = (event) => {
-    const lower = file.name.toLowerCase()
-    try {
-      const text = String(event.target.result || "").replace(/^\uFEFF/, "")
-      if (lower.endsWith('.json')) {
-        const parsed = JSON.parse(text)
-        resolve(parseJsonData(parsed))
-      } else {
-        // Import CSV/TXT conservé tel quel.
-        resolve(parseCsvText(text))
-      }
-    } catch (err) {
-      if (lower?.endsWith?.('.json')) reject(new Error(`JSON invalide : ${err.message || "format incorrect"}`))
-      else reject(err)
+/* -------------------------
+   Lecteurs de données externes
+   Tous les lecteurs retournent la même structure :
+   { columns: string[], rows: object[] }
+   ------------------------- */
+const dataLibraryPromises = {}
+
+const loadExternalLibrary = (name, src, globalName) => {
+  if (window[globalName]) return Promise.resolve(window[globalName])
+  if (dataLibraryPromises[name]) return dataLibraryPromises[name]
+  dataLibraryPromises[name] = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-data-library="${name}"]`)
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window[globalName]))
+      existing.addEventListener('error', () => reject(new Error(`Impossible de charger le lecteur ${name}.`)))
+      return
+    }
+    const script = document.createElement('script')
+    script.src = src
+    script.async = true
+    script.dataset.dataLibrary = name
+    script.onload = () => window[globalName]
+      ? resolve(window[globalName])
+      : reject(new Error(`Le lecteur ${name} n'est pas disponible.`))
+    script.onerror = () => reject(new Error(`Impossible de charger le lecteur ${name}.`))
+    document.head.appendChild(script)
+  })
+  return dataLibraryPromises[name]
+}
+
+const normalizeExternalValue = (value) => {
+  if (value === undefined) return ""
+  if (value === null) return "null"
+  if (typeof value === 'object') {
+    try { return JSON.stringify(value) } catch { return String(value) }
+  }
+  return value
+}
+
+const rowsFromObjects = (items) => {
+  const list = Array.isArray(items) ? items : [items]
+  if (!list.length) return { columns: [], rows: [] }
+
+  const objects = list.filter(v => v !== null && typeof v === 'object' && !Array.isArray(v))
+  if (objects.length === list.length) {
+    const columns = [...new Set(list.flatMap(v => Object.keys(v)))]
+    return {
+      columns: columns.length ? columns : ['Valeur'],
+      rows: list.map(v => {
+        const row = {}
+        columns.forEach(c => { row[c] = normalizeExternalValue(v[c]) })
+        return row
+      })
     }
   }
-  reader.onerror = () => reject(new Error("Impossible de lire le fichier."))
-  reader.readAsText(file, 'UTF-8')
-})
+
+  return {
+    columns: ['Valeur'],
+    rows: list.map(v => ({ Valeur: normalizeExternalValue(v) }))
+  }
+}
+
+const parseJsonData = (parsed) => {
+  if (Array.isArray(parsed)) return rowsFromObjects(parsed)
+  if (parsed !== null && typeof parsed === 'object') return rowsFromObjects(parsed)
+  return { columns: ['Valeur'], rows: [{ Valeur: normalizeExternalValue(parsed) }] }
+}
+
+const parseCsvData = (text) => parseCsvText(text, detectDelimitedSeparator(text))
+
+const parseTsvData = (text) => parseDelimitedText(text, '\t')
+
+const parseTxtData = (text) => {
+  const clean = String(text || '').replace(/^\uFEFF/, '')
+  const lines = clean.split(/\r?\n/).filter(line => line.trim() !== '')
+  if (!lines.length) return { columns: [], rows: [] }
+  const sep = detectDelimitedSeparator(clean)
+  const structured = parseDelimitedText(clean, sep)
+  if (structured.columns.length > 1 || structured.rows.length) {
+    const hasSeparator = lines.some(line => line.includes(sep))
+    if (hasSeparator) return structured
+  }
+  return { columns: ['Valeur'], rows: lines.map(line => ({ Valeur: line })) }
+}
+
+const xmlNodeValue = (node) => {
+  const elementChildren = [...node.children]
+  if (!elementChildren.length) return node.textContent?.trim() || ''
+  const obj = {}
+  elementChildren.forEach(child => {
+    const key = child.tagName
+    const value = xmlNodeValue(child)
+    if (obj[key] === undefined) obj[key] = value
+    else if (Array.isArray(obj[key])) obj[key].push(value)
+    else obj[key] = [obj[key], value]
+  })
+  return obj
+}
+
+const parseXmlData = (text) => {
+  const xml = new DOMParser().parseFromString(text, 'application/xml')
+  const parserError = xml.querySelector('parsererror')
+  if (parserError) throw new Error('XML invalide ou impossible à analyser.')
+
+  const root = xml.documentElement
+  if (!root) throw new Error('Le fichier XML est vide.')
+  const children = [...root.children]
+  if (!children.length) return { columns: [root.tagName], rows: [{ [root.tagName]: root.textContent?.trim() || '' }] }
+
+  const repeated = {}
+  children.forEach(child => { repeated[child.tagName] = (repeated[child.tagName] || 0) + 1 })
+  const repeatedTags = Object.keys(repeated).filter(k => repeated[k] > 1)
+
+  if (repeatedTags.length === 1) {
+    const items = children.filter(c => c.tagName === repeatedTags[0]).map(xmlNodeValue)
+    return rowsFromObjects(items)
+  }
+
+  return rowsFromObjects({ [root.tagName]: xmlNodeValue(root) })
+}
+
+const parseYamlData = async (text) => {
+  const jsyaml = await loadExternalLibrary(
+    'js-yaml',
+    'https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js',
+    'jsyaml'
+  )
+  let parsed
+  try { parsed = jsyaml.load(text) }
+  catch (err) { throw new Error(`YAML invalide : ${err.message || 'format incorrect'}`) }
+  return parseJsonData(parsed)
+}
+
+const parseExcelData = async (file) => {
+  const XLSX = await loadExternalLibrary(
+    'xlsx',
+    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'XLSX'
+  )
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+  if (!workbook.SheetNames.length) throw new Error('Le classeur Excel ne contient aucune feuille.')
+
+  // La première feuille est importée automatiquement. Le nom est conservé pour le diagnostic.
+  const sheetName = workbook.SheetNames[0]
+  const sheet = workbook.Sheets[sheetName]
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false })
+  const result = rowsFromObjects(rows)
+  result.sourceSheet = sheetName
+  result.availableSheets = workbook.SheetNames
+  return result
+}
+
+const parseDataFile = async (file) => {
+  const lower = file.name.toLowerCase()
+  const ext = lower.includes('.') ? lower.split('.').pop() : ''
+
+  if (ext === 'json') {
+    const text = await file.text()
+    try { return parseJsonData(JSON.parse(text.replace(/^\uFEFF/, ''))) }
+    catch (err) { throw new Error(`JSON invalide : ${err.message || 'format incorrect'}`) }
+  }
+
+  if (ext === 'csv') return parseCsvData(await file.text())
+  if (ext === 'tsv') return parseTsvData(await file.text())
+  if (ext === 'txt') return parseTxtData(await file.text())
+  if (ext === 'xml') return parseXmlData(await file.text())
+  if (ext === 'yaml' || ext === 'yml') return parseYamlData(await file.text())
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'xlsb' || ext === 'ods') return parseExcelData(file)
+
+  throw new Error(`Format non pris en charge : .${ext || 'inconnu'}`)
+}
+
+// ── Access / MySQL via serveur Railway indépendant ─────────────────
+const DATA_SERVER_DEFAULT_URL = ''
+
+const getDataServerUrl = (section) => {
+  const value = String(section?.dataServerUrl || DATA_SERVER_DEFAULT_URL).trim()
+  return value.replace(/\/$/, '')
+}
+
+const fetchDataServerJson = async (url, options = {}) => {
+  const response = await fetch(url, options)
+  let data = {}
+  try { data = await response.json() } catch { data = {} }
+  if (!response.ok) throw new Error(data.error || data.details || `Erreur serveur (${response.status})`)
+  return data
+}
+
+const resetDataSourceRuntime = (section) => {
+  section.accessSessionId = ''
+  section.accessTables = []
+  section.accessTable = ''
+  section.mysql ||= { host:'', port:3306, user:'', password:'', database:'', tables:[], table:'', connected:false }
+  section.mysql.tables = []
+  section.mysql.table = ''
+  section.mysql.connected = false
+}
+
+const importAccessDatabase = async (event, section) => {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || !section) return
+  const server = getDataServerUrl(section)
+  if (!server) { dataImportError.value = 'Indiquez d’abord l’URL de votre serveur Railway Access/MySQL.'; return }
+  if (!/\.(mdb|accdb)$/i.test(file.name)) { dataImportError.value = 'Sélectionnez un fichier Access .mdb ou .accdb.'; return }
+  dataImportLoading.value = true
+  dataImportError.value = ''
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const data = await fetchDataServerJson(`${server}/api/access/upload`, { method:'POST', body:form })
+    section.sourceType = 'access'
+    section.sourceName = data.filename || file.name
+    section.accessSessionId = data.sessionId || ''
+    section.accessTables = Array.isArray(data.tables) ? data.tables : []
+    section.accessTable = section.accessTables[0] || ''
+    if (section.accessTable) await loadAccessTable(section, section.accessTable)
+    notify(`Base Access chargée : ${section.accessTables.length} table(s) ✓`)
+  } catch (err) {
+    console.error('Access :', err)
+    dataImportError.value = err.message || 'Impossible de lire la base Access.'
+    notify('Lecture Access impossible', 'error')
+  } finally { dataImportLoading.value = false }
+}
+
+const loadAccessTable = async (section, tableName) => {
+  const server = getDataServerUrl(section)
+  if (!server || !section.accessSessionId || !tableName) return
+  dataImportLoading.value = true
+  dataImportError.value = ''
+  try {
+    const params = new URLSearchParams({ page:'1', pageSize:'5000' })
+    const data = await fetchDataServerJson(`${server}/api/access/${encodeURIComponent(section.accessSessionId)}/table/${encodeURIComponent(tableName)}?${params}`)
+    section.columns = Array.isArray(data.columns) ? data.columns : []
+    section.rows = Array.isArray(data.rows) ? data.rows : []
+    section.sourceType = 'access'
+    section.sourceName = `${section.sourceName || 'Access'} — ${tableName}`
+    section.currentPage = 1
+    notify(`${section.rows.length} ligne(s) chargée(s) depuis Access ✓`)
+  } catch (err) {
+    console.error('Access table :', err)
+    dataImportError.value = err.message || 'Impossible de lire cette table Access.'
+    notify('Lecture de la table impossible', 'error')
+  } finally { dataImportLoading.value = false }
+}
+
+const testMysqlConnection = async (section) => {
+  const server = getDataServerUrl(section)
+  if (!server) { dataImportError.value = 'Indiquez l’URL du serveur Railway Access/MySQL.'; return }
+  section.mysql ||= { host:'', port:3306, user:'', password:'', database:'', tables:[], table:'', connected:false }
+  dataImportLoading.value = true
+  dataImportError.value = ''
+  try {
+    const data = await fetchDataServerJson(`${server}/api/mysql/test`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(section.mysql)
+    })
+    section.mysql.connected = !!data.connected
+    notify('Connexion MySQL réussie ✓')
+  } catch (err) {
+    section.mysql.connected = false
+    dataImportError.value = err.message || 'Connexion MySQL impossible.'
+    notify('Connexion MySQL impossible', 'error')
+  } finally { dataImportLoading.value = false }
+}
+
+const loadMysqlTables = async (section) => {
+  const server = getDataServerUrl(section)
+  if (!server) { dataImportError.value = 'Indiquez l’URL du serveur Railway Access/MySQL.'; return }
+  section.mysql ||= { host:'', port:3306, user:'', password:'', database:'', tables:[], table:'', connected:false }
+  dataImportLoading.value = true
+  dataImportError.value = ''
+  try {
+    const data = await fetchDataServerJson(`${server}/api/mysql/tables`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(section.mysql)
+    })
+    section.mysql.connected = true
+    section.mysql.tables = Array.isArray(data.tables) ? data.tables : []
+    section.mysql.table = section.mysql.tables[0] || ''
+    notify(`${section.mysql.tables.length} table(s) MySQL trouvée(s) ✓`)
+  } catch (err) {
+    section.mysql.connected = false
+    dataImportError.value = err.message || 'Impossible de récupérer les tables MySQL.'
+    notify('Lecture MySQL impossible', 'error')
+  } finally { dataImportLoading.value = false }
+}
+
+const loadMysqlTable = async (section, tableName) => {
+  const server = getDataServerUrl(section)
+  if (!server || !tableName) return
+  dataImportLoading.value = true
+  dataImportError.value = ''
+  try {
+    const payload = { ...section.mysql, table: tableName, page:1, pageSize:5000 }
+    const data = await fetchDataServerJson(`${server}/api/mysql/table`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+    })
+    section.columns = Array.isArray(data.columns) ? data.columns : []
+    section.rows = Array.isArray(data.rows) ? data.rows : []
+    section.sourceType = 'mysql'
+    section.sourceName = `${section.mysql.database || 'MySQL'} — ${tableName}`
+    section.currentPage = 1
+    notify(`${section.rows.length} ligne(s) chargée(s) depuis MySQL ✓`)
+  } catch (err) {
+    console.error('MySQL table :', err)
+    dataImportError.value = err.message || 'Impossible de lire cette table MySQL.'
+    notify('Lecture de la table impossible', 'error')
+  } finally { dataImportLoading.value = false }
+}
 
 const importDataFile = async (event) => {
   const file = event.target.files?.[0]
-  event.target.value = ""
+  event.target.value = ''
   const section = dataImportTarget.value
   if (!file || !section) return
   dataImportLoading.value = true
-  dataImportError.value = ""
+  dataImportError.value = ''
   try {
     const lower = file.name.toLowerCase()
-    if (!lower.endsWith('.csv') && !lower.endsWith('.json') && !lower.endsWith('.txt')) {
-      throw new Error("Format non pris en charge. Utilisez CSV ou JSON.")
+    const supported = ['.csv', '.json', '.txt', '.tsv', '.xml', '.yaml', '.yml', '.xlsx', '.xls', '.xlsb', '.ods']
+    if (!supported.some(ext => lower.endsWith(ext))) {
+      throw new Error('Format non pris en charge. Utilisez JSON, CSV, TXT, TSV, XML, YAML, XLS/XLSX ou ODS.')
     }
-    if (file.size > 8 * 1024 * 1024) throw new Error("Le fichier est trop volumineux (8 Mo maximum).")
+    if (file.size > 8 * 1024 * 1024) throw new Error('Le fichier est trop volumineux (8 Mo maximum).')
     const parsed = await parseDataFile(file)
-    if (!parsed.columns.length) throw new Error("Aucune colonne détectée.")
-    if (parsed.rows.length > 5000) throw new Error("Le fichier contient plus de 5 000 lignes. Réduisez-le avant l'import.")
+    if (!parsed.columns.length) throw new Error('Aucune colonne détectée.')
+    if (parsed.rows.length > 5000) throw new Error('Le fichier contient plus de 5 000 lignes. Réduisez-le avant l’import.')
     section.columns = parsed.columns
     section.rows = parsed.rows
-    section.sourceName = file.name
-    if (!section.display) section.display = "table"
+    section.sourceName = parsed.sourceSheet ? `${file.name} — ${parsed.sourceSheet}` : file.name
+    if (!section.display) section.display = 'table'
     notify(`${parsed.rows.length} lignes importées depuis ${file.name} ✓`)
   } catch (err) {
-    console.error("Import données :", err)
-    dataImportError.value = err.message || "Erreur lors de l'import."
-    notify("Import impossible", "error")
+    console.error('Import données :', err)
+    dataImportError.value = err.message || 'Erreur lors de l’import.'
+    notify('Import impossible', 'error')
   } finally {
     dataImportLoading.value = false
   }
@@ -2079,6 +2433,8 @@ nav{background:var(--nav-bg,#fff);border-bottom:1px solid var(--nav-border,#e5e7
 /* FOOTER */
 .site-footer{text-align:center;padding:24px;font-size:13px;color:var(--text-sub);border-top:1px solid var(--nav-border);background:var(--bg-alt)}
 
+.external-data-server-row{display:flex;gap:12px;align-items:center;margin:10px 0}.external-data-server-row label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;flex:1}.data-server-input,.data-db-input{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d1d5db;border-radius:7px;background:#fff;color:#111827}.external-data-source-tabs{display:flex;gap:6px;margin:10px 0}.data-source-tab{border:1px solid #d1d5db;background:#fff;border-radius:7px;padding:7px 11px;cursor:pointer}.data-source-tab.active{font-weight:700;box-shadow:0 0 0 2px rgba(99,102,241,.15)}.external-db-panel{padding:10px;border:1px solid #e5e7eb;border-radius:9px;background:#fafafa;margin-bottom:10px}.external-db-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:9px}.external-db-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}@media(max-width:800px){.external-db-grid{grid-template-columns:1fr 1fr}}
+
 /* RESPONSIVE */
 @media(max-width:600px){
   nav{padding:0 12px;height:52px}
@@ -2262,10 +2618,11 @@ const setPageStyle = (type, value) => {
   <input
     ref="dataFileInput"
     type="file"
-    accept=".csv,.json,.txt,application/json,text/csv"
+    accept=".csv,.json,.txt,.tsv,.xml,.yaml,.yml,.xlsx,.xls,.xlsb,.ods,application/json,text/csv,application/xml,text/xml"
     hidden
     @change="importDataFile"
   />
+  <input ref="accessFileInput" type="file" accept=".mdb,.accdb,application/x-msaccess" hidden @change="importAccessDatabase($event, dataAccessTarget)" />
 
   <!-- NOTIFICATION -->
   <Transition name="notif">
@@ -3353,11 +3710,54 @@ const setPageStyle = (type, value) => {
               <div class="external-data-toolbar">
                 <span class="sec-type-label">🗄️ Données externes</span>
                 <div class="external-data-actions">
-                  <button class="btn-action small" @click.stop="openDataFilePicker(s)" :disabled="dataImportLoading">{{ dataImportLoading ? 'Import...' : '📥 Importer CSV / JSON' }}</button>
+                  <button class="btn-action small" @click.stop="openDataFilePicker(s)" :disabled="dataImportLoading">📥 Fichier</button>
+                  <button class="btn-action small" @click.stop="openAccessFilePicker(s)" :disabled="dataImportLoading">🗃️ Access</button>
                   <button v-if="s.rows?.length" class="btn-action small" @click.stop="clearExternalData(s)">🗑️ Vider</button>
                 </div>
               </div>
+              <div class="external-data-server-row">
+                <label>Serveur données
+                  <input v-model.trim="s.dataServerUrl" class="data-server-input" placeholder="https://votre-serveur.up.railway.app" />
+                </label>
+              </div>
+              <div class="external-data-source-tabs">
+                <button class="data-source-tab" :class="{active:s.sourceType==='file'}" @click.stop="s.sourceType='file'">📄 Fichiers</button>
+                <button class="data-source-tab" :class="{active:s.sourceType==='access'}" @click.stop="s.sourceType='access'">🗃️ Access</button>
+                <button class="data-source-tab" :class="{active:s.sourceType==='mysql'}" @click.stop="s.sourceType='mysql'">🐬 MySQL</button>
+              </div>
               <div v-if="dataImportError" class="external-data-error">{{ dataImportError }}</div>
+              <div v-if="s.sourceType==='access'" class="external-db-panel">
+                <div class="external-db-row">
+                  <button class="btn-action small" @click.stop="openAccessFilePicker(s)" :disabled="dataImportLoading">🗃️ Choisir .mdb / .accdb</button>
+                  <select v-if="s.accessTables?.length" v-model="s.accessTable" class="data-select" @change="loadAccessTable(s,s.accessTable)">
+                    <option value="">Choisir une table</option>
+                    <option v-for="table in s.accessTables" :key="table" :value="table">{{ table }}</option>
+                  </select>
+                  <button v-if="s.accessTable" class="btn-action small" @click.stop="loadAccessTable(s,s.accessTable)" :disabled="dataImportLoading">↻ Lire la table</button>
+                </div>
+                <div v-if="s.accessTables?.length" class="external-data-summary">🗃️ {{ s.accessTables.length }} table(s) disponible(s)</div>
+              </div>
+
+              <div v-if="s.sourceType==='mysql'" class="external-db-panel">
+                <div class="external-db-grid">
+                  <input v-model.trim="s.mysql.host" placeholder="Hôte MySQL" class="data-db-input" />
+                  <input v-model.number="s.mysql.port" type="number" min="1" max="65535" placeholder="Port" class="data-db-input" />
+                  <input v-model.trim="s.mysql.user" placeholder="Utilisateur" class="data-db-input" />
+                  <input v-model="s.mysql.password" type="password" placeholder="Mot de passe" class="data-db-input" autocomplete="off" />
+                  <input v-model.trim="s.mysql.database" placeholder="Base de données" class="data-db-input" />
+                </div>
+                <div class="external-db-row">
+                  <button class="btn-action small" @click.stop="testMysqlConnection(s)" :disabled="dataImportLoading">🔌 Tester</button>
+                  <button class="btn-action small" @click.stop="loadMysqlTables(s)" :disabled="dataImportLoading">📋 Charger les tables</button>
+                  <select v-if="s.mysql.tables?.length" v-model="s.mysql.table" class="data-select" @change="loadMysqlTable(s,s.mysql.table)">
+                    <option value="">Choisir une table</option>
+                    <option v-for="table in s.mysql.tables" :key="table" :value="table">{{ table }}</option>
+                  </select>
+                  <button v-if="s.mysql.table" class="btn-action small" @click.stop="loadMysqlTable(s,s.mysql.table)" :disabled="dataImportLoading">↻ Lire la table</button>
+                </div>
+                <div v-if="s.mysql.connected" class="external-data-summary">🟢 MySQL connecté</div>
+              </div>
+
               <div class="external-data-config">
                 <input v-model="s.title" class="data-title-input" placeholder="Titre de la section"/>
                 <label>Affichage
@@ -3389,7 +3789,7 @@ const setPageStyle = (type, value) => {
                   <div v-for="col in externalDataVisibleColumns(s)" :key="col" class="external-data-card-row"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div>
                 </article>
               </div>
-              <div v-else class="external-data-empty">📥 Importez un fichier CSV ou JSON pour afficher ses données ici.</div>
+              <div v-else class="external-data-empty">📥 Importez un fichier, chargez une base Access ou connectez MySQL pour afficher les données ici.</div>
               <div v-if="s.rows?.length && externalDataPageCount(s)>1" class="external-data-pagination">
                 <button class="btn-action small" :disabled="(s.currentPage||1)<=1" @click.stop="setExternalDataPage(s,(s.currentPage||1)-1)">‹</button>
                 <span>Page {{ s.currentPage || 1 }} / {{ externalDataPageCount(s) }}</span>
