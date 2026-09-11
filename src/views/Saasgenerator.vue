@@ -1339,12 +1339,6 @@ const rowsFromObjects = (items) => {
   }
 }
 
-const parseJsonData = (parsed) => {
-  if (Array.isArray(parsed)) return rowsFromObjects(parsed)
-  if (parsed !== null && typeof parsed === 'object') return rowsFromObjects(parsed)
-  return { columns: ['Valeur'], rows: [{ Valeur: normalizeExternalValue(parsed) }] }
-}
-
 const parseCsvData = (text) => parseCsvText(text, detectDelimitedSeparator(text))
 
 const parseTsvData = (text) => parseDelimitedText(text, '\t')
