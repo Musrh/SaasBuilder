@@ -958,7 +958,17 @@ const toggleEditorPreview = async () => {
 
 const openPublicPreview = async () => {
   await persistBeforePreview()
-  showPublicPreview.value = true
+  const slug = (publishedSlugValue.value || publishAddress.value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  const uid = currentUser.value?.uid || ''
+  if (!slug && !uid) {
+    notify('Impossible d’ouvrir l’aperçu : compte introuvable.', 'error')
+    return
+  }
+  // L’aperçu ouvre le vrai SiteViewer afin de tester exactement le rendu public,
+  // notamment le choix des fichiers dans les sections Données.
+  window.location.href = slug
+    ? `https://mronlinestores.com/#/${slug}`
+    : `https://mronlinestores.com/#/site/${uid}`
 }
 
 // Synchroniser la collection prodinfos depuis siteData
