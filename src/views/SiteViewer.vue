@@ -425,7 +425,28 @@ const openViewerAccessPicker = (section) => {
   input.click()
 }
 const importViewerAccessFile = async (event,section) => {const file=event?.target?.files?.[0];if(!file||!section)return;const st=getViewerDataState(section);st.loading=true;st.error='';try{const form=new FormData();form.append('file',file);const res=await fetch(`${DATA_SERVER_URL}/api/access/upload`,{method:'POST',body:form});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||data.details||`Erreur serveur ${res.status}`);st.accessSessionId=data.sessionId;const tr=await fetch(`${DATA_SERVER_URL}/api/access/${encodeURIComponent(data.sessionId)}/tables`);const td=await tr.json().catch(()=>({}));if(!tr.ok)throw new Error(td.error||`Erreur tables ${tr.status}`);st.accessTables=td.tables||[];st.accessTable=st.accessTables[0]||'';st.sourceName=file.name;st.sourceType='access';if(st.accessTable)await loadViewerAccessTable(section,st.accessTable)}catch(e){st.error=`Impossible de lire Access : ${e.message}`}finally{st.loading=false;if(event.target)event.target.value=''}}
-const loadViewerAccessTable = async (section,table) => {const st=getViewerDataState(section);if(!st.accessSessionId||!table)return;st.loading=true;st.error='';try{const res=await fetch(`${DATA_SERVER_URL}/api/access/${encodeURIComponent(st.accessSessionId)}/table/${encodeURIComponent(table)}`);const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||data.details||`Erreur serveur ${res.status}`);st.columns=data.columns||[];st.rows=data.rows||[];st.accessTable=table;st.page=1}catch(e){st.error=`Impossible de charger la table : ${e.message}`}finally{st.loading=false}}
+const loadViewerAccessTable = async (section,table) => {
+  const st=getViewerDataState(section)
+  if(!st.accessSessionId||!table)return
+  st.loading=true
+  st.error=''
+  st.columns=[]
+  st.rows=[]
+  try{
+    const res=await fetch(`${DATA_SERVER_URL}/api/access/${encodeURIComponent(st.accessSessionId)}/table/${encodeURIComponent(table)}?page=1&pageSize=5000`)
+    const data=await res.json().catch(()=>({}))
+    if(!res.ok)throw new Error(data.error||data.details||`Erreur serveur ${res.status}`)
+    st.columns=Array.isArray(data.columns)?data.columns:[]
+    st.rows=Array.isArray(data.rows)?data.rows:[]
+    st.accessTable=table
+    st.page=1
+    if(!st.columns.length && st.rows.length){
+      st.columns=[...new Set(st.rows.flatMap(row=>Object.keys(row||{})))]
+    }
+  }catch(e){
+    st.error=`Impossible de charger la table : ${e.message}`
+  }finally{st.loading=false}
+}
 const viewerDataColumns = s => getViewerDataState(s).columns
 const viewerDataRows = s => {const st=getViewerDataState(s),size=Number(s.pageSize)||10,start=((st.page||1)-1)*size;return st.rows.slice(start,start+size)}
 const viewerDataPageCount = s => Math.max(1,Math.ceil(getViewerDataState(s).rows.length/(Number(s.pageSize)||10)))

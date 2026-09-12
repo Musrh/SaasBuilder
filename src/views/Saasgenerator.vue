@@ -270,7 +270,8 @@ const publishSite = async () => {
     // Ouvrir l'aperçu public après publication
     setTimeout(() => {
       showPublishModal.value = false
-      showPublicPreview.value = true
+      const previewUrl = `https://mronlinestores.com/#/${slug}`
+      window.location.href = previewUrl
     }, 800)
   } catch (e) {
     console.error("Erreur publication:", e)
