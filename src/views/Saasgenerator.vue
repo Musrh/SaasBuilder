@@ -1445,12 +1445,9 @@ const parseDataFile = async (file) => {
 }
 
 // ── Access / MySQL via serveur Railway indépendant ─────────────────
-const DATA_SERVER_DEFAULT_URL = ''
+const DATA_SERVER_DEFAULT_URL = 'https://serverdb-production.up.railway.app'
 
-const getDataServerUrl = (section) => {
-  const value = String(section?.dataServerUrl || DATA_SERVER_DEFAULT_URL).trim()
-  return value.replace(/\/$/, '')
-}
+const getDataServerUrl = () => DATA_SERVER_DEFAULT_URL
 
 const fetchDataServerJson = async (url, options = {}) => {
   const response = await fetch(url, options)
@@ -3708,11 +3705,6 @@ const setPageStyle = (type, value) => {
                   <button class="btn-action small" @click.stop="openAccessFilePicker(s)" :disabled="dataImportLoading">🗃️ Access</button>
                   <button v-if="s.rows?.length" class="btn-action small" @click.stop="clearExternalData(s)">🗑️ Vider</button>
                 </div>
-              </div>
-              <div class="external-data-server-row">
-                <label>Serveur données
-                  <input v-model.trim="s.dataServerUrl" class="data-server-input" placeholder="https://votre-serveur.up.railway.app" />
-                </label>
               </div>
               <div class="external-data-source-tabs">
                 <button class="data-source-tab" :class="{active:s.sourceType==='file'}" @click.stop="s.sourceType='file'">📄 Fichiers</button>
