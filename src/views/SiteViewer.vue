@@ -480,9 +480,9 @@ const loadViewerAccessTable = async (section,table) => {
     st.error=`Impossible de charger la table : ${e.message}`
   }finally{st.loading=false}
 }
-const viewerDataColumns = s => getViewerDataState(s).columns
-const viewerDataRows = s => {const st=getViewerDataState(s),size=Number(s.pageSize)||10,start=((st.page||1)-1)*size;return st.rows.slice(start,start+size)}
-const viewerDataPageCount = s => Math.max(1,Math.ceil(getViewerDataState(s).rows.length/(Number(s.pageSize)||10)))
+const viewerDataColumns = s => { const st=getViewerDataState(s); return st.columns?.length ? st.columns : (Array.isArray(s?.columns) ? s.columns : []) }
+const viewerDataRows = s => { const st=getViewerDataState(s); const rows=st.rows?.length ? st.rows : (Array.isArray(s?.rows) ? s.rows : []); const size=Number(s.pageSize)||10; const start=((st.page||1)-1)*size; return rows.slice(start,start+size) }
+const viewerDataPageCount = s => { const st=getViewerDataState(s); const rows=st.rows?.length ? st.rows : (Array.isArray(s?.rows) ? s.rows : []); return Math.max(1,Math.ceil(rows.length/(Number(s.pageSize)||10))) }
 const setViewerDataPage = (s,p) => {const st=getViewerDataState(s);st.page=Math.max(1,Math.min(p,viewerDataPageCount(s)))}
 
 const debugInfo = ref("")
@@ -500,12 +500,6 @@ const loadSite = async () => {
   error.value           = ""
   debugInfo.value       = ""
   accountSuspended.value = false
-
-  const VALID_ROUTES = ["site", "slug-site"]
-  if (route.name && !VALID_ROUTES.includes(String(route.name))) {
-    loading.value = false
-    return
-  }
 
   const routeParam = route.params.uid
                   || route.params.slug
@@ -1382,10 +1376,10 @@ const saveOrder = async (provider, transactionId) => {
           <div v-if="getViewerDataState(s).accessTables.length" class="sv-data-table-picker"><label>Table :</label><select v-model="getViewerDataState(s).accessTable" @change="loadViewerAccessTable(s,getViewerDataState(s).accessTable)"><option v-for="table in getViewerDataState(s).accessTables" :key="table" :value="table">{{ table }}</option></select></div>
           <p v-if="getViewerDataState(s).loading" class="sv-data-status">Lecture des données…</p>
           <p v-if="getViewerDataState(s).error" class="sv-data-error">⚠ {{ getViewerDataState(s).error }}</p>
-          <div v-if="getViewerDataState(s).rows.length && s.display==='cards'" class="sv-data-cards"><article v-for="(row,ri) in viewerDataRows(s)" :key="ri" class="sv-data-card"><div v-for="col in viewerDataColumns(s)" :key="col"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div></article></div>
-          <div v-else-if="getViewerDataState(s).rows.length" class="sv-data-table-wrap"><table class="sv-data-table"><thead><tr><th v-for="col in viewerDataColumns(s)" :key="col">{{ col }}</th></tr></thead><tbody><tr v-for="(row,ri) in viewerDataRows(s)" :key="ri"><td v-for="col in viewerDataColumns(s)" :key="col">{{ row[col] }}</td></tr></tbody></table></div>
+          <div v-if="viewerDataRows(s).length && s.display==='cards'" class="sv-data-cards"><article v-for="(row,ri) in viewerDataRows(s)" :key="ri" class="sv-data-card"><div v-for="col in viewerDataColumns(s)" :key="col"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div></article></div>
+          <div v-else-if="viewerDataRows(s).length" class="sv-data-table-wrap"><table class="sv-data-table"><thead><tr><th v-for="col in viewerDataColumns(s)" :key="col">{{ col }}</th></tr></thead><tbody><tr v-for="(row,ri) in viewerDataRows(s)" :key="ri"><td v-for="col in viewerDataColumns(s)" :key="col">{{ row[col] }}</td></tr></tbody></table></div>
           <p v-else class="sv-data-empty">Choisissez un fichier pour afficher ses données.</p>
-          <div v-if="getViewerDataState(s).rows.length && viewerDataPageCount(s)>1" class="sv-data-pagination"><button @click="setViewerDataPage(s,getViewerDataState(s).page-1)" :disabled="getViewerDataState(s).page<=1">‹</button><span>Page {{ getViewerDataState(s).page }} / {{ viewerDataPageCount(s) }}</span><button @click="setViewerDataPage(s,getViewerDataState(s).page+1)" :disabled="getViewerDataState(s).page>=viewerDataPageCount(s)">›</button></div>
+          <div v-if="viewerDataRows(s).length && viewerDataPageCount(s)>1" class="sv-data-pagination"><button @click="setViewerDataPage(s,getViewerDataState(s).page-1)" :disabled="getViewerDataState(s).page<=1">‹</button><span>Page {{ getViewerDataState(s).page }} / {{ viewerDataPageCount(s) }}</span><button @click="setViewerDataPage(s,getViewerDataState(s).page+1)" :disabled="getViewerDataState(s).page>=viewerDataPageCount(s)">›</button></div>
         </div>
 
         <div v-else-if="s.type==='features'" class="sv-features" :style="s.style">
