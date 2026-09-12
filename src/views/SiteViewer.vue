@@ -372,6 +372,39 @@ const getViewerDataState = (section) => {
   if (!viewerDataState.value[key]) viewerDataState.value[key] = { columns: [], rows: [], sourceName: '', sourceType: '', accessSessionId: '', accessTables: [], accessTable: '', page: 1, loading: false, error: '' }
   return viewerDataState.value[key]
 }
+
+// Reprend les données déjà enregistrées dans la section `data` du site publié.
+// Les fichiers choisis par le visiteur restent, eux, uniquement dans viewerDataState.
+const hydrateViewerDataState = (siteData) => {
+  try {
+    const pages = Array.isArray(siteData?.pages) ? siteData.pages : []
+    pages.forEach(page => {
+      const sections = Array.isArray(page?.sections) ? page.sections : []
+      sections.forEach(section => {
+        if (section?.type !== 'data') return
+        const st = getViewerDataState(section)
+        const columns = Array.isArray(section.columns) ? section.columns : []
+        const rows = Array.isArray(section.rows) ? section.rows : []
+
+        // Les données publiées servent de valeur initiale du viewer.
+        st.columns = columns
+        st.rows = rows
+        st.sourceName = section.sourceName || ''
+        st.sourceType = section.sourceType || ''
+        st.page = 1
+        st.error = ''
+
+        // Une session Access est temporaire et ne doit pas être réutilisée
+        // comme si elle était permanente après publication/rechargement.
+        st.accessSessionId = ''
+        st.accessTables = Array.isArray(section.accessTables) ? section.accessTables : []
+        st.accessTable = section.accessTable || ''
+      })
+    })
+  } catch (e) {
+    console.warn('hydrateViewerDataState:', e.message)
+  }
+}
 const openViewerDataPicker = (section) => {
   viewerDataTarget.value = section
   const input = document.createElement('input')
@@ -512,6 +545,7 @@ const loadSite = async () => {
 
       if (data.siteData) {
         site.value           = data.siteData
+        hydrateViewerDataState(site.value)
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false, stripeVerified: data.stripeVerified === true, expiry: data.expiry || null }
@@ -558,6 +592,7 @@ const loadSite = async () => {
 
         if (rd.siteData) {
           site.value           = rd.siteData
+          hydrateViewerDataState(site.value)
           siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
           resolvedUid.value    = realUid
           storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false, stripeVerified: rd.stripeVerified === true, expiry: rd.expiry || null }
