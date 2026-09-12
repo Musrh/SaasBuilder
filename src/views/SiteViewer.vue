@@ -375,32 +375,65 @@ const getViewerDataState = (section) => {
 
 // Reprend les données déjà enregistrées dans la section `data` du site publié.
 // Les fichiers choisis par le visiteur restent, eux, uniquement dans viewerDataState.
-const hydrateViewerDataState = (siteData) => {
+//
+// Depuis le passage au stockage séparé (users/{ownerUid}/siteDataSections/{id}),
+// les sections volumineuses ne contiennent plus `columns`/`rows` en direct dans
+// siteData : on va les chercher à part. Les anciennes sections publiées avant ce
+// changement, elles, ont encore leurs `rows` embarquées → on les garde telles quelles.
+const hydrateViewerDataState = async (siteData, ownerUid) => {
   try {
     const pages = Array.isArray(siteData?.pages) ? siteData.pages : []
+    const dataSections = []
     pages.forEach(page => {
       const sections = Array.isArray(page?.sections) ? page.sections : []
       sections.forEach(section => {
-        if (section?.type !== 'data') return
-        const st = getViewerDataState(section)
-        const columns = Array.isArray(section.columns) ? section.columns : []
-        const rows = Array.isArray(section.rows) ? section.rows : []
-
-        // Les données publiées servent de valeur initiale du viewer.
-        st.columns = columns
-        st.rows = rows
-        st.sourceName = section.sourceName || ''
-        st.sourceType = section.sourceType || ''
-        st.page = 1
-        st.error = ''
-
-        // Une session Access est temporaire et ne doit pas être réutilisée
-        // comme si elle était permanente après publication/rechargement.
-        st.accessSessionId = ''
-        st.accessTables = Array.isArray(section.accessTables) ? section.accessTables : []
-        st.accessTable = section.accessTable || ''
+        if (section?.type === 'data') dataSections.push(section)
       })
     })
+
+    await Promise.all(dataSections.map(async (section) => {
+      const st = getViewerDataState(section)
+      st.sourceName = section.sourceName || ''
+      st.sourceType = section.sourceType || ''
+      st.page = 1
+      st.error = ''
+      // Une session Access est temporaire et ne doit pas être réutilisée
+      // comme si elle était permanente après publication/rechargement.
+      st.accessSessionId = ''
+      st.accessTables = Array.isArray(section.accessTables) ? section.accessTables : []
+      st.accessTable = section.accessTable || ''
+
+      const hasInlineRows = Array.isArray(section.rows) && section.rows.length
+      if (hasInlineRows) {
+        // Compatibilité : site publié avant l'introduction de siteDataSections.
+        st.columns = Array.isArray(section.columns) ? section.columns : []
+        st.rows = section.rows
+        return
+      }
+
+      if (!section.dataStoredSeparately || !ownerUid || !section.id) {
+        st.columns = []
+        st.rows = []
+        return
+      }
+
+      try {
+        const sectionSnap = await getDoc(doc(db, "users", ownerUid, "siteDataSections", String(section.id)))
+        if (sectionSnap.exists()) {
+          const d = sectionSnap.data()
+          st.columns = Array.isArray(d.columns) ? d.columns : []
+          st.rows = Array.isArray(d.rows) ? d.rows : []
+        } else {
+          st.columns = []
+          st.rows = []
+        }
+      } catch (fetchErr) {
+        console.warn('hydrateViewerDataState (section distante):', fetchErr.message)
+        st.columns = []
+        st.rows = []
+        st.error = 'Impossible de charger les données de cette section.'
+      }
+    }))
   } catch (e) {
     console.warn('hydrateViewerDataState:', e.message)
   }
@@ -539,7 +572,7 @@ const loadSite = async () => {
 
       if (data.siteData) {
         site.value           = data.siteData
-        hydrateViewerDataState(site.value)
+        await hydrateViewerDataState(site.value, uid)
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false, stripeVerified: data.stripeVerified === true, expiry: data.expiry || null }
@@ -586,7 +619,7 @@ const loadSite = async () => {
 
         if (rd.siteData) {
           site.value           = rd.siteData
-          hydrateViewerDataState(site.value)
+          await hydrateViewerDataState(site.value, realUid)
           siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
           resolvedUid.value    = realUid
           storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false, stripeVerified: rd.stripeVerified === true, expiry: rd.expiry || null }

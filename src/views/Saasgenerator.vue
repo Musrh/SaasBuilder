@@ -200,9 +200,19 @@ const publishSite = async () => {
   const urlSlug = `https://mronlinestores.com/#/${slug}`
 
   try {
-    // 1. Sauvegarder siteData + slug dans le document de l'utilisateur
+    // 1. Préparer siteData, puis retirer les sections "data" volumineuses
+    //    pour les enregistrer à part (voir persistDataSections).
     const userRef = doc(db, "users", uid)
-    const rawSiteData = prepareSiteForPersistence(JSON.parse(JSON.stringify(site.value)))
+    const fullClone = prepareSiteForPersistence(JSON.parse(JSON.stringify(site.value)))
+    const { site: rawSiteData, extracted } = splitDataSectionsForPersistence(
+      JSON.parse(JSON.stringify(fullClone))
+    )
+
+    // 1a. Sauvegarder les sections de données volumineuses à part.
+    //     Si une section est trop grosse, on s'arrête avant de publier quoi que ce soit.
+    await persistDataSections(uid, extracted)
+
+    // 1b. Sauvegarder siteData (allégé) + slug dans le document de l'utilisateur
     await setDoc(userRef, {
       siteData:  rawSiteData,
       siteName:  siteName.value,
@@ -275,7 +285,10 @@ const publishSite = async () => {
     }, 800)
   } catch (e) {
     console.error("Erreur publication:", e)
-    notify("Erreur de publication : " + e.message, "error")
+    const detail = e?.code === "resource-exhausted"
+      ? "Le contenu dépasse la limite Firestore (notamment si une vidéo ou une section de données est très volumineuse)."
+      : e.message
+    notify("Erreur de publication : " + detail, "error", 6000)
   }
 }
 
@@ -371,9 +384,12 @@ watch(storeCurrency, async (v) => {
 })
 watch(currentPageIndex, () => { activeSectionIndex.value = null })
 
-const notify = (msg, type = "success") => {
+const notify = (msg, type = "success", durationMs = null) => {
   notifMsg.value = msg; notifType.value = type; showNotif.value = true
-  setTimeout(() => showNotif.value = false, 2800)
+  // Les erreurs restent affichées plus longtemps par défaut (l'utilisateur
+  // doit avoir le temps de les lire, contrairement à un simple message de succès).
+  const duration = durationMs ?? (type === "error" ? 6000 : 2800)
+  setTimeout(() => showNotif.value = false, duration)
 }
 
 const fillMentions = () => {
@@ -875,6 +891,66 @@ const prepareSiteForPersistence = (rawSite) => {
   return rawSite
 }
 
+// Taille max (en octets, estimée via JSON.stringify) qu'on autorise pour une
+// section "data" individuelle avant de refuser l'import côté éditeur.
+// Firestore limite un document à 1 Mo (1 048 576 octets) : on garde une marge.
+const MAX_DATA_SECTION_BYTES = 900 * 1024
+
+const estimateJsonBytes = (value) => {
+  try { return new Blob([JSON.stringify(value)]).size }
+  catch { return 0 }
+}
+
+// Retire les champs volumineux (columns/rows) des sections "data" avant
+// d'écrire le document principal, et retourne séparément ce qu'il faut
+// enregistrer dans la sous-collection users/{uid}/siteDataSections/{id}.
+// Les sections sans lignes ne sont pas touchées (rien à extraire).
+const splitDataSectionsForPersistence = (rawSite) => {
+  const extracted = [] // [{ id, columns, rows }]
+  try {
+    rawSite.pages?.forEach(page => {
+      page.sections?.forEach(section => {
+        if (section.type !== 'data') return
+        const hasRows = Array.isArray(section.rows) && section.rows.length
+        if (!hasRows) return
+        extracted.push({
+          id: String(section.id),
+          columns: Array.isArray(section.columns) ? section.columns : [],
+          rows: section.rows,
+        })
+        // Le document principal ne garde que les métadonnées légères :
+        // les vraies données vivent désormais dans la sous-collection.
+        section.rows = []
+        section.columns = section.columns || []
+        section.dataStoredSeparately = true
+      })
+    })
+  } catch (err) {
+    console.warn('Extraction des sections de données :', err.message)
+  }
+  return { site: rawSite, extracted }
+}
+
+// Écrit chaque section "data" extraite dans users/{uid}/siteDataSections/{id}.
+// Un seul writeBatch → soit tout passe, soit rien n'est écrit (évite un état
+// à moitié enregistré si une section dépasse la limite Firestore).
+const persistDataSections = async (uid, extracted) => {
+  if (!extracted.length) return
+  const oversized = extracted.filter(s => estimateJsonBytes(s) > MAX_DATA_SECTION_BYTES)
+  if (oversized.length) {
+    throw new Error(
+      `Une section "Données externes" est trop volumineuse (${oversized.length} lignes/colonnes concernées). ` +
+      `Réduisez le nombre de lignes ou de colonnes avant d'enregistrer.`
+    )
+  }
+  const batch = writeBatch(db)
+  extracted.forEach(({ id, columns, rows }) => {
+    const ref = doc(db, "users", uid, "siteDataSections", id)
+    batch.set(ref, { columns, rows, updatedAt: new Date().toISOString() })
+  })
+  await batch.commit()
+}
+
 const saveSite = async () => {
   if (isSaving.value) return
   syncAllTextEditors()
@@ -894,26 +970,36 @@ const saveSite = async () => {
   if (!currentUser.value) { notify(t.value.connectedError, "error"); return }
   isSaving.value = true
   try {
-    const uid     = currentUser.value.uid
-    const docRef  = doc(db, "users", uid)
-    const rawSite = prepareSiteForPersistence(JSON.parse(JSON.stringify(site.value)))
+    const uid = currentUser.value.uid
+    const docRef = doc(db, "users", uid)
 
-    // Garder aussi une copie locale : elle permet de récupérer les dernières
-    // modifications si la connexion Firestore est momentanément indisponible.
-    try { localStorage.setItem("siteDataPro", JSON.stringify(rawSite)) } catch (storageError) {
+    // Copie complète (avec les rows) : gardée en local pour la résilience
+    // hors-ligne — voir le fallback localStorage dans onMounted().
+    const fullClone = prepareSiteForPersistence(JSON.parse(JSON.stringify(site.value)))
+    try { localStorage.setItem("siteDataPro", JSON.stringify(fullClone)) } catch (storageError) {
       console.warn("Copie locale impossible :", storageError.message)
     }
 
-    // 1. Sauvegarder siteData dans users/{uid}
+    // Copie allégée : les sections "data" volumineuses sont retirées ici et
+    // enregistrées à part, pour ne jamais faire dépasser 1 Mo au document principal.
+    const { site: rawSite, extracted } = splitDataSectionsForPersistence(
+      JSON.parse(JSON.stringify(fullClone))
+    )
+
+    // 1. Sauvegarder les sections de données volumineuses à part.
+    //    Si ça échoue (section trop grosse), on s'arrête avant de toucher
+    //    au document principal.
+    await persistDataSections(uid, extracted)
+
+    // 2. Sauvegarder siteData (allégé) dans users/{uid}
     await setDoc(docRef, {
       siteData:  rawSite,
       siteName:  siteName.value,
       siteLogo:  siteLogo.value,
       siteTheme: rawSite.theme || null,
     }, { merge: true })
-    localStorage.setItem("siteDataPro", JSON.stringify(rawSite))
 
-    // 2. Synchroniser prodinfos — extraire tous les produits du siteData
+    // 3. Synchroniser prodinfos — extraire tous les produits du siteData
     await syncProdinfos(uid, rawSite)
 
     isSaved.value = true
@@ -921,9 +1007,9 @@ const saveSite = async () => {
   } catch (e) {
     console.error("Erreur sauvegarde :", e)
     const detail = e?.code === "resource-exhausted"
-      ? "Le contenu dépasse la limite Firestore (notamment si une vidéo est très volumineuse)."
+      ? "Le contenu dépasse la limite Firestore (notamment si une vidéo ou une section de données est très volumineuse)."
       : (e?.message ? ` (${e.message})` : "")
-    notify(t.value.saveError + detail, "error")
+    notify(t.value.saveError + detail, "error", 6000)
   } finally { isSaving.value = false }
 }
 
@@ -1513,8 +1599,13 @@ const loadAccessTable = async (section, tableName) => {
   try {
     const params = new URLSearchParams({ page:'1', pageSize:'5000' })
     const data = await fetchDataServerJson(`${server}/api/access/${encodeURIComponent(section.accessSessionId)}/table/${encodeURIComponent(tableName)}?${params}`)
-    section.columns = Array.isArray(data.columns) ? data.columns : []
-    section.rows = Array.isArray(data.rows) ? data.rows : []
+    const incomingColumns = Array.isArray(data.columns) ? data.columns : []
+    const incomingRows = Array.isArray(data.rows) ? data.rows : []
+    if (estimateJsonBytes({ columns: incomingColumns, rows: incomingRows }) > MAX_DATA_SECTION_BYTES) {
+      throw new Error('Cette table est trop volumineuse pour être enregistrée. Réduisez le nombre de lignes/colonnes.')
+    }
+    section.columns = incomingColumns
+    section.rows = incomingRows
     section.sourceType = 'access'
     section.sourceName = `${section.sourceName || 'Access'} — ${tableName}`
     section.currentPage = 1
@@ -1576,8 +1667,13 @@ const loadMysqlTable = async (section, tableName) => {
     const data = await fetchDataServerJson(`${server}/api/mysql/table`, {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
     })
-    section.columns = Array.isArray(data.columns) ? data.columns : []
-    section.rows = Array.isArray(data.rows) ? data.rows : []
+    const incomingColumns = Array.isArray(data.columns) ? data.columns : []
+    const incomingRows = Array.isArray(data.rows) ? data.rows : []
+    if (estimateJsonBytes({ columns: incomingColumns, rows: incomingRows }) > MAX_DATA_SECTION_BYTES) {
+      throw new Error('Cette table est trop volumineuse pour être enregistrée. Réduisez le nombre de lignes/colonnes.')
+    }
+    section.columns = incomingColumns
+    section.rows = incomingRows
     section.sourceType = 'mysql'
     section.sourceName = `${section.mysql.database || 'MySQL'} — ${tableName}`
     section.currentPage = 1
@@ -1606,6 +1702,9 @@ const importDataFile = async (event) => {
     const parsed = await parseDataFile(file)
     if (!parsed.columns.length) throw new Error('Aucune colonne détectée.')
     if (parsed.rows.length > 5000) throw new Error('Le fichier contient plus de 5 000 lignes. Réduisez-le avant l’import.')
+    if (estimateJsonBytes({ columns: parsed.columns, rows: parsed.rows }) > MAX_DATA_SECTION_BYTES) {
+      throw new Error('Le fichier est trop volumineux une fois converti. Réduisez le nombre de lignes/colonnes.')
+    }
     section.columns = parsed.columns
     section.rows = parsed.rows
     section.sourceName = parsed.sourceSheet ? `${file.name} — ${parsed.sourceSheet}` : file.name
