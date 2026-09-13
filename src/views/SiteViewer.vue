@@ -369,9 +369,20 @@ const viewerDataState = ref({})
 const viewerDataTarget = ref(null)
 const getViewerDataState = (section) => {
   const key = String(section?.id ?? '')
-  if (!viewerDataState.value[key]) viewerDataState.value[key] = { columns: [], rows: [], sourceName: '', sourceType: '', accessSessionId: '', accessTables: [], accessTable: '', page: 1, loading: false, error: '' }
+  if (!viewerDataState.value[key]) viewerDataState.value[key] = { columns: [], rows: [], sourceName: '', sourceType: '', accessSessionId: '', accessTables: [], accessTable: '', page: 1, loading: false, error: '', debugInfo: '' }
   return viewerDataState.value[key]
 }
+
+// Diagnostic temporaire : ajoutez ?svdebug=1 à l'URL (ex: /#/mj?svdebug=1)
+// pour afficher, sous chaque section "Données externes", d'où viennent
+// (ou non) ses lignes. À retirer une fois le problème de chargement résolu.
+const svDebug = computed(() => {
+  try {
+    const hashQuery = (window.location.hash.split('?')[1] || '')
+    const params = new URLSearchParams(hashQuery || window.location.search.slice(1))
+    return params.get('svdebug') === '1'
+  } catch { return false }
+})
 
 // Reprend les données déjà enregistrées dans la section `data` du site publié.
 // Les fichiers choisis par le visiteur restent, eux, uniquement dans viewerDataState.
@@ -397,6 +408,7 @@ const hydrateViewerDataState = async (siteData, ownerUid) => {
       st.sourceType = section.sourceType || ''
       st.page = 1
       st.error = ''
+      st.debugInfo = `id=${section.id ?? '∅'} ownerUid=${ownerUid || '∅'} dataStoredSeparately=${!!section.dataStoredSeparately}`
       // Une session Access est temporaire et ne doit pas être réutilisée
       // comme si elle était permanente après publication/rechargement.
       st.accessSessionId = ''
@@ -408,12 +420,14 @@ const hydrateViewerDataState = async (siteData, ownerUid) => {
         // Compatibilité : site publié avant l'introduction de siteDataSections.
         st.columns = Array.isArray(section.columns) ? section.columns : []
         st.rows = section.rows
+        st.debugInfo += ' → rows en direct dans siteData'
         return
       }
 
       if (!section.dataStoredSeparately || !ownerUid || !section.id) {
         st.columns = []
         st.rows = []
+        st.debugInfo += ' → arrêt avant fetch (condition non remplie)'
         return
       }
 
@@ -423,15 +437,18 @@ const hydrateViewerDataState = async (siteData, ownerUid) => {
           const d = sectionSnap.data()
           st.columns = Array.isArray(d.columns) ? d.columns : []
           st.rows = Array.isArray(d.rows) ? d.rows : []
+          st.debugInfo += ` → doc trouvé, ${st.rows.length} ligne(s), ${st.columns.length} colonne(s)`
         } else {
           st.columns = []
           st.rows = []
+          st.debugInfo += ' → doc INEXISTANT à ce chemin'
         }
       } catch (fetchErr) {
         console.warn('hydrateViewerDataState (section distante):', fetchErr.message)
         st.columns = []
         st.rows = []
         st.error = 'Impossible de charger les données de cette section.'
+        st.debugInfo += ` → ERREUR fetch : ${fetchErr.code || ''} ${fetchErr.message}`
       }
     }))
   } catch (e) {
@@ -1409,6 +1426,7 @@ const saveOrder = async (provider, transactionId) => {
           <div v-if="getViewerDataState(s).accessTables.length" class="sv-data-table-picker"><label>Table :</label><select v-model="getViewerDataState(s).accessTable" @change="loadViewerAccessTable(s,getViewerDataState(s).accessTable)"><option v-for="table in getViewerDataState(s).accessTables" :key="table" :value="table">{{ table }}</option></select></div>
           <p v-if="getViewerDataState(s).loading" class="sv-data-status">Lecture des données…</p>
           <p v-if="getViewerDataState(s).error" class="sv-data-error">⚠ {{ getViewerDataState(s).error }}</p>
+          <p v-if="svDebug" class="sv-data-error" style="background:#eef2ff;border-color:#c7d2fe;color:#3730a3">🔧 {{ getViewerDataState(s).debugInfo }}</p>
           <div v-if="viewerDataRows(s).length && s.display==='cards'" class="sv-data-cards"><article v-for="(row,ri) in viewerDataRows(s)" :key="ri" class="sv-data-card"><div v-for="col in viewerDataColumns(s)" :key="col"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div></article></div>
           <div v-else-if="viewerDataRows(s).length" class="sv-data-table-wrap"><table class="sv-data-table"><thead><tr><th v-for="col in viewerDataColumns(s)" :key="col">{{ col }}</th></tr></thead><tbody><tr v-for="(row,ri) in viewerDataRows(s)" :key="ri"><td v-for="col in viewerDataColumns(s)" :key="col">{{ row[col] }}</td></tr></tbody></table></div>
           <p v-else class="sv-data-empty">Choisissez un fichier pour afficher ses données.</p>
