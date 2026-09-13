@@ -318,11 +318,11 @@ const sanitizeRichText = (html) => {
   const allowedTags = new Set([
     "P", "BR", "DIV", "SPAN", "STRONG", "B", "EM", "I", "U", "S", "DEL",
     "H1", "H2", "H3", "UL", "OL", "LI", "BLOCKQUOTE", "A", "IMG",
-    "VIDEO", "IFRAME"
+    "VIDEO", "IFRAME", "TABLE", "THEAD", "TBODY", "TR", "TH", "TD", "FONT"
   ])
   const allowedAttributes = new Set([
     "class", "style", "href", "target", "rel", "src", "alt", "title",
-    "controls", "allow", "allowfullscreen", "loading"
+    "controls", "allow", "allowfullscreen", "loading", "color", "align", "face", "size"
   ])
 
   template.content.querySelectorAll("*").forEach((node) => {
@@ -1730,6 +1730,9 @@ const saveOrder = async (provider, transactionId) => {
 .sv-rich-text .inline-media-video-wrap{width:100%;aspect-ratio:16/9;margin:16px 0}
 .sv-rich-text .inline-media-video-wrap iframe{width:100%;height:100%;border:0;border-radius:12px}
 .sv-rich-text .inline-media-video{display:block;width:100%;max-height:560px;border-radius:12px;margin:16px 0}
+.sv-rich-text .inline-text-table{border-collapse:collapse;width:100%;margin:16px 0}
+.sv-rich-text .inline-text-table td,.sv-rich-text .inline-text-table th{border:1px solid #d1d5db;padding:8px 10px}
+.sv-rich-text .inline-text-table th{background:#f3f4f6;font-weight:700}
 .sv-image{padding:32px 60px}.sv-image img{width:100%;border-radius:12px;display:block}
 .sv-gallery{padding:32px 60px}.sv-gallery-grid{display:grid;gap:10px}
 .sv-gallery-item{border-radius:10px;overflow:hidden;aspect-ratio:1}
