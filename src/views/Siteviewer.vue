@@ -364,6 +364,177 @@ const contentToHtml = (content = "") => {
   return sanitizeRichText(html)
 }
 
+const DATA_SERVER_URL = "https://serverdb-production.up.railway.app"
+const viewerDataState = ref({})
+const viewerDataTarget = ref(null)
+const getViewerDataState = (section) => {
+  const key = String(section?.id ?? '')
+  if (!viewerDataState.value[key]) viewerDataState.value[key] = { columns: [], rows: [], sourceName: '', sourceType: '', accessSessionId: '', accessTables: [], accessTable: '', page: 1, loading: false, error: '', debugInfo: '' }
+  return viewerDataState.value[key]
+}
+
+// Diagnostic temporaire : ajoutez ?svdebug=1 à l'URL (ex: /#/mj?svdebug=1)
+// pour afficher, sous chaque section "Données externes", d'où viennent
+// (ou non) ses lignes. À retirer une fois le problème de chargement résolu.
+const svDebug = computed(() => {
+  try {
+    const hashQuery = (window.location.hash.split('?')[1] || '')
+    const params = new URLSearchParams(hashQuery || window.location.search.slice(1))
+    return params.get('svdebug') === '1'
+  } catch { return false }
+})
+
+// Reprend les données déjà enregistrées dans la section `data` du site publié.
+// Les fichiers choisis par le visiteur restent, eux, uniquement dans viewerDataState.
+//
+// Depuis le passage au stockage séparé (users/{ownerUid}/siteDataSections/{id}),
+// les sections volumineuses ne contiennent plus `columns`/`rows` en direct dans
+// siteData : on va les chercher à part. Les anciennes sections publiées avant ce
+// changement, elles, ont encore leurs `rows` embarquées → on les garde telles quelles.
+const hydrateViewerDataState = async (siteData, ownerUid) => {
+  try {
+    const pages = Array.isArray(siteData?.pages) ? siteData.pages : []
+    const dataSections = []
+    pages.forEach(page => {
+      const sections = Array.isArray(page?.sections) ? page.sections : []
+      sections.forEach(section => {
+        if (section?.type === 'data') dataSections.push(section)
+      })
+    })
+
+    await Promise.all(dataSections.map(async (section) => {
+      const st = getViewerDataState(section)
+      st.sourceName = section.sourceName || ''
+      st.sourceType = section.sourceType || ''
+      st.page = 1
+      st.error = ''
+      st.debugInfo = `id=${section.id ?? '∅'} ownerUid=${ownerUid || '∅'} dataStoredSeparately=${!!section.dataStoredSeparately}`
+      // Une session Access est temporaire et ne doit pas être réutilisée
+      // comme si elle était permanente après publication/rechargement.
+      st.accessSessionId = ''
+      st.accessTables = Array.isArray(section.accessTables) ? section.accessTables : []
+      st.accessTable = section.accessTable || ''
+
+      const hasInlineRows = Array.isArray(section.rows) && section.rows.length
+      if (hasInlineRows) {
+        // Compatibilité : site publié avant l'introduction de siteDataSections.
+        st.columns = Array.isArray(section.columns) ? section.columns : []
+        st.rows = section.rows
+        st.debugInfo += ' → rows en direct dans siteData'
+        return
+      }
+
+      if (!section.dataStoredSeparately || !ownerUid || !section.id) {
+        st.columns = []
+        st.rows = []
+        st.debugInfo += ' → arrêt avant fetch (condition non remplie)'
+        return
+      }
+
+      try {
+        const sectionSnap = await getDoc(doc(db, "users", ownerUid, "siteDataSections", String(section.id)))
+        if (sectionSnap.exists()) {
+          const d = sectionSnap.data()
+          st.columns = Array.isArray(d.columns) ? d.columns : []
+          st.rows = Array.isArray(d.rows) ? d.rows : []
+          st.debugInfo += ` → doc trouvé, ${st.rows.length} ligne(s), ${st.columns.length} colonne(s)`
+        } else {
+          st.columns = []
+          st.rows = []
+          st.debugInfo += ' → doc INEXISTANT à ce chemin'
+        }
+      } catch (fetchErr) {
+        console.warn('hydrateViewerDataState (section distante):', fetchErr.message)
+        st.columns = []
+        st.rows = []
+        st.error = 'Impossible de charger les données de cette section.'
+        st.debugInfo += ` → ERREUR fetch : ${fetchErr.code || ''} ${fetchErr.message}`
+      }
+    }))
+  } catch (e) {
+    console.warn('hydrateViewerDataState:', e.message)
+  }
+}
+const openViewerDataPicker = (section) => {
+  viewerDataTarget.value = section
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.csv,.json,.txt,.tsv,.xml,.yaml,.yml,.xlsx,.xls,.xlsb,.ods'
+  input.onchange = (event) => importViewerDataFile(event, section)
+  input.click()
+}
+const detectViewerSeparator = (text) => {
+  const sample = String(text || '').split(/\r?\n/).find(line => line.trim()) || ''
+  const candidates = ['\t',';',',','|',':']; let best = ','; let bestScore = -1
+  for (const sep of candidates) { const score = sample.split(sep).length - 1; if (score > bestScore) { bestScore = score; best = sep } }
+  return best
+}
+const parseViewerDelimited = (text, separator) => {
+  const rows=[]; let row=[]; let cell=''; let quoted=false
+  for(let i=0;i<text.length;i++){ const ch=text[i], next=text[i+1]
+    if(ch==='"'){ if(quoted&&next==='"'){cell+='"';i++}else quoted=!quoted }
+    else if(ch===separator&&!quoted){row.push(cell);cell=''}
+    else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&next==='\n')i++;row.push(cell);cell='';if(row.some(v=>String(v).trim()!==''))rows.push(row);row=[]}
+    else cell+=ch
+  }
+  row.push(cell); if(row.some(v=>String(v).trim()!==''))rows.push(row)
+  if(!rows.length)return {columns:[],rows:[]}
+  const columns=rows[0].map((v,i)=>String(v).trim()||`Colonne ${i+1}`)
+  return {columns,rows:rows.slice(1).map(r=>Object.fromEntries(columns.map((c,i)=>[c,r[i]??''])))}
+}
+const normalizeViewerValue = (v) => { if(v==null)return ''; if(typeof v==='object'){try{return JSON.stringify(v)}catch{return String(v)}} return v }
+const normalizeViewerRecords = (input) => {
+  if(Array.isArray(input)){ if(!input.length)return {columns:[],rows:[]}; if(input.every(v=>v&&typeof v==='object'&&!Array.isArray(v))){const columns=[...new Set(input.flatMap(o=>Object.keys(o)))];return {columns,rows:input.map(o=>Object.fromEntries(columns.map(c=>[c,normalizeViewerValue(o[c])])))} } return {columns:['Valeur'],rows:input.map(v=>({Valeur:normalizeViewerValue(v)}))} }
+  if(input&&typeof input==='object')return {columns:Object.keys(input),rows:[Object.fromEntries(Object.entries(input).map(([k,v])=>[k,normalizeViewerValue(v)]))]}
+  return {columns:['Valeur'],rows:[{Valeur:normalizeViewerValue(input)}]}
+}
+const ensureViewerScript = (src,test) => new Promise((resolve,reject)=>{if(test())return resolve();const old=document.querySelector(`script[src="${src}"]`);if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return}const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})
+const parseViewerFile = async (file) => {
+  const ext=(file.name.split('.').pop()||'').toLowerCase()
+  if(['xlsx','xls','xlsb','ods'].includes(ext)){await ensureViewerScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',()=>!!window.XLSX);const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array'});return normalizeViewerRecords(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}))}
+  const text=await file.text()
+  if(ext==='json')return normalizeViewerRecords(JSON.parse(text))
+  if(ext==='xml'){const xml=new DOMParser().parseFromString(text,'application/xml');if(xml.querySelector('parsererror'))throw new Error('XML invalide.');const items=[...xml.documentElement.children];return items.length?normalizeViewerRecords(items.map(el=>Object.fromEntries([...el.children].map(c=>[c.tagName,c.textContent])))):normalizeViewerRecords(xml.documentElement.textContent)}
+  if(ext==='yaml'||ext==='yml'){await ensureViewerScript('https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js',()=>!!window.jsyaml);return normalizeViewerRecords(window.jsyaml.load(text))}
+  return parseViewerDelimited(text,ext==='tsv'?'\t':detectViewerSeparator(text))
+}
+const importViewerDataFile = async (event,section) => {const file=event?.target?.files?.[0];if(!file||!section)return;const st=getViewerDataState(section);st.loading=true;st.error='';try{const p=await parseViewerFile(file);Object.assign(st,{columns:p.columns,rows:p.rows,sourceName:file.name,sourceType:'file',page:1})}catch(e){st.error=`Impossible de lire le fichier : ${e.message}`}finally{st.loading=false;if(event.target)event.target.value=''}}
+const openViewerAccessPicker = (section) => {
+  viewerDataTarget.value = section
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.mdb,.accdb,application/x-msaccess'
+  input.onchange = (event) => importViewerAccessFile(event, section)
+  input.click()
+}
+const importViewerAccessFile = async (event,section) => {const file=event?.target?.files?.[0];if(!file||!section)return;const st=getViewerDataState(section);st.loading=true;st.error='';try{const form=new FormData();form.append('file',file);const res=await fetch(`${DATA_SERVER_URL}/api/access/upload`,{method:'POST',body:form});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||data.details||`Erreur serveur ${res.status}`);st.accessSessionId=data.sessionId;const tr=await fetch(`${DATA_SERVER_URL}/api/access/${encodeURIComponent(data.sessionId)}/tables`);const td=await tr.json().catch(()=>({}));if(!tr.ok)throw new Error(td.error||`Erreur tables ${tr.status}`);st.accessTables=td.tables||[];st.accessTable=st.accessTables[0]||'';st.sourceName=file.name;st.sourceType='access';if(st.accessTable)await loadViewerAccessTable(section,st.accessTable)}catch(e){st.error=`Impossible de lire Access : ${e.message}`}finally{st.loading=false;if(event.target)event.target.value=''}}
+const loadViewerAccessTable = async (section,table) => {
+  const st=getViewerDataState(section)
+  if(!st.accessSessionId||!table)return
+  st.loading=true
+  st.error=''
+  st.columns=[]
+  st.rows=[]
+  try{
+    const res=await fetch(`${DATA_SERVER_URL}/api/access/${encodeURIComponent(st.accessSessionId)}/table/${encodeURIComponent(table)}?page=1&pageSize=5000`)
+    const data=await res.json().catch(()=>({}))
+    if(!res.ok)throw new Error(data.error||data.details||`Erreur serveur ${res.status}`)
+    st.columns=Array.isArray(data.columns)?data.columns:[]
+    st.rows=Array.isArray(data.rows)?data.rows:[]
+    st.accessTable=table
+    st.page=1
+    if(!st.columns.length && st.rows.length){
+      st.columns=[...new Set(st.rows.flatMap(row=>Object.keys(row||{})))]
+    }
+  }catch(e){
+    st.error=`Impossible de charger la table : ${e.message}`
+  }finally{st.loading=false}
+}
+const viewerDataColumns = s => { const st=getViewerDataState(s); return st.columns?.length ? st.columns : (Array.isArray(s?.columns) ? s.columns : []) }
+const viewerDataRows = s => { const st=getViewerDataState(s); const rows=st.rows?.length ? st.rows : (Array.isArray(s?.rows) ? s.rows : []); const size=Number(s.pageSize)||10; const start=((st.page||1)-1)*size; return rows.slice(start,start+size) }
+const viewerDataPageCount = s => { const st=getViewerDataState(s); const rows=st.rows?.length ? st.rows : (Array.isArray(s?.rows) ? s.rows : []); return Math.max(1,Math.ceil(rows.length/(Number(s.pageSize)||10))) }
+const setViewerDataPage = (s,p) => {const st=getViewerDataState(s);st.page=Math.max(1,Math.min(p,viewerDataPageCount(s)))}
+
 const debugInfo = ref("")
 
 // ── Helper : vérifie si le compte est actif ───────────────
@@ -379,12 +550,6 @@ const loadSite = async () => {
   error.value           = ""
   debugInfo.value       = ""
   accountSuspended.value = false
-
-  const VALID_ROUTES = ["site", "slug-site"]
-  if (route.name && !VALID_ROUTES.includes(String(route.name))) {
-    loading.value = false
-    return
-  }
 
   const routeParam = route.params.uid
                   || route.params.slug
@@ -424,6 +589,7 @@ const loadSite = async () => {
 
       if (data.siteData) {
         site.value           = data.siteData
+        await hydrateViewerDataState(site.value, uid)
         siteMeta.value       = { name: data.siteName || "", logo: data.siteLogo || "" }
         resolvedUid.value    = uid
         storeOwner.value     = { plan: data.plan || "free", paye: data.paye || false, stripeVerified: data.stripeVerified === true, expiry: data.expiry || null }
@@ -470,6 +636,7 @@ const loadSite = async () => {
 
         if (rd.siteData) {
           site.value           = rd.siteData
+          await hydrateViewerDataState(site.value, realUid)
           siteMeta.value       = { name: rd.siteName || "", logo: rd.siteLogo || "" }
           resolvedUid.value    = realUid
           storeOwner.value     = { plan: rd.plan || "free", paye: rd.paye || false, stripeVerified: rd.stripeVerified === true, expiry: rd.expiry || null }
@@ -1186,10 +1353,15 @@ const saveOrder = async (provider, transactionId) => {
 
     <!-- CONTENU PAGE -->
     <main class="sv-page" :style="currentPage?.style">
+      <!-- Diagnostic temporaire (?svdebug=1) : liste brute des sections trouvées
+           sur la page actuelle, pour vérifier sans Firestore ce qui est publié.
+           À retirer une fois le problème résolu. -->
+      <div v-if="svDebug" style="margin:16px;padding:12px;border:2px dashed #6c63ff;border-radius:10px;background:#f5f3ff;font-family:monospace;font-size:12px;color:#312e81;white-space:pre-wrap">🔧 DEBUG — page "{{ currentPage?.name }}" ({{ currentPage?.sections?.length || 0 }} section(s)) :
+<template v-for="(sec, i) in (currentPage?.sections || [])" :key="'dbg-'+i">{{ i }}: type="{{ sec.type }}" id={{ sec.id }}
+</template></div>
       <template v-for="s in currentPage?.sections" :key="s.id">
 
-        <div v-if="s.type==='hero'" class="sv-hero" :style="s.style">
-          <h1 class="sv-hero-title">{{ s.content }}</h1>
+        <div v-if="s.type==='hero'" class="sv-hero" :style="s.style">          <h1 class="sv-hero-title">{{ s.content }}</h1>
           <p  class="sv-hero-sub">{{ s.subtitle }}</p>
           <button v-if="s.cta" class="sv-hero-cta">{{ s.cta }}</button>
         </div>
@@ -1247,6 +1419,23 @@ const saveOrder = async (provider, transactionId) => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div v-else-if="s.type==='data'" class="sv-data-section" :style="s.style">
+          <h2 v-if="s.title" class="sv-data-title">{{ s.title }}</h2>
+          <div class="sv-data-picker">
+            <button class="sv-data-btn" @click="openViewerDataPicker(s)">📥 Choisir un fichier</button>
+            <button class="sv-data-btn" @click="openViewerAccessPicker(s)">🗃️ Choisir Access</button>
+            <span v-if="getViewerDataState(s).sourceName" class="sv-data-source">{{ getViewerDataState(s).sourceName }}</span>
+          </div>
+          <div v-if="getViewerDataState(s).accessTables.length" class="sv-data-table-picker"><label>Table :</label><select v-model="getViewerDataState(s).accessTable" @change="loadViewerAccessTable(s,getViewerDataState(s).accessTable)"><option v-for="table in getViewerDataState(s).accessTables" :key="table" :value="table">{{ table }}</option></select></div>
+          <p v-if="getViewerDataState(s).loading" class="sv-data-status">Lecture des données…</p>
+          <p v-if="getViewerDataState(s).error" class="sv-data-error">⚠ {{ getViewerDataState(s).error }}</p>
+          <p v-if="svDebug" class="sv-data-error" style="background:#eef2ff;border-color:#c7d2fe;color:#3730a3">🔧 {{ getViewerDataState(s).debugInfo }}</p>
+          <div v-if="viewerDataRows(s).length && s.display==='cards'" class="sv-data-cards"><article v-for="(row,ri) in viewerDataRows(s)" :key="ri" class="sv-data-card"><div v-for="col in viewerDataColumns(s)" :key="col"><strong>{{ col }}</strong><span>{{ row[col] }}</span></div></article></div>
+          <div v-else-if="viewerDataRows(s).length" class="sv-data-table-wrap"><table class="sv-data-table"><thead><tr><th v-for="col in viewerDataColumns(s)" :key="col">{{ col }}</th></tr></thead><tbody><tr v-for="(row,ri) in viewerDataRows(s)" :key="ri"><td v-for="col in viewerDataColumns(s)" :key="col">{{ row[col] }}</td></tr></tbody></table></div>
+          <p v-else class="sv-data-empty">Choisissez un fichier pour afficher ses données.</p>
+          <div v-if="viewerDataRows(s).length && viewerDataPageCount(s)>1" class="sv-data-pagination"><button @click="setViewerDataPage(s,getViewerDataState(s).page-1)" :disabled="getViewerDataState(s).page<=1">‹</button><span>Page {{ getViewerDataState(s).page }} / {{ viewerDataPageCount(s) }}</span><button @click="setViewerDataPage(s,getViewerDataState(s).page+1)" :disabled="getViewerDataState(s).page>=viewerDataPageCount(s)">›</button></div>
         </div>
 
         <div v-else-if="s.type==='features'" class="sv-features" :style="s.style">
@@ -1858,4 +2047,6 @@ const saveOrder = async (provider, transactionId) => {
   font-weight: 600; color: #ef4444;
   background: rgba(239,68,68,.06); border: 1px dashed rgba(239,68,68,.25);
 }
+/* DONNEES CHOISIES PAR LE VISITEUR */
+.sv-data-section{padding:28px 32px}.sv-data-title{margin:0 0 16px;font-size:24px}.sv-data-picker{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}.sv-data-btn{padding:10px 14px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#374151;font-weight:600;cursor:pointer}.sv-data-btn:hover{border-color:var(--theme-accent,#6c63ff);color:var(--theme-accent,#6c63ff)}.sv-data-source{font-size:13px;color:#6b7280}.sv-data-table-picker{display:flex;align-items:center;gap:8px;margin:8px 0 14px;font-size:13px}.sv-data-table-picker select{padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}.sv-data-status{color:#6b7280;font-size:13px}.sv-data-error{padding:10px 12px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px}.sv-data-table-wrap{overflow:auto;border:1px solid #e5e7eb;border-radius:10px}.sv-data-table{width:100%;border-collapse:collapse;font-size:13px}.sv-data-table th,.sv-data-table td{padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:left;white-space:nowrap}.sv-data-table th{background:#f9fafb;font-weight:700}.sv-data-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.sv-data-card{padding:14px;border:1px solid #e5e7eb;border-radius:12px;background:#fff}.sv-data-card>div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #f3f4f6}.sv-data-card strong{font-size:12px;color:#6b7280}.sv-data-card span{font-size:13px;text-align:right;word-break:break-word}.sv-data-empty{padding:20px;border:1px dashed #d1d5db;border-radius:10px;color:#6b7280;text-align:center}.sv-data-pagination{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:14px;font-size:13px}.sv-data-pagination button{padding:6px 10px;border:1px solid #e5e7eb;border-radius:7px;background:#fff;cursor:pointer}.sv-data-pagination button:disabled{opacity:.4;cursor:not-allowed}
 </style>
