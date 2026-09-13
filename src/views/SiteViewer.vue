@@ -1353,10 +1353,15 @@ const saveOrder = async (provider, transactionId) => {
 
     <!-- CONTENU PAGE -->
     <main class="sv-page" :style="currentPage?.style">
+      <!-- Diagnostic temporaire (?svdebug=1) : liste brute des sections trouvées
+           sur la page actuelle, pour vérifier sans Firestore ce qui est publié.
+           À retirer une fois le problème résolu. -->
+      <div v-if="svDebug" style="margin:16px;padding:12px;border:2px dashed #6c63ff;border-radius:10px;background:#f5f3ff;font-family:monospace;font-size:12px;color:#312e81;white-space:pre-wrap">🔧 DEBUG — page "{{ currentPage?.name }}" ({{ currentPage?.sections?.length || 0 }} section(s)) :
+<template v-for="(sec, i) in (currentPage?.sections || [])" :key="'dbg-'+i">{{ i }}: type="{{ sec.type }}" id={{ sec.id }}
+</template></div>
       <template v-for="s in currentPage?.sections" :key="s.id">
 
-        <div v-if="s.type==='hero'" class="sv-hero" :style="s.style">
-          <h1 class="sv-hero-title">{{ s.content }}</h1>
+        <div v-if="s.type==='hero'" class="sv-hero" :style="s.style">          <h1 class="sv-hero-title">{{ s.content }}</h1>
           <p  class="sv-hero-sub">{{ s.subtitle }}</p>
           <button v-if="s.cta" class="sv-hero-cta">{{ s.cta }}</button>
         </div>
