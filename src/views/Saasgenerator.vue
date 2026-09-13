@@ -2029,6 +2029,97 @@ const insertTextVideo = (sectionId = null) => {
   textSelectionActive.value = false
 }
 
+// ── Tableaux dans la zone de texte ────────────────────────────────
+// Retrouve la cellule (td/th) qui contient le curseur actuel, pour que les
+// boutons d'ajout/suppression de ligne/colonne agissent sur le bon tableau.
+const findActiveTableCell = () => {
+  const editor = activeTextEditor.value
+  const selection = window.getSelection()
+  if (!editor || !selection || !selection.rangeCount) return null
+  let node = selection.anchorNode
+  if (node && node.nodeType === Node.TEXT_NODE) node = node.parentElement
+  const cell = node?.closest?.("td,th")
+  if (!cell || !editor.contains(cell)) return null
+  return cell
+}
+
+const insertTextTable = (sectionId) => {
+  if (sectionId !== undefined) activateTextEditor(sectionId)
+  if (!restoreTextSelection()) return
+  const cols = 3
+  const rows = 3
+  let html = '<table class="inline-text-table"><tbody>'
+  for (let r = 0; r < rows; r++) {
+    html += "<tr>"
+    for (let c = 0; c < cols; c++) html += "<td>&nbsp;</td>"
+    html += "</tr>"
+  }
+  html += "</tbody></table><p><br></p>"
+  document.execCommand("insertHTML", false, html)
+  syncTextEditorContent()
+}
+
+const addTableRow = () => {
+  const cell = findActiveTableCell()
+  const tr = cell?.closest("tr")
+  if (!cell || !tr) { notify("Cliquez d'abord dans une cellule du tableau.", "error"); return }
+  const newTr = document.createElement("tr")
+  for (let i = 0; i < tr.children.length; i++) {
+    const td = document.createElement("td")
+    td.innerHTML = "&nbsp;"
+    newTr.appendChild(td)
+  }
+  tr.after(newTr)
+  syncTextEditorContent()
+}
+
+const addTableColumn = () => {
+  const cell = findActiveTableCell()
+  const table = cell?.closest("table")
+  if (!cell || !table) { notify("Cliquez d'abord dans une cellule du tableau.", "error"); return }
+  const idx = Array.prototype.indexOf.call(cell.parentElement.children, cell)
+  table.querySelectorAll("tr").forEach(tr => {
+    const ref = tr.children[idx]
+    const tag = ref?.tagName === "TH" ? "th" : "td"
+    const td = document.createElement(tag)
+    td.innerHTML = "&nbsp;"
+    if (ref) ref.after(td); else tr.appendChild(td)
+  })
+  syncTextEditorContent()
+}
+
+const deleteTableRow = () => {
+  const cell = findActiveTableCell()
+  const tr = cell?.closest("tr")
+  const table = cell?.closest("table")
+  if (!cell || !tr || !table) { notify("Cliquez d'abord dans une cellule du tableau.", "error"); return }
+  if (table.querySelectorAll("tr").length <= 1) { notify("Le tableau doit garder au moins une ligne.", "error"); return }
+  if (!window.confirm("Voulez-vous vraiment supprimer cette ligne du tableau ?")) return
+  tr.remove()
+  syncTextEditorContent()
+}
+
+const deleteTableColumn = () => {
+  const cell = findActiveTableCell()
+  const table = cell?.closest("table")
+  if (!cell || !table) { notify("Cliquez d'abord dans une cellule du tableau.", "error"); return }
+  const firstRow = table.querySelector("tr")
+  if (firstRow && firstRow.children.length <= 1) { notify("Le tableau doit garder au moins une colonne.", "error"); return }
+  const idx = Array.prototype.indexOf.call(cell.parentElement.children, cell)
+  if (!window.confirm("Voulez-vous vraiment supprimer cette colonne du tableau ?")) return
+  table.querySelectorAll("tr").forEach(tr => { tr.children[idx]?.remove() })
+  syncTextEditorContent()
+}
+
+const deleteTable = () => {
+  const cell = findActiveTableCell()
+  const table = cell?.closest("table")
+  if (!cell || !table) { notify("Cliquez d'abord dans une cellule du tableau.", "error"); return }
+  if (!window.confirm("Voulez-vous vraiment supprimer ce tableau ?")) return
+  table.remove()
+  syncTextEditorContent()
+}
+
 // ── Déplacement des sections par glisser-déposer ─────────────────
 const startSectionDrag = (index, event) => {
   dragSectionIndex.value = index
@@ -3622,17 +3713,18 @@ const setPageStyle = (type, value) => {
                 v-if="activeSectionIndex===i"
                 class="text-format-toolbar"
                 @mousedown.stop
+                @touchstart.stop
               >
-                <button type="button" title="Gras" @mousedown.prevent="applyTextFormat('bold')"><b>B</b></button>
-                <button type="button" title="Italique" @mousedown.prevent="applyTextFormat('italic')"><i>I</i></button>
-                <button type="button" title="Souligné" @mousedown.prevent="applyTextFormat('underline')"><u>U</u></button>
-                <button type="button" title="Barré" @mousedown.prevent="applyTextFormat('strikeThrough')"><s>S</s></button>
+                <button type="button" title="Gras" @mousedown.prevent="applyTextFormat('bold')" @touchstart.prevent="applyTextFormat('bold')"><b>B</b></button>
+                <button type="button" title="Italique" @mousedown.prevent="applyTextFormat('italic')" @touchstart.prevent="applyTextFormat('italic')"><i>I</i></button>
+                <button type="button" title="Souligné" @mousedown.prevent="applyTextFormat('underline')" @touchstart.prevent="applyTextFormat('underline')"><u>U</u></button>
+                <button type="button" title="Barré" @mousedown.prevent="applyTextFormat('strikeThrough')" @touchstart.prevent="applyTextFormat('strikeThrough')"><s>S</s></button>
                 <span class="toolbar-separator"></span>
-                <button type="button" title="Titre" @mousedown.prevent="applyTextFormat('formatBlock','h2')">H</button>
-                <button type="button" title="Liste à puces" @mousedown.prevent="applyTextFormat('insertUnorderedList')">•☰</button>
-                <button type="button" title="Liste numérotée" @mousedown.prevent="applyTextFormat('insertOrderedList')">1☰</button>
-                <button type="button" title="Aligner à gauche" @mousedown.prevent="applyTextFormat('justifyLeft')">≡</button>
-                <button type="button" title="Centrer" @mousedown.prevent="applyTextFormat('justifyCenter')">≡</button>
+                <button type="button" title="Titre" @mousedown.prevent="applyTextFormat('formatBlock','h2')" @touchstart.prevent="applyTextFormat('formatBlock','h2')">H</button>
+                <button type="button" title="Liste à puces" @mousedown.prevent="applyTextFormat('insertUnorderedList')" @touchstart.prevent="applyTextFormat('insertUnorderedList')">•☰</button>
+                <button type="button" title="Liste numérotée" @mousedown.prevent="applyTextFormat('insertOrderedList')" @touchstart.prevent="applyTextFormat('insertOrderedList')">1☰</button>
+                <button type="button" title="Aligner à gauche" @mousedown.prevent="applyTextFormat('justifyLeft')" @touchstart.prevent="applyTextFormat('justifyLeft')">≡</button>
+                <button type="button" title="Centrer" @mousedown.prevent="applyTextFormat('justifyCenter')" @touchstart.prevent="applyTextFormat('justifyCenter')">≡</button>
 
                 <span class="toolbar-separator"></span>
 
@@ -3647,6 +3739,7 @@ const setPageStyle = (type, value) => {
                     :style="{ backgroundColor: color }"
                     :title="'Texte ' + color"
                     @mousedown.prevent="applyTextColor(color, false)"
+                    @touchstart.prevent="applyTextColor(color, false)"
                   ></button>
                   <input
                     type="color"
@@ -3654,6 +3747,7 @@ const setPageStyle = (type, value) => {
                     value="#111111"
                     title="Choisir une couleur de texte"
                     @mousedown.stop
+                    @touchstart.stop
                     @change="applyTextColor($event.target.value, false)"
                   />
                 </span>
@@ -3669,6 +3763,7 @@ const setPageStyle = (type, value) => {
                     :style="{ backgroundColor: color }"
                     :title="'Arrière-plan ' + color"
                     @mousedown.prevent="applyTextColor(color, true)"
+                    @touchstart.prevent="applyTextColor(color, true)"
                   ></button>
                   <input
                     type="color"
@@ -3676,14 +3771,22 @@ const setPageStyle = (type, value) => {
                     value="#ffff00"
                     title="Choisir une couleur d'arrière-plan"
                     @mousedown.stop
+                    @touchstart.stop
                     @change="applyTextColor($event.target.value, true)"
                   />
                 </span>
 
                 <span class="toolbar-separator"></span>
-                <button type="button" class="toolbar-media-btn" title="Téléverser une image dans le texte" @mousedown.prevent="openTextImagePicker(s.id)">🖼️ Image</button>
-                <button type="button" class="toolbar-media-btn" title="Téléverser une vidéo dans le texte" @mousedown.prevent="openTextVideoPicker(s.id)">🎬 Vidéo</button>
-                <button type="button" class="toolbar-media-btn" title="Insérer une vidéo depuis une URL" @mousedown.prevent="insertTextVideo(s.id)">🔗 URL</button>
+                <button type="button" class="toolbar-media-btn" title="Téléverser une image dans le texte" @mousedown.prevent="openTextImagePicker(s.id)" @touchstart.prevent="openTextImagePicker(s.id)">🖼️ Image</button>
+                <button type="button" class="toolbar-media-btn" title="Téléverser une vidéo dans le texte" @mousedown.prevent="openTextVideoPicker(s.id)" @touchstart.prevent="openTextVideoPicker(s.id)">🎬 Vidéo</button>
+                <button type="button" class="toolbar-media-btn" title="Insérer une vidéo depuis une URL" @mousedown.prevent="insertTextVideo(s.id)" @touchstart.prevent="insertTextVideo(s.id)">🔗 URL</button>
+                <span class="toolbar-separator"></span>
+                <button type="button" class="toolbar-media-btn" title="Insérer un tableau" @mousedown.prevent="insertTextTable(s.id)" @touchstart.prevent="insertTextTable(s.id)">📊 Tableau</button>
+                <button type="button" title="Ajouter une ligne" @mousedown.prevent="addTableRow()" @touchstart.prevent="addTableRow()">➕⎯</button>
+                <button type="button" title="Ajouter une colonne" @mousedown.prevent="addTableColumn()" @touchstart.prevent="addTableColumn()">➕│</button>
+                <button type="button" title="Supprimer la ligne" @mousedown.prevent="deleteTableRow()" @touchstart.prevent="deleteTableRow()">➖⎯</button>
+                <button type="button" title="Supprimer la colonne" @mousedown.prevent="deleteTableColumn()" @touchstart.prevent="deleteTableColumn()">➖│</button>
+                <button type="button" title="Supprimer le tableau" @mousedown.prevent="deleteTable()" @touchstart.prevent="deleteTable()">🗑️ Tableau</button>
               </div>
               <div class="rich-text-editor-wrap">
               <div
@@ -4156,7 +4259,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .section-block.is-active{border-color:var(--accent)!important}
 .section-block.is-dragging{opacity:.45}
 .section-block.drag-over{border-color:var(--accent2);box-shadow:inset 0 -3px 0 var(--accent2)}
-.section-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:10;opacity:0;transition:opacity .15s}
+.section-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:20;opacity:0;transition:opacity .15s}
 .section-block:hover .section-actions,.section-block.is-active .section-actions{opacity:1}
 .section-actions button{background:#fff;border:1px solid #ddd;border-radius:4px;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;transition:all .15s}
 .section-actions button:hover{background:#f0f0f0}
@@ -4182,7 +4285,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .rich-text-editor h1,.rich-text-editor h2,.rich-text-editor h3{color:#1a1a2e;margin:8px 0 10px;line-height:1.25}
 .rich-text-editor ul,.rich-text-editor ol{padding-left:24px;margin:8px 0}
 .rich-text-editor blockquote{border-left:3px solid var(--accent);padding-left:12px;color:#6b7280;margin:8px 0}
-.text-format-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px 8px;background:#1f1f23;border:1px solid #35353c;border-radius:8px;box-shadow:0 5px 16px rgba(0,0,0,.16);position:sticky;top:8px;z-index:12}
+.text-format-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:34px;margin-bottom:8px;padding:6px 8px;background:#1f1f23;border:1px solid #35353c;border-radius:8px;box-shadow:0 5px 16px rgba(0,0,0,.16);position:sticky;top:8px;z-index:12}
 .text-format-toolbar button{min-width:28px;height:28px;padding:3px 7px;border:1px solid #4a4a55;border-radius:5px;background:#2a2a30;color:#f0f0f0;cursor:pointer;font-family:'DM Sans',sans-serif}
 .text-format-toolbar button:hover{background:var(--accent);border-color:var(--accent)}
 .text-format-toolbar .toolbar-media-btn{font-size:11px;font-weight:600}
@@ -4199,6 +4302,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
 .inline-media-video-wrap{width:100%;margin:12px 0;aspect-ratio:16/9}
 .inline-media-video-wrap iframe{width:100%;height:100%;border:0;border-radius:8px}
 .inline-media-video{display:block;width:100%;max-height:460px;border-radius:8px;margin:12px 0}
+.inline-text-table{border-collapse:collapse;width:100%;margin:12px 0}
+.inline-text-table td,.inline-text-table th{border:1px solid #d1d5db;padding:8px 10px;min-width:32px}
+.inline-text-table th{background:#f3f4f6;font-weight:700}
 .sec-spacer{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(135deg,#fafafa,#fafafa 8px,#f3f4f6 8px,#f3f4f6 16px);color:#9ca3af;font-size:11px;letter-spacing:.2px;min-height:8px}
 .spacer-size-value{display:block;color:#9ca3af;font-size:11px;margin-top:4px}
 .sec-image{padding:20px 40px}
