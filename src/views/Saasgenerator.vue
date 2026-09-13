@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue"
+import { ref, computed, onMounted, watch, markRaw } from "vue"
 import { db, auth } from "../firebase.js"
 import { doc, getDoc, setDoc, collection, writeBatch, deleteDoc, getDocs, query, where } from "firebase/firestore"
 import { onAuthStateChanged, signOut } from "firebase/auth" 
@@ -335,6 +335,20 @@ onMounted(() => {
         const d = snap.data()
         if (d.siteData) {
           site.value = d.siteData
+          // Les sections "data" peuvent contenir des milliers de lignes (sites
+          // publiés avant l'introduction de siteDataSections, ou tables Access/MySQL
+          // volumineuses). Ces lignes n'ont pas besoin d'être réactives ligne par
+          // ligne : les marquer "raw" empêche le deep-watch ci-dessous de les
+          // reparcourir à chaque frappe, ce qui évitait sinon des ralentissements
+          // sévères, voire un plantage de l'onglet, sur les comptes avec beaucoup
+          // de données importées.
+          site.value.pages?.forEach(page => {
+            page.sections?.forEach(section => {
+              if (section.type === 'data' && Array.isArray(section.rows) && section.rows.length) {
+                section.rows = markRaw(section.rows)
+              }
+            })
+          })
           // Toujours garantir les champs nouveaux après chargement Firestore
           if (!site.value.legal) site.value.legal = { mentions: "", cgv: "", privacy: "", privacyPolicy: "", remboursement: "" }
           if (!site.value.legal.privacyPolicy) site.value.legal.privacyPolicy = ""
@@ -1605,7 +1619,7 @@ const loadAccessTable = async (section, tableName) => {
       throw new Error('Cette table est trop volumineuse pour être enregistrée. Réduisez le nombre de lignes/colonnes.')
     }
     section.columns = incomingColumns
-    section.rows = incomingRows
+    section.rows = markRaw(incomingRows)
     section.sourceType = 'access'
     section.sourceName = `${section.sourceName || 'Access'} — ${tableName}`
     section.currentPage = 1
@@ -1673,7 +1687,7 @@ const loadMysqlTable = async (section, tableName) => {
       throw new Error('Cette table est trop volumineuse pour être enregistrée. Réduisez le nombre de lignes/colonnes.')
     }
     section.columns = incomingColumns
-    section.rows = incomingRows
+    section.rows = markRaw(incomingRows)
     section.sourceType = 'mysql'
     section.sourceName = `${section.mysql.database || 'MySQL'} — ${tableName}`
     section.currentPage = 1
@@ -1706,7 +1720,7 @@ const importDataFile = async (event) => {
       throw new Error('Le fichier est trop volumineux une fois converti. Réduisez le nombre de lignes/colonnes.')
     }
     section.columns = parsed.columns
-    section.rows = parsed.rows
+    section.rows = markRaw(parsed.rows)
     section.sourceName = parsed.sourceSheet ? `${file.name} — ${parsed.sourceSheet}` : file.name
     if (!section.display) section.display = 'table'
     notify(`${parsed.rows.length} lignes importées depuis ${file.name} ✓`)
